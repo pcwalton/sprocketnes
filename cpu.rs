@@ -91,7 +91,7 @@ struct Regs {
 }
 
 impl Regs {
-    static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0, flags: 0, pc: 0 } }
+    static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
 }
 
 //
@@ -159,7 +159,9 @@ pub impl CpuDebug {
         }
     }
     #[cfg(debug)]
-    fn snapshot(&mut self, regs: &mut Regs) {
+    fn snapshot(&mut self, cy: Cycles, regs: &mut Regs) {
+        self.mnem = None;
+        self.cy_snapshot = cy;
         self.regs_snapshot = *regs;
     }
     #[cfg(debug)]
@@ -180,7 +182,7 @@ pub impl CpuDebug {
     #[cfg(ndebug)]
     static fn new() -> CpuDebug { CpuDebug }
     #[cfg(ndebug)]
-    fn snapshot(&mut self, _: &mut Regs) {}
+    fn snapshot(&mut self, _: Cycles, _: &mut Regs) {}
     #[cfg(ndebug)]
     fn print(&mut self) {}
 }
@@ -284,18 +286,38 @@ pub impl<M:Mem> Cpu<M> {
     //
 
     // Loads
-    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.a = self.set_zn(am.load(self)) }
-    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.x = self.set_zn(am.load(self)) }
-    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.y = self.set_zn(am.load(self)) }
+    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("lda");
+        self.regs.a = self.set_zn(am.load(self))
+    }
+    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("ldx");
+        self.regs.x = self.set_zn(am.load(self))
+    }
+    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("ldy");
+        self.regs.y = self.set_zn(am.load(self))
+    }
 
     // Stores
-    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.a) }
-    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.x) }
-    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.y) }
+    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("sta");
+        am.store(self, self.regs.a)
+    }
+    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("stx");
+        am.store(self, self.regs.x)
+    }
+    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("sty");
+        am.store(self, self.regs.y)
+    }
 
     // Arithmetic
     #[inline(always)]
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("adc");
+
         let val = am.load(self);
         let mut result = self.regs.a as u32 + val as u32;
         if self.get_flag(CARRY_FLAG) {
@@ -307,6 +329,8 @@ pub impl<M:Mem> Cpu<M> {
     }
     #[inline(always)]
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("sbc");
+
         let val = am.load(self);
         let mut result = self.regs.a as u32 - val as u32;
         if !self.get_flag(CARRY_FLAG) {
@@ -324,21 +348,35 @@ pub impl<M:Mem> Cpu<M> {
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
         self.regs.a = self.set_zn(result as u8);
     }
-    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.a, am) }
-    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.x, am) }
-    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.y, am) }
+    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("cmp");
+        self.cmp_base(self.regs.a, am)
+    }
+    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("cpx");
+        self.cmp_base(self.regs.x, am)
+    }
+    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("cpy");
+        self.cmp_base(self.regs.y, am)
+    }
 
     // Bitwise operations
     fn and<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("and");
         self.regs.a = self.set_zn(am.load(self) & self.regs.a)
     }
     fn ora<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("ora");
         self.regs.a = self.set_zn(am.load(self) | self.regs.a)
     }
     fn eor<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("eor");
         self.regs.a = self.set_zn(am.load(self) ^ self.regs.a)
     }
     fn bit<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("bit");
+
         let val = am.load(self);
         self.set_flag(ZERO_FLAG, (val & self.regs.a) == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
@@ -367,42 +405,46 @@ pub impl<M:Mem> Cpu<M> {
         am.store(self, self.set_zn(result as u8))
     }
     fn rol<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("rol");
         self.shl_base(self.get_flag(CARRY_FLAG), am)
     }
     fn ror<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("ror");
         self.shr_base(self.get_flag(CARRY_FLAG), am)
     }
-    fn asl<AM:AddressingMode<M>>(&mut self, am: AM) { self.shl_base(false, am) }
-    fn lsr<AM:AddressingMode<M>>(&mut self, am: AM) { self.shr_base(false, am) }
+    fn asl<AM:AddressingMode<M>>(&mut self, am: AM) { self.mnem("asl"); self.shl_base(false, am) }
+    fn lsr<AM:AddressingMode<M>>(&mut self, am: AM) { self.mnem("lsr"); self.shr_base(false, am) }
 
     // Increments and decrements
     fn inc<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("inc");
         am.store(self, self.set_zn(am.load(self) + 1))
     }
     fn dec<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.mnem("dec");
         am.store(self, self.set_zn(am.load(self) - 1))
     }
-    fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
-    fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }
-    fn iny(&mut self) { self.regs.y = self.set_zn(self.regs.y + 1) }
-    fn dey(&mut self) { self.regs.y = self.set_zn(self.regs.y - 1) }
+    fn inx(&mut self) { self.mnem("inx"); self.regs.x = self.set_zn(self.regs.x + 1) }
+    fn dex(&mut self) { self.mnem("dex"); self.regs.x = self.set_zn(self.regs.x - 1) }
+    fn iny(&mut self) { self.mnem("iny"); self.regs.y = self.set_zn(self.regs.y + 1) }
+    fn dey(&mut self) { self.mnem("dey"); self.regs.y = self.set_zn(self.regs.y - 1) }
 
     // Register moves
-    fn tax(&mut self) { self.regs.x = self.set_zn(self.regs.a) }
-    fn tay(&mut self) { self.regs.y = self.set_zn(self.regs.a) }
-    fn txa(&mut self) { self.regs.a = self.set_zn(self.regs.x) }
-    fn tya(&mut self) { self.regs.a = self.set_zn(self.regs.y) }
-    fn txs(&mut self) { self.regs.s = self.regs.x }
-    fn tsx(&mut self) { self.regs.x = self.regs.s }
+    fn tax(&mut self) { self.mnem("tax"); self.regs.x = self.set_zn(self.regs.a) }
+    fn tay(&mut self) { self.mnem("tay"); self.regs.y = self.set_zn(self.regs.a) }
+    fn txa(&mut self) { self.mnem("txa"); self.regs.a = self.set_zn(self.regs.x) }
+    fn tya(&mut self) { self.mnem("tya"); self.regs.a = self.set_zn(self.regs.y) }
+    fn txs(&mut self) { self.mnem("txs"); self.regs.s = self.regs.x }
+    fn tsx(&mut self) { self.mnem("tsx"); self.regs.x = self.regs.s }
 
     // Flag operations
-    fn clc(&mut self) { self.set_flag(CARRY_FLAG, false) }
-    fn sec(&mut self) { self.set_flag(CARRY_FLAG, true) }
-    fn cli(&mut self) { self.set_flag(IRQ_FLAG, false) }
-    fn sei(&mut self) { self.set_flag(IRQ_FLAG, true) }
-    fn clv(&mut self) { self.set_flag(OVERFLOW_FLAG, false) }
-    fn cld(&mut self) { self.set_flag(DECIMAL_FLAG, false) }
-    fn sed(&mut self) { self.set_flag(DECIMAL_FLAG, true) }
+    fn clc(&mut self) { self.mnem("clc"); self.set_flag(CARRY_FLAG, false) }
+    fn sec(&mut self) { self.mnem("sec"); self.set_flag(CARRY_FLAG, true) }
+    fn cli(&mut self) { self.mnem("cli"); self.set_flag(IRQ_FLAG, false) }
+    fn sei(&mut self) { self.mnem("sei");  self.set_flag(IRQ_FLAG, true) }
+    fn clv(&mut self) { self.mnem("clv");  self.set_flag(OVERFLOW_FLAG, false) }
+    fn cld(&mut self) { self.mnem("cld");  self.set_flag(DECIMAL_FLAG, false) }
+    fn sed(&mut self) { self.mnem("sed");  self.set_flag(DECIMAL_FLAG, true) }
 
     // Branches
     fn bra_base(&mut self, cond: bool) {
@@ -411,14 +453,14 @@ pub impl<M:Mem> Cpu<M> {
             self.regs.pc = (self.regs.pc as i32 + disp as i32) as u16;
         }
     }
-    fn bpl(&mut self) { self.bra_base(!self.get_flag(NEGATIVE_FLAG)) }
-    fn bmi(&mut self) { self.bra_base(self.get_flag(NEGATIVE_FLAG))  }
-    fn bvc(&mut self) { self.bra_base(!self.get_flag(OVERFLOW_FLAG)) }
-    fn bvs(&mut self) { self.bra_base(self.get_flag(OVERFLOW_FLAG))  }
-    fn bcc(&mut self) { self.bra_base(!self.get_flag(CARRY_FLAG))    }
-    fn bcs(&mut self) { self.bra_base(self.get_flag(CARRY_FLAG))     }
-    fn bne(&mut self) { self.bra_base(!self.get_flag(ZERO_FLAG))     }
-    fn beq(&mut self) { self.bra_base(self.get_flag(ZERO_FLAG))      }
+    fn bpl(&mut self) { self.mnem("bpl"); self.bra_base(!self.get_flag(NEGATIVE_FLAG)) }
+    fn bmi(&mut self) { self.mnem("bmi"); self.bra_base(self.get_flag(NEGATIVE_FLAG))  }
+    fn bvc(&mut self) { self.mnem("bvc"); self.bra_base(!self.get_flag(OVERFLOW_FLAG)) }
+    fn bvs(&mut self) { self.mnem("bvs"); self.bra_base(self.get_flag(OVERFLOW_FLAG))  }
+    fn bcc(&mut self) { self.mnem("bcc"); self.bra_base(!self.get_flag(CARRY_FLAG))    }
+    fn bcs(&mut self) { self.mnem("bcs"); self.bra_base(self.get_flag(CARRY_FLAG))     }
+    fn bne(&mut self) { self.mnem("bne"); self.bra_base(!self.get_flag(ZERO_FLAG))     }
+    fn beq(&mut self) { self.mnem("beq"); self.bra_base(self.get_flag(ZERO_FLAG))      }
 
     // Jumps
     fn jmp(&mut self) { self.mnem("jmp"); self.regs.pc = self.loadw_bump_pc() }
@@ -435,31 +477,40 @@ pub impl<M:Mem> Cpu<M> {
 
     // Procedure calls
     fn jsr(&mut self) {
+        self.mnem("jsr");
+
         let addr = self.loadw_bump_pc();
         self.pushw(self.regs.pc - 1);
         self.regs.pc = addr;
     }
-    fn rts(&mut self) { self.regs.pc = self.popw() + 1 }
+    fn rts(&mut self) { self.mnem("rts"); self.regs.pc = self.popw() + 1 }
     fn brk(&mut self) {
+        self.mnem("brk");
+
         self.pushw(self.regs.pc + 1);
         self.pushb(self.regs.flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
         self.set_flag(IRQ_FLAG, true);
         self.regs.pc = self.mem.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
+        self.mnem("rti");
+
         self.regs.flags = self.popb();
         self.regs.pc = self.popw(); // NB: no + 1
     }
 
     // Stack operations
-    fn pha(&mut self) { self.pushb(self.regs.a) }
-    fn pla(&mut self) { self.regs.a = self.popb() }
-    fn php(&mut self) { self.pushb(self.regs.flags) }
-    fn plp(&mut self) { self.regs.flags = self.popb() }
+    fn pha(&mut self) { self.mnem("pha"); self.pushb(self.regs.a) }
+    fn pla(&mut self) { self.mnem("pla"); self.regs.a = self.popb() }
+    fn php(&mut self) { self.mnem("php"); self.pushb(self.regs.flags) }
+    fn plp(&mut self) { self.mnem("plp"); self.regs.flags = self.popb() }
+
+    // No operation
+    fn nop(&mut self) { self.mnem("nop"); }
 
     // The main fetch-and-decode routine
     fn step(&mut self) {
-        self.debug.snapshot(&mut self.regs);
+        self.debug.snapshot(self.cy, &mut self.regs);
 
         // We try to keep this in the same order as the implementations above.
         // TODO: Use arm macros to fix some of this duplication.
@@ -657,7 +708,7 @@ pub impl<M:Mem> Cpu<M> {
             0x28 => self.plp(),
 
             // No operation
-            0xea => (),
+            0xea => self.nop(),
 
             _ => fail ~"unimplemented or illegal instruction"
         }

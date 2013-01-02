@@ -14,7 +14,7 @@ use core::libc::size_t;
 use core::{libc, os, str};
 
 // Currently io GC's. This is obviously bad. To work around this I am not using it.
-fn println(s: &str) {
+pub fn println(s: &str) {
     unsafe {
         libc::write(2, transmute(&s[0]), s.len() as size_t); 
         libc::write(2, transmute(&'\n'), 1);
@@ -34,7 +34,9 @@ fn main() {
 
     let mapper = Mapper::new(&rom);
     let mut cpu = Cpu::new(mapper);
-    cpu.reset();
+
+    // TODO: For testing purposes (nestest.log)...
+    // cpu.reset();
 
     for 1000.times {
         cpu.step();
