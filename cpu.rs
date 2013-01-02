@@ -58,7 +58,7 @@ pub trait Mem {
 }
 
 /// A basic memory interface used for testing.
-struct SimpleMem {
+pub struct SimpleMem {
     data: [u8 * 65536]  // FIXME: Stub.
 }
 
@@ -121,19 +121,23 @@ impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
 
 type Cycles = u64;
 
-struct Cpu<M> {
+pub struct Cpu<M> {
     cy: Cycles,
     regs: Regs,
     mem: M,
 }
 
-impl<M:Mem> Cpu<M> {
+// FIXME: This should not need to be public! Sigh. Resolve bug.
+pub impl<M:Mem> Cpu<M> {
     // Memory access helpers
+    /// Loads the byte at the program counter and increments the program counter.
     fn loadb_bump_pc(&mut self) -> u8 {
         let val = self.mem.loadb(self.regs.pc);
         self.regs.pc += 1;
         val
     }
+    /// Loads two bytes (little-endian) at the program counter and bumps the program counter over
+    /// them.
     fn loadw_bump_pc(&mut self) -> u16 {
         let val = self.mem.loadw(self.regs.pc);
         self.regs.pc += 2;
@@ -590,24 +594,14 @@ impl<M:Mem> Cpu<M> {
 
         self.cy += CYCLE_TABLE[op] as Cycles;
     }
-}
 
-fn main() {
-    let mut cpu = Cpu {
-        cy: 0,
-        regs: Regs {
-            a: 0,
-            x: 0,
-            y: 0,
-            s: 0,
-            flags: 0,
-            pc: 0
-        },
-        mem: SimpleMem {
-            data: [ 0, ..65536 ]
+    /// The constructor.
+    static fn new(mem: M) -> Cpu<M> {
+        Cpu {
+            cy: 0,
+            regs: Regs { a: 0, x: 0, y: 0, s: 0, flags: 0, pc: 0 },
+            mem: mem
         }
-    };
-    cpu.step();
+    }
 }
-
 
