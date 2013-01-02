@@ -78,3 +78,18 @@ struct INesHeader {
     zero: [u8 * 5],     // always zero
 }
 
+impl INesHeader {
+    fn mapper(&self) -> u8 {
+        (self.flags_7 & 0xf0) | (self.flags_6 >> 4)
+    }
+
+    fn to_str(&self) -> ~str {
+        fmt!(
+            "PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d",
+            self.prg_rom_size as int,
+            self.chr_rom_size as int,
+            self.mapper() as int
+        )
+    }
+}
+

@@ -17,7 +17,8 @@ const BREAK_FLAG:    u8 = 1 << 4;
 const OVERFLOW_FLAG: u8 = 1 << 6;
 const NEGATIVE_FLAG: u8 = 1 << 7;
 
-const RESET_VECTOR: u16 = 0xfffe;
+const RESET_VECTOR: u16 = 0xfffc; 
+const BRK_VECTOR:   u16 = 0xfffe;
 
 /// The number of cycles that each machine operation takes. Indexed by opcode number.
 ///
@@ -76,6 +77,10 @@ impl SimpleMem : Mem {
     }
 }
 
+//
+// Registers
+//
+
 struct Regs {
     a: u8,
     x: u8,
@@ -83,6 +88,10 @@ struct Regs {
     s: u8,
     flags: u8,
     pc: u16
+}
+
+impl Regs {
+    static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0, flags: 0, pc: 0 } }
 }
 
 //
@@ -121,14 +130,69 @@ impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
 
 type Cycles = u64;
 
+/// The main CPU structure definition.
 pub struct Cpu<M> {
     cy: Cycles,
     regs: Regs,
+    debug: CpuDebug,
     mem: M,
+}
+
+// Debugging
+#[cfg(debug)]
+pub struct CpuDebug {
+    mnem: Option<&static/str>,
+    cy_snapshot: Cycles,
+    regs_snapshot: Regs,
+}
+#[cfg(ndebug)]
+pub struct CpuDebug;
+
+// FIXME: This should not need to be public! Sigh. Resolve bug.
+pub impl CpuDebug {
+    #[cfg(debug)]
+    static fn new() -> CpuDebug {
+        CpuDebug {
+            mnem: None,
+            cy_snapshot: 0,
+            regs_snapshot: Regs::new()
+        }
+    }
+    #[cfg(debug)]
+    fn snapshot(&mut self, regs: &mut Regs) {
+        self.regs_snapshot = *regs;
+    }
+    #[cfg(debug)]
+    fn print(&mut self) {
+        io::println(fmt!(
+            "%04x %s A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%4u",
+            self.regs_snapshot.pc as uint,
+            match self.mnem { None => "???", Some(m) => m },
+            self.regs_snapshot.a as uint,
+            self.regs_snapshot.x as uint,
+            self.regs_snapshot.y as uint,
+            self.regs_snapshot.flags as uint,
+            self.regs_snapshot.s as uint,
+            self.cy_snapshot as uint
+        ));
+    }
+
+    #[cfg(ndebug)]
+    static fn new() -> CpuDebug { CpuDebug }
+    #[cfg(ndebug)]
+    fn snapshot(&mut self, _: &mut Regs) {}
+    #[cfg(ndebug)]
+    fn print(&mut self) {}
 }
 
 // FIXME: This should not need to be public! Sigh. Resolve bug.
 pub impl<M:Mem> Cpu<M> {
+    // Debugging
+    #[cfg(debug)]
+    fn mnem(&mut self, mnemonic: &static/str) { self.debug.mnem = Some(mnemonic) }
+    #[cfg(ndebug)]
+    fn mnem(&mut self, _: &static/str) {}
+
     // Memory access helpers
     /// Loads the byte at the program counter and increments the program counter.
     fn loadb_bump_pc(&mut self) -> u8 {
@@ -357,12 +421,15 @@ pub impl<M:Mem> Cpu<M> {
     fn beq(&mut self) { self.bra_base(self.get_flag(ZERO_FLAG))      }
 
     // Jumps
-    fn jmp(&mut self) { self.regs.pc = self.loadw_bump_pc() }
+    fn jmp(&mut self) { self.mnem("jmp"); self.regs.pc = self.loadw_bump_pc() }
     fn jmpi(&mut self) {
+        self.mnem("jmp");
+
         // Replicate the famous CPU bug...
         let pc_high = self.regs.pc & 0xff00;
         let lo = self.loadb_bump_pc();
         let hi = self.mem.loadb((self.regs.pc & 0x00ff) | pc_high);
+
         self.regs.pc = (hi as u16 << 8) | lo as u16;
     }
 
@@ -377,7 +444,7 @@ pub impl<M:Mem> Cpu<M> {
         self.pushw(self.regs.pc + 1);
         self.pushb(self.regs.flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
         self.set_flag(IRQ_FLAG, true);
-        self.regs.pc = self.mem.loadw(RESET_VECTOR);
+        self.regs.pc = self.mem.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
         self.regs.flags = self.popb();
@@ -392,6 +459,8 @@ pub impl<M:Mem> Cpu<M> {
 
     // The main fetch-and-decode routine
     fn step(&mut self) {
+        self.debug.snapshot(&mut self.regs);
+
         // We try to keep this in the same order as the implementations above.
         // TODO: Use arm macros to fix some of this duplication.
         let op = self.loadb_bump_pc();
@@ -594,13 +663,21 @@ pub impl<M:Mem> Cpu<M> {
         }
 
         self.cy += CYCLE_TABLE[op] as Cycles;
+
+        self.debug.print();
+    }
+
+    /// External interfaces
+    fn reset(&mut self) {
+        self.regs.pc = self.mem.loadw(RESET_VECTOR);
     }
 
     /// The constructor.
     static fn new(mem: M) -> Cpu<M> {
         Cpu {
             cy: 0,
-            regs: Regs { a: 0, x: 0, y: 0, s: 0, flags: 0, pc: 0 },
+            regs: Regs::new(),
+            debug: CpuDebug::new(),
             mem: mem
         }
     }

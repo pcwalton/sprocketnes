@@ -7,6 +7,7 @@
 
 mod cpu;
 mod main;
+mod mapper;
 mod rom;
 
 

@@ -6,6 +6,7 @@
 //
 
 use cpu::{Cpu, SimpleMem};
+use mapper::Mapper;
 use rom::Rom;
 
 use core::cast::transmute;
@@ -22,15 +23,21 @@ fn println(s: &str) {
 
 fn main() {
     let args = os::args();
-    if args.len() < 1 {
+    if args.len() < 2 {
         println("usage: sprocketnes <path-to-rom>");
         return;
     }
 
     let rom = Rom::from_path(args[1]);
-    debug!("io header is %?", rom.header);
+    println("Loaded ROM:");
+    println(rom.header.to_str());
 
-    let mut cpu = Cpu::new(SimpleMem { data: [ 0, ..65536 ] });
-    cpu.step();
+    let mapper = Mapper::new(&rom);
+    let mut cpu = Cpu::new(mapper);
+    cpu.reset();
+
+    for 1000.times {
+        cpu.step();
+    }
 }
 
