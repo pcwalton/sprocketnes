@@ -5,6 +5,8 @@
 // Author: Patrick Walton
 //
 
+use main::println;
+
 //
 // Constants
 //
@@ -147,8 +149,8 @@ pub impl CpuDebug {
     }
     #[cfg(debug)]
     fn print(&mut self) {
-        io::println(fmt!(
-            "%04x %s A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%4u",
+        println(fmt!(
+            "%04X %s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
             self.regs_snapshot.pc as uint,
             match self.mnem { None => "???", Some(m) => m },
             self.regs_snapshot.a as uint,
