@@ -318,12 +318,12 @@ pub impl<M:Mem> Cpu<M> {
     fn dec<AM:AddressingMode<M>>(&mut self, am: AM) {
         am.store(self, self.set_zn(am.load(self) - 1))
     }
-
-    // Register operations
     fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
-    fn iny(&mut self) { self.regs.y = self.set_zn(self.regs.y + 1) }
     fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }
+    fn iny(&mut self) { self.regs.y = self.set_zn(self.regs.y + 1) }
     fn dey(&mut self) { self.regs.y = self.set_zn(self.regs.y - 1) }
+
+    // Register moves
     fn tax(&mut self) { self.regs.x = self.set_zn(self.regs.a) }
     fn tay(&mut self) { self.regs.y = self.set_zn(self.regs.a) }
     fn txa(&mut self) { self.regs.a = self.set_zn(self.regs.x) }
@@ -539,11 +539,12 @@ pub impl<M:Mem> Cpu<M> {
             0xce => self.dec(self.absolute()),
             0xde => self.dec(self.absolute_x()),
 
-            // Register operations
             0xe8 => self.inx(),
-            0xc8 => self.iny(),
             0xca => self.dex(),
+            0xc8 => self.iny(),
             0x88 => self.dey(),
+
+            // Register moves
             0xaa => self.tax(),
             0xa8 => self.tay(),
             0x8a => self.txa(),
