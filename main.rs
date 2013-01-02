@@ -5,7 +5,7 @@
 // Author: Patrick Walton
 //
 
-use cpu::{Cpu, SimpleMem};
+use cpu::Cpu;
 use mapper::Mapper;
 use rom::Rom;
 

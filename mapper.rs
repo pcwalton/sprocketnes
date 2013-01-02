@@ -67,6 +67,7 @@ pub impl Nrom : IMapper {
         if addr <= 0x8000 {
             0   // FIXME
         } else {
+            // FIXME: Unsafe get for speed?
             this.rom.prg[addr & 0x3fff]
         }
     }

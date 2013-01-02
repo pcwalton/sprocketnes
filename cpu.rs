@@ -58,25 +58,6 @@ pub trait Mem {
     fn storew(&mut self, addr: u16, val: u16);
 }
 
-/// A basic memory interface used for testing.
-pub struct SimpleMem {
-    data: [u8 * 65536]  // FIXME: Stub.
-}
-
-impl SimpleMem : Mem {
-    fn loadb(&mut self, addr: u16) -> u8     { self.data[addr] }
-    fn storeb(&mut self, addr: u16, val: u8) { self.data[addr] = val }
-    fn loadw(&mut self, addr: u16) -> u16 {
-        // FIXME: On x86 use unsafe code to do an unaligned read.
-        self.data[addr] as u16 | (self.data[addr + 1] as u16 << 8)
-    }
-    fn storew(&mut self, addr: u16, val: u16) {
-        // FIXME: On x86 use unsafe code to do an unaligned store.
-        self.data[addr] = val as u8;
-        self.data[addr+1] = (val >> 8) as u8;
-    }
-}
-
 //
 // Registers
 //
