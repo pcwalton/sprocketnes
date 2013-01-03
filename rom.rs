@@ -8,6 +8,7 @@
 use core::cast::transmute;
 use core::libc::{O_RDONLY, c_int, size_t, ssize_t};
 use core::libc;
+use core::str;
 use core::sys::size_of;
 use core::vec;
 

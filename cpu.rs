@@ -5,6 +5,7 @@
 // Author: Patrick Walton
 //
 
+use disasm::Disassembler;
 use main::println;
 
 //
@@ -108,6 +109,231 @@ impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
 }
 
 //
+// Opcode decoding
+//
+// This is implemented as a macro so that both the disassembler and the emulator can use it.
+//
+
+macro_rules! decode_op {
+    (
+        op: $op:expr,
+        this: $this:expr,
+        modes: [
+            $immediate:expr,
+            $accumulator:expr,
+            $zero_page:expr,
+            $zero_page_x:expr,
+            $zero_page_y:expr,
+            $absolute:expr,
+            $absolute_x:expr,
+            $absolute_y:expr,
+            $indexed_indirect_x:expr,
+            $indirect_indexed_y:expr
+        ]
+    ) => {
+        // We try to keep this in the same order as the implementations above.
+        // TODO: Use arm macros to fix some of this duplication.
+        match $op {
+            // Loads
+            0xa1 => $this.lda($indexed_indirect_x),
+            0xa5 => $this.lda($zero_page),
+            0xa9 => $this.lda($immediate),
+            0xad => $this.lda($absolute),
+            0xb1 => $this.lda($indirect_indexed_y),
+            0xb5 => $this.lda($zero_page_x),
+            0xb9 => $this.lda($absolute_y),
+            0xbd => $this.lda($absolute_x),
+
+            0xa2 => $this.ldx($immediate),
+            0xa6 => $this.ldx($zero_page),
+            0xae => $this.ldx($zero_page_y),
+            0xb6 => $this.ldx($absolute),
+            0xbe => $this.ldx($absolute_y),
+
+            0xa0 => $this.ldy($immediate),
+            0xa4 => $this.ldy($zero_page),
+            0xac => $this.ldy($zero_page_x),
+            0xb4 => $this.ldy($absolute),
+            0xbc => $this.ldy($absolute_x),
+
+            // Stores
+            0x85 => $this.sta($zero_page),
+            0x95 => $this.sta($zero_page_x),
+            0x8d => $this.sta($absolute),
+            0x9d => $this.sta($absolute_x),
+            0x99 => $this.sta($absolute_y),
+            0x81 => $this.sta($indexed_indirect_x),
+            0x91 => $this.sta($indirect_indexed_y),
+
+            0x86 => $this.stx($zero_page),
+            0x96 => $this.stx($zero_page_y),
+            0x8e => $this.stx($absolute),
+
+            0x84 => $this.sty($zero_page),
+            0x94 => $this.sty($zero_page_x),
+            0x8c => $this.sty($absolute),
+
+            // Arithmetic
+            0x69 => $this.adc($immediate),
+            0x65 => $this.adc($zero_page),
+            0x75 => $this.adc($zero_page_x),
+            0x6d => $this.adc($absolute),
+            0x7d => $this.adc($absolute_x),
+            0x79 => $this.adc($absolute_y),
+            0x61 => $this.adc($indexed_indirect_x),
+            0x71 => $this.adc($indirect_indexed_y),
+
+            0xe9 => $this.sbc($immediate),
+            0xe5 => $this.sbc($zero_page),
+            0xf5 => $this.sbc($zero_page_x),
+            0xed => $this.sbc($absolute),
+            0xfd => $this.sbc($absolute_x),
+            0xf9 => $this.sbc($absolute_y),
+            0xe1 => $this.sbc($indexed_indirect_x),
+            0xf1 => $this.sbc($indirect_indexed_y),
+
+            // Comparisons
+            0xc9 => $this.cmp($immediate),
+            0xc5 => $this.cmp($zero_page),
+            0xd5 => $this.cmp($zero_page_x),
+            0xcd => $this.cmp($absolute),
+            0xdd => $this.cmp($absolute_x),
+            0xd9 => $this.cmp($absolute_y),
+            0xc1 => $this.cmp($indexed_indirect_x),
+            0xd1 => $this.cmp($indirect_indexed_y),
+
+            0xe0 => $this.cpx($immediate),
+            0xe4 => $this.cpx($zero_page),
+            0xec => $this.cpx($absolute),
+
+            0xc0 => $this.cpy($immediate),
+            0xc4 => $this.cpy($zero_page),
+            0xcc => $this.cpy($absolute),
+
+            // Bitwise operations
+            0x29 => $this.and($immediate),
+            0x25 => $this.and($zero_page),
+            0x35 => $this.and($zero_page_x),
+            0x2d => $this.and($absolute),
+            0x3d => $this.and($absolute_x),
+            0x39 => $this.and($absolute_y),
+            0x21 => $this.and($indexed_indirect_x),
+            0x31 => $this.and($indirect_indexed_y),
+
+            0x09 => $this.ora($immediate),
+            0x05 => $this.ora($zero_page),
+            0x15 => $this.ora($zero_page_x),
+            0x0d => $this.ora($absolute),
+            0x1d => $this.ora($absolute_x),
+            0x19 => $this.ora($absolute_y),
+            0x01 => $this.ora($indexed_indirect_x),
+            0x11 => $this.ora($indirect_indexed_y),
+
+            0x49 => $this.eor($immediate),
+            0x45 => $this.eor($zero_page),
+            0x55 => $this.eor($zero_page_x),
+            0x4d => $this.eor($absolute),
+            0x5d => $this.eor($absolute_x),
+            0x59 => $this.eor($absolute_y),
+            0x41 => $this.eor($indexed_indirect_x),
+            0x51 => $this.eor($indirect_indexed_y),
+
+            0x24 => $this.bit($zero_page),
+            0x2c => $this.bit($absolute),
+
+            // Shifts and rotates
+            0x2a => $this.rol($accumulator),
+            0x26 => $this.rol($zero_page),
+            0x36 => $this.rol($zero_page_x),
+            0x2e => $this.rol($absolute),
+            0x3e => $this.rol($absolute_x),
+
+            0x6a => $this.ror($accumulator),
+            0x66 => $this.ror($zero_page),
+            0x76 => $this.ror($zero_page_x),
+            0x6e => $this.ror($absolute),
+            0x7e => $this.ror($absolute_x),
+
+            0x0a => $this.asl($accumulator),
+            0x06 => $this.asl($zero_page),
+            0x16 => $this.asl($zero_page_x),
+            0x0e => $this.asl($absolute),
+            0x1e => $this.asl($absolute_x),
+
+            0x4a => $this.lsr($accumulator),
+            0x46 => $this.lsr($zero_page),
+            0x56 => $this.lsr($zero_page_x),
+            0x4e => $this.lsr($absolute),
+            0x5e => $this.lsr($absolute_x),
+
+            // Increments and decrements
+            0xe6 => $this.inc($zero_page),
+            0xf6 => $this.inc($zero_page_x),
+            0xee => $this.inc($absolute),
+            0xfe => $this.inc($absolute_x),
+
+            0xc6 => $this.dec($zero_page),
+            0xd6 => $this.dec($zero_page_x),
+            0xce => $this.dec($absolute),
+            0xde => $this.dec($absolute_x),
+
+            0xe8 => $this.inx(),
+            0xca => $this.dex(),
+            0xc8 => $this.iny(),
+            0x88 => $this.dey(),
+
+            // Register moves
+            0xaa => $this.tax(),
+            0xa8 => $this.tay(),
+            0x8a => $this.txa(),
+            0x98 => $this.tya(),
+            0x9a => $this.txs(),
+            0xba => $this.tsx(),
+
+            // Flag operations
+            0x18 => $this.clc(),
+            0x38 => $this.sec(),
+            0x58 => $this.cli(),
+            0x78 => $this.sei(),
+            0xb8 => $this.clv(),
+            0xd8 => $this.cld(),
+            0xf8 => $this.sed(),
+
+            // Branches
+            0x10 => $this.bpl(),
+            0x30 => $this.bmi(),
+            0x50 => $this.bvc(),
+            0x70 => $this.bvs(),
+            0x90 => $this.bcc(),
+            0xb0 => $this.bcs(),
+            0xd0 => $this.bne(),
+            0xf0 => $this.beq(),
+
+            // Jumps
+            0x4c => $this.jmp(),
+            0x6c => $this.jmpi(),
+
+            // Procedure calls
+            0x20 => $this.jsr(),
+            0x60 => $this.rts(),
+            0x00 => $this.brk(),
+            0x40 => $this.rti(),
+
+            // Stack operations
+            0x48 => $this.pha(),
+            0x68 => $this.pla(),
+            0x08 => $this.php(),
+            0x28 => $this.plp(),
+
+            // No operation
+            0xea => $this.nop(),
+
+            _ => fail ~"unimplemented or illegal instruction"
+        }
+    }
+}
+
+//
 // Main CPU implementation
 //
 
@@ -117,66 +343,29 @@ type Cycles = u64;
 pub struct Cpu<M> {
     cy: Cycles,
     regs: Regs,
-    debug: CpuDebug,
     mem: M,
-}
-
-// Debugging
-#[cfg(debug)]
-pub struct CpuDebug {
-    mnem: Option<&static/str>,
-    cy_snapshot: Cycles,
-    regs_snapshot: Regs,
-}
-#[cfg(ndebug)]
-pub struct CpuDebug;
-
-// FIXME: This should not need to be public! Sigh. Resolve bug.
-pub impl CpuDebug {
-    #[cfg(debug)]
-    static fn new() -> CpuDebug {
-        CpuDebug {
-            mnem: None,
-            cy_snapshot: 0,
-            regs_snapshot: Regs::new()
-        }
-    }
-    #[cfg(debug)]
-    fn snapshot(&mut self, cy: Cycles, regs: &mut Regs) {
-        self.mnem = None;
-        self.cy_snapshot = cy;
-        self.regs_snapshot = *regs;
-    }
-    #[cfg(debug)]
-    fn print(&mut self) {
-        println(fmt!(
-            "%04X %s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
-            self.regs_snapshot.pc as uint,
-            match self.mnem { None => "???", Some(m) => m },
-            self.regs_snapshot.a as uint,
-            self.regs_snapshot.x as uint,
-            self.regs_snapshot.y as uint,
-            self.regs_snapshot.flags as uint,
-            self.regs_snapshot.s as uint,
-            self.cy_snapshot as uint
-        ));
-    }
-
-    #[cfg(ndebug)]
-    static fn new() -> CpuDebug { CpuDebug }
-    #[cfg(ndebug)]
-    fn snapshot(&mut self, _: Cycles, _: &mut Regs) {}
-    #[cfg(ndebug)]
-    fn print(&mut self) {}
 }
 
 // FIXME: This should not need to be public! Sigh. Resolve bug.
 pub impl<M:Mem> Cpu<M> {
     // Debugging
     #[cfg(debug)]
-    fn mnem(&mut self, mnemonic: &static/str) { self.debug.mnem = Some(mnemonic) }
+    fn trace(&mut self) {
+        let mut disassembler = Disassembler { pc: self.regs.pc, mem: &mut self.mem };
+        println(fmt!(
+            "%04X %-20s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
+            self.regs.pc as uint,
+            disassembler.disassemble(),
+            self.regs.a as uint,
+            self.regs.x as uint,
+            self.regs.y as uint,
+            self.regs.flags as uint,
+            self.regs.s as uint,
+            self.cy as uint
+        ));
+    }
     #[cfg(ndebug)]
-    fn mnem(&mut self, _: &static/str) {}
+    fn trace(&mut self) {}
 
     // Memory access helpers
     /// Loads the byte at the program counter and increments the program counter.
@@ -269,38 +458,18 @@ pub impl<M:Mem> Cpu<M> {
     //
 
     // Loads
-    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("lda");
-        self.regs.a = self.set_zn(am.load(self))
-    }
-    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("ldx");
-        self.regs.x = self.set_zn(am.load(self))
-    }
-    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("ldy");
-        self.regs.y = self.set_zn(am.load(self))
-    }
+    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.a = self.set_zn(am.load(self)) }
+    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.x = self.set_zn(am.load(self)) }
+    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.y = self.set_zn(am.load(self)) }
 
     // Stores
-    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("sta");
-        am.store(self, self.regs.a)
-    }
-    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("stx");
-        am.store(self, self.regs.x)
-    }
-    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("sty");
-        am.store(self, self.regs.y)
-    }
+    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.a) }
+    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.x) }
+    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.y) }
 
     // Arithmetic
     #[inline(always)]
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("adc");
-
         let val = am.load(self);
         let mut result = self.regs.a as u32 + val as u32;
         if self.get_flag(CARRY_FLAG) {
@@ -312,8 +481,6 @@ pub impl<M:Mem> Cpu<M> {
     }
     #[inline(always)]
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("sbc");
-
         let val = am.load(self);
         let mut result = self.regs.a as u32 - val as u32;
         if !self.get_flag(CARRY_FLAG) {
@@ -331,35 +498,21 @@ pub impl<M:Mem> Cpu<M> {
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
         self.regs.a = self.set_zn(result as u8);
     }
-    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("cmp");
-        self.cmp_base(self.regs.a, am)
-    }
-    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("cpx");
-        self.cmp_base(self.regs.x, am)
-    }
-    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("cpy");
-        self.cmp_base(self.regs.y, am)
-    }
+    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.a, am) }
+    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.x, am) }
+    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.y, am) }
 
     // Bitwise operations
     fn and<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("and");
         self.regs.a = self.set_zn(am.load(self) & self.regs.a)
     }
     fn ora<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("ora");
         self.regs.a = self.set_zn(am.load(self) | self.regs.a)
     }
     fn eor<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("eor");
         self.regs.a = self.set_zn(am.load(self) ^ self.regs.a)
     }
     fn bit<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("bit");
-
         let val = am.load(self);
         self.set_flag(ZERO_FLAG, (val & self.regs.a) == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
@@ -388,46 +541,42 @@ pub impl<M:Mem> Cpu<M> {
         am.store(self, self.set_zn(result as u8))
     }
     fn rol<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("rol");
         self.shl_base(self.get_flag(CARRY_FLAG), am)
     }
     fn ror<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("ror");
         self.shr_base(self.get_flag(CARRY_FLAG), am)
     }
-    fn asl<AM:AddressingMode<M>>(&mut self, am: AM) { self.mnem("asl"); self.shl_base(false, am) }
-    fn lsr<AM:AddressingMode<M>>(&mut self, am: AM) { self.mnem("lsr"); self.shr_base(false, am) }
+    fn asl<AM:AddressingMode<M>>(&mut self, am: AM) { self.shl_base(false, am) }
+    fn lsr<AM:AddressingMode<M>>(&mut self, am: AM) { self.shr_base(false, am) }
 
     // Increments and decrements
     fn inc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("inc");
         am.store(self, self.set_zn(am.load(self) + 1))
     }
     fn dec<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.mnem("dec");
         am.store(self, self.set_zn(am.load(self) - 1))
     }
-    fn inx(&mut self) { self.mnem("inx"); self.regs.x = self.set_zn(self.regs.x + 1) }
-    fn dex(&mut self) { self.mnem("dex"); self.regs.x = self.set_zn(self.regs.x - 1) }
-    fn iny(&mut self) { self.mnem("iny"); self.regs.y = self.set_zn(self.regs.y + 1) }
-    fn dey(&mut self) { self.mnem("dey"); self.regs.y = self.set_zn(self.regs.y - 1) }
+    fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
+    fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }
+    fn iny(&mut self) { self.regs.y = self.set_zn(self.regs.y + 1) }
+    fn dey(&mut self) { self.regs.y = self.set_zn(self.regs.y - 1) }
 
     // Register moves
-    fn tax(&mut self) { self.mnem("tax"); self.regs.x = self.set_zn(self.regs.a) }
-    fn tay(&mut self) { self.mnem("tay"); self.regs.y = self.set_zn(self.regs.a) }
-    fn txa(&mut self) { self.mnem("txa"); self.regs.a = self.set_zn(self.regs.x) }
-    fn tya(&mut self) { self.mnem("tya"); self.regs.a = self.set_zn(self.regs.y) }
-    fn txs(&mut self) { self.mnem("txs"); self.regs.s = self.regs.x }
-    fn tsx(&mut self) { self.mnem("tsx"); self.regs.x = self.regs.s }
+    fn tax(&mut self) { self.regs.x = self.set_zn(self.regs.a) }
+    fn tay(&mut self) { self.regs.y = self.set_zn(self.regs.a) }
+    fn txa(&mut self) { self.regs.a = self.set_zn(self.regs.x) }
+    fn tya(&mut self) { self.regs.a = self.set_zn(self.regs.y) }
+    fn txs(&mut self) { self.regs.s = self.regs.x }
+    fn tsx(&mut self) { self.regs.x = self.regs.s }
 
     // Flag operations
-    fn clc(&mut self) { self.mnem("clc"); self.set_flag(CARRY_FLAG, false) }
-    fn sec(&mut self) { self.mnem("sec"); self.set_flag(CARRY_FLAG, true) }
-    fn cli(&mut self) { self.mnem("cli"); self.set_flag(IRQ_FLAG, false) }
-    fn sei(&mut self) { self.mnem("sei");  self.set_flag(IRQ_FLAG, true) }
-    fn clv(&mut self) { self.mnem("clv");  self.set_flag(OVERFLOW_FLAG, false) }
-    fn cld(&mut self) { self.mnem("cld");  self.set_flag(DECIMAL_FLAG, false) }
-    fn sed(&mut self) { self.mnem("sed");  self.set_flag(DECIMAL_FLAG, true) }
+    fn clc(&mut self) { self.set_flag(CARRY_FLAG, false) }
+    fn sec(&mut self) { self.set_flag(CARRY_FLAG, true) }
+    fn cli(&mut self) { self.set_flag(IRQ_FLAG, false) }
+    fn sei(&mut self) { self.set_flag(IRQ_FLAG, true) }
+    fn clv(&mut self) { self.set_flag(OVERFLOW_FLAG, false) }
+    fn cld(&mut self) { self.set_flag(DECIMAL_FLAG, false) }
+    fn sed(&mut self) { self.set_flag(DECIMAL_FLAG, true) }
 
     // Branches
     fn bra_base(&mut self, cond: bool) {
@@ -436,20 +585,18 @@ pub impl<M:Mem> Cpu<M> {
             self.regs.pc = (self.regs.pc as i32 + disp as i32) as u16;
         }
     }
-    fn bpl(&mut self) { self.mnem("bpl"); self.bra_base(!self.get_flag(NEGATIVE_FLAG)) }
-    fn bmi(&mut self) { self.mnem("bmi"); self.bra_base(self.get_flag(NEGATIVE_FLAG))  }
-    fn bvc(&mut self) { self.mnem("bvc"); self.bra_base(!self.get_flag(OVERFLOW_FLAG)) }
-    fn bvs(&mut self) { self.mnem("bvs"); self.bra_base(self.get_flag(OVERFLOW_FLAG))  }
-    fn bcc(&mut self) { self.mnem("bcc"); self.bra_base(!self.get_flag(CARRY_FLAG))    }
-    fn bcs(&mut self) { self.mnem("bcs"); self.bra_base(self.get_flag(CARRY_FLAG))     }
-    fn bne(&mut self) { self.mnem("bne"); self.bra_base(!self.get_flag(ZERO_FLAG))     }
-    fn beq(&mut self) { self.mnem("beq"); self.bra_base(self.get_flag(ZERO_FLAG))      }
+    fn bpl(&mut self) { self.bra_base(!self.get_flag(NEGATIVE_FLAG)) }
+    fn bmi(&mut self) { self.bra_base(self.get_flag(NEGATIVE_FLAG))  }
+    fn bvc(&mut self) { self.bra_base(!self.get_flag(OVERFLOW_FLAG)) }
+    fn bvs(&mut self) { self.bra_base(self.get_flag(OVERFLOW_FLAG))  }
+    fn bcc(&mut self) { self.bra_base(!self.get_flag(CARRY_FLAG))    }
+    fn bcs(&mut self) { self.bra_base(self.get_flag(CARRY_FLAG))     }
+    fn bne(&mut self) { self.bra_base(!self.get_flag(ZERO_FLAG))     }
+    fn beq(&mut self) { self.bra_base(self.get_flag(ZERO_FLAG))      }
 
     // Jumps
-    fn jmp(&mut self) { self.mnem("jmp"); self.regs.pc = self.loadw_bump_pc() }
+    fn jmp(&mut self) { self.regs.pc = self.loadw_bump_pc() }
     fn jmpi(&mut self) {
-        self.mnem("jmp");
-
         // Replicate the famous CPU bug...
         let pc_high = self.regs.pc & 0xff00;
         let lo = self.loadb_bump_pc();
@@ -460,245 +607,54 @@ pub impl<M:Mem> Cpu<M> {
 
     // Procedure calls
     fn jsr(&mut self) {
-        self.mnem("jsr");
-
         let addr = self.loadw_bump_pc();
         self.pushw(self.regs.pc - 1);
         self.regs.pc = addr;
     }
-    fn rts(&mut self) { self.mnem("rts"); self.regs.pc = self.popw() + 1 }
+    fn rts(&mut self) { self.regs.pc = self.popw() + 1 }
     fn brk(&mut self) {
-        self.mnem("brk");
-
         self.pushw(self.regs.pc + 1);
         self.pushb(self.regs.flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
         self.set_flag(IRQ_FLAG, true);
         self.regs.pc = self.mem.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
-        self.mnem("rti");
-
         self.regs.flags = self.popb();
         self.regs.pc = self.popw(); // NB: no + 1
     }
 
     // Stack operations
-    fn pha(&mut self) { self.mnem("pha"); self.pushb(self.regs.a) }
-    fn pla(&mut self) { self.mnem("pla"); self.regs.a = self.popb() }
-    fn php(&mut self) { self.mnem("php"); self.pushb(self.regs.flags) }
-    fn plp(&mut self) { self.mnem("plp"); self.regs.flags = self.popb() }
+    fn pha(&mut self) { self.pushb(self.regs.a) }
+    fn pla(&mut self) { self.regs.a = self.popb() }
+    fn php(&mut self) { self.pushb(self.regs.flags) }
+    fn plp(&mut self) { self.regs.flags = self.popb() }
 
     // No operation
-    fn nop(&mut self) { self.mnem("nop"); }
+    fn nop(&mut self) {}
 
     // The main fetch-and-decode routine
     fn step(&mut self) {
-        self.debug.snapshot(self.cy, &mut self.regs);
+        self.trace();
 
-        // We try to keep this in the same order as the implementations above.
-        // TODO: Use arm macros to fix some of this duplication.
         let op = self.loadb_bump_pc();
-        match op {
-            // Loads
-            0xa1 => self.lda(self.indexed_indirect_x()),
-            0xa5 => self.lda(self.zero_page()),
-            0xa9 => self.lda(ImmediateAddressingMode),
-            0xad => self.lda(self.absolute()),
-            0xb1 => self.lda(self.indirect_indexed_y()),
-            0xb5 => self.lda(self.zero_page_x()),
-            0xb9 => self.lda(self.absolute_y()),
-            0xbd => self.lda(self.absolute_x()),
-
-            0xa2 => self.ldx(ImmediateAddressingMode),
-            0xa6 => self.ldx(self.zero_page()),
-            0xae => self.ldx(self.zero_page_y()),
-            0xb6 => self.ldx(self.absolute()),
-            0xbe => self.ldx(self.absolute_y()),
-
-            0xa0 => self.ldy(ImmediateAddressingMode),
-            0xa4 => self.ldy(self.zero_page()),
-            0xac => self.ldy(self.zero_page_x()),
-            0xb4 => self.ldy(self.absolute()),
-            0xbc => self.ldy(self.absolute_x()),
-
-            // Stores
-            0x85 => self.sta(self.zero_page()),
-            0x95 => self.sta(self.zero_page_x()),
-            0x8d => self.sta(self.absolute()),
-            0x9d => self.sta(self.absolute_x()),
-            0x99 => self.sta(self.absolute_y()),
-            0x81 => self.sta(self.indexed_indirect_x()),
-            0x91 => self.sta(self.indirect_indexed_y()),
-
-            0x86 => self.stx(self.zero_page()),
-            0x96 => self.stx(self.zero_page_y()),
-            0x8e => self.stx(self.absolute()),
-
-            0x84 => self.sty(self.zero_page()),
-            0x94 => self.sty(self.zero_page_x()),
-            0x8c => self.sty(self.absolute()),
-
-            // Arithmetic
-            0x69 => self.adc(ImmediateAddressingMode),
-            0x65 => self.adc(self.zero_page()),
-            0x75 => self.adc(self.zero_page_x()),
-            0x6d => self.adc(self.absolute()),
-            0x7d => self.adc(self.absolute_x()),
-            0x79 => self.adc(self.absolute_y()),
-            0x61 => self.adc(self.indexed_indirect_x()),
-            0x71 => self.adc(self.indirect_indexed_y()),
-
-            0xe9 => self.sbc(ImmediateAddressingMode),
-            0xe5 => self.sbc(self.zero_page()),
-            0xf5 => self.sbc(self.zero_page_x()),
-            0xed => self.sbc(self.absolute()),
-            0xfd => self.sbc(self.absolute_x()),
-            0xf9 => self.sbc(self.absolute_y()),
-            0xe1 => self.sbc(self.indexed_indirect_x()),
-            0xf1 => self.sbc(self.indirect_indexed_y()),
-
-            // Comparisons
-            0xc9 => self.cmp(ImmediateAddressingMode),
-            0xc5 => self.cmp(self.zero_page()),
-            0xd5 => self.cmp(self.zero_page_x()),
-            0xcd => self.cmp(self.absolute()),
-            0xdd => self.cmp(self.absolute_x()),
-            0xd9 => self.cmp(self.absolute_y()),
-            0xc1 => self.cmp(self.indexed_indirect_x()),
-            0xd1 => self.cmp(self.indirect_indexed_y()),
-
-            0xe0 => self.cpx(ImmediateAddressingMode),
-            0xe4 => self.cpx(self.zero_page()),
-            0xec => self.cpx(self.absolute()),
-
-            0xc0 => self.cpy(ImmediateAddressingMode),
-            0xc4 => self.cpy(self.zero_page()),
-            0xcc => self.cpy(self.absolute()),
-
-            // Bitwise operations
-            0x29 => self.and(ImmediateAddressingMode),
-            0x25 => self.and(self.zero_page()),
-            0x35 => self.and(self.zero_page_x()),
-            0x2d => self.and(self.absolute()),
-            0x3d => self.and(self.absolute_x()),
-            0x39 => self.and(self.absolute_y()),
-            0x21 => self.and(self.indexed_indirect_x()),
-            0x31 => self.and(self.indirect_indexed_y()),
-
-            0x09 => self.ora(ImmediateAddressingMode),
-            0x05 => self.ora(self.zero_page()),
-            0x15 => self.ora(self.zero_page_x()),
-            0x0d => self.ora(self.absolute()),
-            0x1d => self.ora(self.absolute_x()),
-            0x19 => self.ora(self.absolute_y()),
-            0x01 => self.ora(self.indexed_indirect_x()),
-            0x11 => self.ora(self.indirect_indexed_y()),
-
-            0x49 => self.eor(ImmediateAddressingMode),
-            0x45 => self.eor(self.zero_page()),
-            0x55 => self.eor(self.zero_page_x()),
-            0x4d => self.eor(self.absolute()),
-            0x5d => self.eor(self.absolute_x()),
-            0x59 => self.eor(self.absolute_y()),
-            0x41 => self.eor(self.indexed_indirect_x()),
-            0x51 => self.eor(self.indirect_indexed_y()),
-
-            0x24 => self.bit(self.zero_page()),
-            0x2c => self.bit(self.absolute()),
-
-            // Shifts and rotates
-            0x2a => self.rol(AccumulatorAddressingMode),
-            0x26 => self.rol(self.zero_page()),
-            0x36 => self.rol(self.zero_page_x()),
-            0x2e => self.rol(self.absolute()),
-            0x3e => self.rol(self.absolute_x()),
-
-            0x6a => self.ror(AccumulatorAddressingMode),
-            0x66 => self.ror(self.zero_page()),
-            0x76 => self.ror(self.zero_page_x()),
-            0x6e => self.ror(self.absolute()),
-            0x7e => self.ror(self.absolute_x()),
-
-            0x0a => self.asl(AccumulatorAddressingMode),
-            0x06 => self.asl(self.zero_page()),
-            0x16 => self.asl(self.zero_page_x()),
-            0x0e => self.asl(self.absolute()),
-            0x1e => self.asl(self.absolute_x()),
-
-            0x4a => self.lsr(AccumulatorAddressingMode),
-            0x46 => self.lsr(self.zero_page()),
-            0x56 => self.lsr(self.zero_page_x()),
-            0x4e => self.lsr(self.absolute()),
-            0x5e => self.lsr(self.absolute_x()),
-
-            // Increments and decrements
-            0xe6 => self.inc(self.zero_page()),
-            0xf6 => self.inc(self.zero_page_x()),
-            0xee => self.inc(self.absolute()),
-            0xfe => self.inc(self.absolute_x()),
-
-            0xc6 => self.dec(self.zero_page()),
-            0xd6 => self.dec(self.zero_page_x()),
-            0xce => self.dec(self.absolute()),
-            0xde => self.dec(self.absolute_x()),
-
-            0xe8 => self.inx(),
-            0xca => self.dex(),
-            0xc8 => self.iny(),
-            0x88 => self.dey(),
-
-            // Register moves
-            0xaa => self.tax(),
-            0xa8 => self.tay(),
-            0x8a => self.txa(),
-            0x98 => self.tya(),
-            0x9a => self.txs(),
-            0xba => self.tsx(),
-
-            // Flag operations
-            0x18 => self.clc(),
-            0x38 => self.sec(),
-            0x58 => self.cli(),
-            0x78 => self.sei(),
-            0xb8 => self.clv(),
-            0xd8 => self.cld(),
-            0xf8 => self.sed(),
-
-            // Branches
-            0x10 => self.bpl(),
-            0x30 => self.bmi(),
-            0x50 => self.bvc(),
-            0x70 => self.bvs(),
-            0x90 => self.bcc(),
-            0xb0 => self.bcs(),
-            0xd0 => self.bne(),
-            0xf0 => self.beq(),
-
-            // Jumps
-            0x4c => self.jmp(),
-            0x6c => self.jmpi(),
-
-            // Procedure calls
-            0x20 => self.jsr(),
-            0x60 => self.rts(),
-            0x00 => self.brk(),
-            0x40 => self.rti(),
-
-            // Stack operations
-            0x48 => self.pha(),
-            0x68 => self.pla(),
-            0x08 => self.php(),
-            0x28 => self.plp(),
-
-            // No operation
-            0xea => self.nop(),
-
-            _ => fail ~"unimplemented or illegal instruction"
-        }
+        decode_op!(
+            op: op,
+            this: self,
+            modes: [
+                ImmediateAddressingMode,
+                AccumulatorAddressingMode,
+                self.zero_page(),
+                self.zero_page_x(),
+                self.zero_page_y(),
+                self.absolute(),
+                self.absolute_x(),
+                self.absolute_y(),
+                self.indexed_indirect_x(),
+                self.indirect_indexed_y()
+            ]
+        );
 
         self.cy += CYCLE_TABLE[op] as Cycles;
-
-        self.debug.print();
     }
 
     /// External interfaces
@@ -711,7 +667,6 @@ pub impl<M:Mem> Cpu<M> {
         Cpu {
             cy: 0,
             regs: Regs::new(),
-            debug: CpuDebug::new(),
             mem: mem
         }
     }

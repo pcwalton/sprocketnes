@@ -5,7 +5,11 @@
 // Author: Patrick Walton
 //
 
+// FIXME: fmt! is busted here.
+use core::{extfmt, str};
+
 mod cpu;
+mod disasm;
 mod main;
 mod mapper;
 mod rom;
