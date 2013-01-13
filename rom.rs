@@ -15,7 +15,11 @@ use core::vec;
 // Blech! This really should go in the standard library!
 struct Fd(c_int);
 impl Fd : Drop {
-    fn finalize(&self) { libc::close(**self); }
+    fn finalize(&self) {
+        unsafe {
+            libc::close(**self);
+        }
+    }
 }
 
 pub struct Rom {
@@ -59,10 +63,12 @@ pub impl Rom {
     }
 
     static fn from_path(path: &str) -> Rom {
-        do str::as_c_str(path) |c_path| {
-            // FIXME: O_RDONLY should be a c_int in the first place!
-            let fd = Fd(libc::open(c_path, O_RDONLY as c_int, 0));
-            Rom::from_fd(*fd)
+        unsafe {
+            do str::as_c_str(path) |c_path| {
+                // FIXME: O_RDONLY should be a c_int in the first place!
+                let fd = Fd(libc::open(c_path, O_RDONLY as c_int, 0));
+                Rom::from_fd(*fd)
+            }
         }
     }
 }

@@ -7,16 +7,18 @@
 
 use sdl::sdl::{InitTimer, InitVideo};
 use sdl::sdl;
-use sdl::video::{DoubleBuf, HWSurface};
+use sdl::video::{DoubleBuf, HWSurface, Surface};
 use sdl::video;
 
-pub struct Gfx;
+pub struct Gfx {
+    screen: ~Surface
+}
 
 pub impl Gfx {
     static fn new() -> Gfx {
         sdl::init([ InitVideo, InitTimer ]);
-        video::set_video_mode(320, 240, 24, [ HWSurface ], [ DoubleBuf ]);
-        Gfx
+        let screen = video::set_video_mode(320, 240, 24, [ HWSurface ], [ DoubleBuf ]).unwrap();
+        Gfx { screen: screen }
     }
 }
 

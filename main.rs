@@ -14,6 +14,7 @@ use core::cast::transmute;
 use core::libc::size_t;
 use core::task::PlatformThread;
 use core::{libc, os, str};
+use sdl;
 
 // Currently io GC's. This is obviously bad. To work around this I am not using it.
 pub fn println(s: &str) {
@@ -34,9 +35,7 @@ fn start() {
     println("Loaded ROM:");
     println(rom.header.to_str());
 
-    // FIXME: Doesn't work on Mac yet. Cocoa issue. Bah.
-    //let gfx = Gfx::new();
-
+    let gfx = Gfx::new();
     let mapper = Mapper::new(&rom);
     let mut cpu = Cpu::new(mapper);
 
@@ -46,9 +45,24 @@ fn start() {
     for 1000.times {
         cpu.step();
     }
+
+    do gfx.screen.with_lock |pixels| {
+        for vec::each_mut(pixels) |pixel| {
+            *pixel = 0x80;
+        }
+    }
+
+    gfx.screen.flip();
+
+    loop {
+        match sdl::event::poll_event() {
+            sdl::event::KeyUpEvent(*) => break,
+            _ => {}
+        }
+    }
 }
 
 fn main() {
-    task::task().sched_mode(PlatformThread).spawn(start);
+    sdl::start::start(start);
 }
 
