@@ -12,6 +12,7 @@ mod disasm;
 mod gfx;
 mod main;
 mod mapper;
+mod ppu;
 mod rom;
 
 
