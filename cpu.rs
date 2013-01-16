@@ -6,7 +6,7 @@
 //
 
 use disasm::Disassembler;
-use main::println;
+use util::println;
 
 //
 // Constants

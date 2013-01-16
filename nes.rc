@@ -14,5 +14,6 @@ mod main;
 mod mapper;
 mod ppu;
 mod rom;
+mod util;
 
 

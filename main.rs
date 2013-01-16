@@ -9,20 +9,13 @@ use cpu::Cpu;
 use gfx::Gfx;
 use mapper::Mapper;
 use rom::Rom;
+use util::println;
 
 use core::cast::transmute;
 use core::libc::size_t;
 use core::task::PlatformThread;
 use core::{libc, os, str};
 use sdl;
-
-// Currently io GC's. This is obviously bad. To work around this I am not using it.
-pub fn println(s: &str) {
-    unsafe {
-        libc::write(2, transmute(&s[0]), s.len() as size_t); 
-        libc::write(2, transmute(&'\n'), 1);
-    }
-}
 
 fn start() {
     let args = os::args();

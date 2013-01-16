@@ -7,6 +7,7 @@
 
 use cpu::Mem;
 use rom::Rom;
+use util::debug_assert;
 
 //
 // Registers
@@ -17,6 +18,8 @@ struct Regs {
     mask: PpuMask,      // PPUMASK: 0x2001
     status: PpuStatus,  // PPUSTATUS: 0x2002
     oam_addr: u8,       // OAMADDR: 0x2003
+    scroll: PpuScroll,  // PPUSCROLL: 0x2005
+    addr: u16,          // PPUADDR: 0x2006
 }
 
 //
@@ -32,7 +35,7 @@ enum SpriteSize {
 
 impl PpuCtrl {
     fn base_nametable_addr(self) -> u16           { 0x2000 + (*self & 0x3) as u16 * 0x400 }
-    fn vram_addr_increment(self) -> u8            { if (*self & 0x04) == 0 { 0 } else { 32 } }
+    fn vram_addr_increment(self) -> u16           { if (*self & 0x04) == 0 { 0 } else { 32 } }
     fn sprite_pattern_table_addr(self) -> u16     { if (*self & 0x08) == 0 { 0 } else { 0x1000 } }
     fn background_pattern_table_addr(self) -> u16 { if (*self & 0x10) == 0 { 0 } else { 0x1000 } }
     fn sprite_size(self) -> SpriteSize {
@@ -75,6 +78,21 @@ impl PpuStatus {
     fn set_in_vblank(&mut self, val: bool) {
         if val { *self = PpuStatus(**self | 0x80) } else { *self = PpuStatus(**self & !0x80) }
     }
+}
+
+//
+// PPUSCROLL: 0x2005
+//
+
+struct PpuScroll {
+    x: u8,
+    y: u8,
+    next: PpuScrollDir
+}
+
+enum PpuScrollDir {
+    XDir,
+    YDir,
 }
 
 // PPU memory. This implements the same Mem trait that the CPU memory does.
@@ -124,10 +142,49 @@ impl PpuMem : Mem {
 
 // The main PPU structure. This structure is separate from the PPU memory just as the CPU is.
 
-struct Ppu {
+struct Ppu<VM,OM> {
     regs: Regs,
+    vram: VM,
+    oam: OM,
 }
 
-impl Ppu {
+impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
+    // Performs a store to the PPU register at the given CPU address.
+    fn storeb(&mut self, addr: u16, val: u8) {
+        debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
+        match addr & 7 {
+            0 => self.regs.ctrl = PpuCtrl(val),
+            1 => self.regs.mask = PpuMask(val),
+            2 => (),    // PPUSTATUS is read-only
+            3 => self.regs.oam_addr = val,
+            4 => fail ~"OAM write unimplemented",
+            5 => self.update_ppuscroll(val),
+            6 => self.update_ppuaddr(val),
+            7 => self.write_ppudata(val),
+            _ => fail ~"can't happen"
+        }
+    }
+
+    fn update_ppuscroll(&mut self, val: u8) {
+        match self.regs.scroll.next {
+            XDir => {
+                self.regs.scroll.x = val;
+                self.regs.scroll.next = YDir;
+            }
+            YDir => {
+                self.regs.scroll.y = val;
+                self.regs.scroll.next = XDir;
+            }
+        }
+    }
+
+    fn update_ppuaddr(&mut self, val: u8) {
+        self.regs.addr = (self.regs.addr << 8) | (val as u16);
+    }
+
+    fn write_ppudata(&mut self, val: u8) {
+        self.vram.storeb(self.regs.addr, val);
+        self.regs.addr += self.regs.ctrl.vram_addr_increment();
+    }
 }
 
