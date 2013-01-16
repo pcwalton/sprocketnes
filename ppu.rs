@@ -5,7 +5,7 @@
 // Author: Patrick Walton
 //
 
-use cpu::Mem;
+use mem::Mem;
 use rom::Rom;
 use util::debug_assert;
 
@@ -95,15 +95,25 @@ enum PpuScrollDir {
     YDir,
 }
 
-// PPU memory. This implements the same Mem trait that the CPU memory does.
+// PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
-pub struct PpuMem {
+pub struct Vram {
     rom: &Rom,
     nametables: [u8 * 0x1000],  // 4 nametables, 0x400 each
     palette: [u8 * 0x20],
 }
 
-impl PpuMem : Mem {
+pub impl Vram {
+    static fn new(rom: &a/Rom) -> Vram/&a {
+        Vram {
+            rom: rom,
+            nametables: [ 0, ..0x1000 ],
+            palette: [ 0, ..0x20 ]
+        }
+    }
+}
+
+pub impl Vram : Mem {
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
             return self.rom.chr[addr]
@@ -130,25 +140,50 @@ impl PpuMem : Mem {
             self.palette[addr] = val;
         }
     }
-    fn loadw(&mut self, addr: u16) -> u16 {
-        // TODO: Duplicated code, blah. Default implementations would be nice here.
-        self.loadb(addr) as u16 | (self.loadb(addr + 1) as u16 << 8)
-    }
+}
 
-    fn storew(&mut self, _: u16, _: u16) {
-        // TODO
+// Object Attribute Memory (OAM).
+
+pub struct Oam {
+    oam: [u8 * 0x100]
+}
+
+pub impl Oam {
+    static fn new() -> Oam {
+        Oam { oam: [ 0, ..0x100 ] }
     }
+}
+
+pub impl Oam : Mem {
+    fn loadb(&mut self, addr: u16) -> u8     { self.oam[addr] }
+    fn storeb(&mut self, addr: u16, val: u8) { self.oam[addr] = val }
 }
 
 // The main PPU structure. This structure is separate from the PPU memory just as the CPU is.
 
-struct Ppu<VM,OM> {
+pub struct Ppu<VM,OM> {
     regs: Regs,
     vram: VM,
     oam: OM,
 }
 
-impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
+pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
+    // Performs a load of the PPU register at the given CPU address.
+    fn loadb(&mut self, addr: u16) -> u8 {
+        debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
+        match addr & 7 {
+            0 => *self.regs.ctrl,
+            1 => *self.regs.mask,
+            2 => *self.regs.status,
+            3 => 0, // OAMADDR is read-only
+            4 => fail ~"OAM read unimplemented",
+            5 => 0, // PPUSCROLL is read-only
+            6 => 0, // PPUADDR is read-only
+            7 => self.read_ppudata(),
+            _ => fail ~"can't happen"
+        }
+    }
+
     // Performs a store to the PPU register at the given CPU address.
     fn storeb(&mut self, addr: u16, val: u8) {
         debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
@@ -162,6 +197,23 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             6 => self.update_ppuaddr(val),
             7 => self.write_ppudata(val),
             _ => fail ~"can't happen"
+        }
+    }
+}
+
+pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
+    static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
+        Ppu {
+            regs: Regs {
+                ctrl: PpuCtrl(0),
+                mask: PpuMask(0),
+                status: PpuStatus(0),
+                oam_addr: 0,
+                scroll: PpuScroll { x: 0, y: 0, next: XDir },
+                addr: 0,
+            },
+            vram: vram,
+            oam: oam
         }
     }
 
@@ -185,6 +237,12 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     fn write_ppudata(&mut self, val: u8) {
         self.vram.storeb(self.regs.addr, val);
         self.regs.addr += self.regs.ctrl.vram_addr_increment();
+    }
+
+    fn read_ppudata(&mut self) -> u8 {
+        let val = self.vram.loadb(self.regs.addr);
+        self.regs.addr += self.regs.ctrl.vram_addr_increment();
+        val
     }
 }
 

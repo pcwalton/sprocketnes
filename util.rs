@@ -25,4 +25,12 @@ pub fn debug_assert(cond: bool, msg: &static/str) {
     }
 }
 
+#[cfg(debug)]
+pub fn debug_print(msg: &static/str) {
+    println(msg);
+}
+
+#[cfg(ndebug)]
+pub fn debug_print(msg: &static/str) {}
+
 

@@ -5,7 +5,7 @@
 // Author: Patrick Walton
 //
 
-use cpu::Mem;
+use mem::Mem;
 
 use core::uint;
 

@@ -8,6 +8,8 @@
 use cpu::Cpu;
 use gfx::Gfx;
 use mapper::Mapper;
+use mem::MemMap;
+use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
 use util::println;
 
@@ -29,8 +31,10 @@ fn start() {
     println(rom.header.to_str());
 
     let gfx = Gfx::new();
-    let mapper = Mapper::new(&rom);
-    let mut cpu = Cpu::new(mapper);
+    let mut mapper = Mapper::new(&rom);
+    let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
+    let mut memmap = MemMap::new(ppu, mapper);
+    let mut cpu = Cpu::new(memmap);
 
     // TODO: For testing purposes (nestest.log)...
     // cpu.reset();

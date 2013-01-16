@@ -6,6 +6,7 @@
 //
 
 use disasm::Disassembler;
+use mem::{Mem, MemUtil};
 use util::println;
 
 //
@@ -45,21 +46,6 @@ const CYCLE_TABLE: [u8 * 256] = [
     /*0xE0*/ 2,6,3,8,3,3,5,5,2,2,2,2,4,4,6,6,
     /*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
 ];
-
-//
-// The memory interface
-//
-
-/// The basic memory interface
-pub trait Mem {
-    fn loadb(&mut self, addr: u16) -> u8;
-    fn storeb(&mut self, addr: u16, val: u8);
-
-    // These two could be defined in terms of the base, but often (e.g. on x86) it is possible to
-    // use unaligned reads/writes to implement these more efficiently.
-    fn loadw(&mut self, addr: u16) -> u16;
-    fn storew(&mut self, addr: u16, val: u16);
-}
 
 //
 // Registers
