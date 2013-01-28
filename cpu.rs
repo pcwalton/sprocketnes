@@ -444,45 +444,51 @@ pub impl<M:Mem> Cpu<M> {
     //
 
     // Loads
-    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.a = self.set_zn(am.load(self)) }
-    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.x = self.set_zn(am.load(self)) }
-    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.y = self.set_zn(am.load(self)) }
+    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.regs.a = self.set_zn(am.load(&mut *self))
+    }
+    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.regs.x = self.set_zn(am.load(&mut *self))
+    }
+    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) {
+        self.regs.y = self.set_zn(am.load(&mut *self))
+    }
 
     // Stores
-    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.a) }
-    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.x) }
-    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.y) }
+    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(&mut *self, self.regs.a) }
+    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(&mut *self, self.regs.x) }
+    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(&mut *self, self.regs.y) }
 
     // Arithmetic
     #[inline(always)]
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        let val = am.load(self);
+        let val = am.load(&mut *self);
         let mut result = self.regs.a as u32 + val as u32;
-        if self.get_flag(CARRY_FLAG) {
+        if (&mut *self).get_flag(CARRY_FLAG) {
             result += 1;
         }
 
-        self.set_flag(CARRY_FLAG, (result & 0x100) != 0);
-        self.regs.a = self.set_znv(result as u8);
+        (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) != 0);
+        (&mut *self).regs.a = self.set_znv(result as u8);
     }
     #[inline(always)]
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        let val = am.load(self);
+        let val = am.load(&mut *self);
         let mut result = self.regs.a as u32 - val as u32;
-        if !self.get_flag(CARRY_FLAG) {
+        if !(&mut *self).get_flag(CARRY_FLAG) {
             result -= 1;
         }
 
-        self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
-        self.regs.a = self.set_znv(result as u8);
+        (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) == 0);
+        (&mut *self).regs.a = self.set_znv(result as u8);
     }
 
     // Comparisons
     fn cmp_base<AM:AddressingMode<M>>(&mut self, x: u8, am: AM) {
-        let y = am.load(self);
+        let y = am.load(&mut *self);
         let mut result = x as u32 - y as u32;
-        self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
-        self.regs.a = self.set_zn(result as u8);
+        (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) == 0);
+        (&mut *self).regs.a = (&mut *self).set_zn(result as u8);
     }
     fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.a, am) }
     fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.x, am) }
@@ -499,7 +505,7 @@ pub impl<M:Mem> Cpu<M> {
         self.regs.a = self.set_zn(am.load(self) ^ self.regs.a)
     }
     fn bit<AM:AddressingMode<M>>(&mut self, am: AM) {
-        let val = am.load(self);
+        let val = am.load(&mut *self);
         self.set_flag(ZERO_FLAG, (val & self.regs.a) == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
         self.set_flag(OVERFLOW_FLAG, (val & 0x40) != 0);
@@ -507,24 +513,24 @@ pub impl<M:Mem> Cpu<M> {
 
     // Shifts and rotates
     fn shl_base<AM:AddressingMode<M>>(&mut self, lsb: bool, am: AM) {
-        let val = am.load(self);
+        let val = am.load(&mut *self);
         let new_carry = (val & 0x80) != 0;
         let mut result = val << 1;
         if lsb {
             result |= 1;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        am.store(self, self.set_zn(result as u8))
+        am.store(&mut *self, self.set_zn(result as u8))
     }
     fn shr_base<AM:AddressingMode<M>>(&mut self, msb: bool, am: AM) {
-        let val = am.load(self);
+        let val = am.load(&mut *self);
         let new_carry = (val & 0x1) != 0;
         let mut result = val >> 1;
         if msb {
             result |= 0x80;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        am.store(self, self.set_zn(result as u8))
+        am.store(&mut *self, self.set_zn(result as u8))
     }
     fn rol<AM:AddressingMode<M>>(&mut self, am: AM) {
         self.shl_base(self.get_flag(CARRY_FLAG), am)
@@ -537,10 +543,10 @@ pub impl<M:Mem> Cpu<M> {
 
     // Increments and decrements
     fn inc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        am.store(self, self.set_zn(am.load(self) + 1))
+        am.store(&mut *self, self.set_zn(am.load(self) + 1))
     }
     fn dec<AM:AddressingMode<M>>(&mut self, am: AM) {
-        am.store(self, self.set_zn(am.load(self) - 1))
+        am.store(&mut *self, self.set_zn(am.load(self) - 1))
     }
     fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
     fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }

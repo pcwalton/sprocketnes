@@ -77,7 +77,9 @@ pub impl MemMap : Mem {
             debug_print("I/O regs unimplemented");
             0
         } else {
-            (self.mapper.loadb)(&mut self.mapper, addr)
+            unsafe {
+                (self.mapper.loadb)(cast::transmute(&mut self.mapper), addr)
+            }
         }
     }
     fn storeb(&mut self, addr: u16, val: u8) {
@@ -88,7 +90,9 @@ pub impl MemMap : Mem {
         } else if addr < 0x4018 {
             debug_print("I/O regs unimplemented")
         } else {
-            (self.mapper.storeb)(&mut self.mapper, addr, val)
+            unsafe {
+                (self.mapper.storeb)(cast::transmute(&mut self.mapper), addr, val)
+            }
         }
     }
 }
