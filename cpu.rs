@@ -392,7 +392,7 @@ pub impl<M:Mem> Cpu<M> {
     }
 
     // Flag helpers
-    fn get_flag(&mut self, flag: u8) -> bool { (self.regs.flags & flag) != 0 }
+    fn get_flag(&self, flag: u8) -> bool { (self.regs.flags & flag) != 0 }
     fn set_flag(&mut self, flag: u8, on: bool) {
         if on {
             self.regs.flags |= flag;
@@ -464,7 +464,7 @@ pub impl<M:Mem> Cpu<M> {
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(&mut *self);
         let mut result = self.regs.a as u32 + val as u32;
-        if (&mut *self).get_flag(CARRY_FLAG) {
+        if self.get_flag(CARRY_FLAG) {
             result += 1;
         }
 
@@ -475,7 +475,7 @@ pub impl<M:Mem> Cpu<M> {
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(&mut *self);
         let mut result = self.regs.a as u32 - val as u32;
-        if !(&mut *self).get_flag(CARRY_FLAG) {
+        if !self.get_flag(CARRY_FLAG) {
             result -= 1;
         }
 

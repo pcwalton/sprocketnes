@@ -165,6 +165,7 @@ pub struct Ppu<VM,OM> {
     regs: Regs,
     vram: VM,
     oam: OM,
+    scanline: u8
 }
 
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
@@ -213,9 +214,14 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                 addr: 0,
             },
             vram: vram,
-            oam: oam
+            oam: oam,
+            scanline: 0
         }
     }
+
+    //
+    // Register manipulation
+    //
 
     fn update_ppuscroll(&mut self, val: u8) {
         match self.regs.scroll.next {
@@ -243,6 +249,14 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         let val = self.vram.loadb(self.regs.addr);
         self.regs.addr += self.regs.ctrl.vram_addr_increment();
         val
+    }
+
+    //
+    // Rendering
+    //
+
+    fn render_scanline(&self) {
+        // TODO
     }
 }
 
