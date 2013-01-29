@@ -9,7 +9,7 @@ use cpu::Cpu;
 use gfx::Gfx;
 use mapper::Mapper;
 use mem::MemMap;
-use ppu::{Oam, Ppu, Vram};
+use ppu::{NewFrame, Oam, Ppu, Vram};
 use rom::Rom;
 use util::println;
 
@@ -18,6 +18,14 @@ use core::libc::size_t;
 use core::task::PlatformThread;
 use core::{libc, os, str};
 use sdl;
+
+// FIXME: This is wrong; we should DRAIN the event queue.
+fn check_input() -> bool {
+    match sdl::event::poll_event() {
+        sdl::event::KeyUpEvent(*) => false,
+        _ => true
+    }
+}
 
 fn start() {
     let args = os::args();
@@ -36,20 +44,20 @@ fn start() {
     let mut memmap = MemMap::new(ppu, mapper);
     let mut cpu = Cpu::new(memmap);
 
-    // TODO: For testing purposes (nestest.log)...
-    // cpu.reset();
+    // TODO: Add a flag to not reset for nestest.log 
+    cpu.reset();
 
-    for 1000.times {
+    loop {
         cpu.step();
-    }
-
-    do gfx.screen.with_lock |pixels| {
-        for vec::each_mut(pixels) |pixel| {
-            *pixel = 0x80;
+        if cpu.mem.ppu.step(cpu.cy) == NewFrame {
+            gfx.blit(cpu.mem.ppu.screen);
+            gfx.screen.flip();
+            if !check_input() {
+                break;
+            }
         }
     }
 
-    gfx.screen.flip();
 
     loop {
         match sdl::event::poll_event() {

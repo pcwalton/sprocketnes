@@ -9,6 +9,16 @@ use mem::Mem;
 use rom::Rom;
 use util::debug_assert;
 
+use core::uint::range;
+
+//
+// Constants
+//
+
+pub const SCREEN_WIDTH: uint = 256;
+pub const SCREEN_HEIGHT: uint = 240;
+pub const CYCLES_PER_SCANLINE: u64 = 124;   // 29781 cycles per frame, 240 scanlines
+
 //
 // Registers
 //
@@ -165,7 +175,10 @@ pub struct Ppu<VM,OM> {
     regs: Regs,
     vram: VM,
     oam: OM,
-    scanline: u8
+
+    screen: ~([u8 * 184320]),  // 256 * 240 * 3
+    scanline: u8,
+    cy: u64
 }
 
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
@@ -202,6 +215,12 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
     }
 }
 
+#[deriving_eq]
+pub enum StepResult {
+    Continue,   // No new frame.
+    NewFrame,   // We wrapped around to the next scanline.
+}
+
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
         Ppu {
@@ -215,7 +234,10 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             },
             vram: vram,
             oam: oam,
-            scanline: 0
+
+            screen: ~([ 0, ..184320 ]),
+            scanline: 0,
+            cy: 0
         }
     }
 
@@ -255,8 +277,41 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     // Rendering
     //
 
-    fn render_scanline(&self) {
+    fn putpixel(&mut self, x: uint, y: uint, color: u32) {
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = (color >> 24) as u8;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = (color >> 16) as u8;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = (color >> 8) as u8;
+    }
+
+    fn render_scanline(&mut self) {
         // TODO
+        for range(0, SCREEN_WIDTH) |x| {
+            self.putpixel(x, self.scanline as uint, 0x00ff0000);
+        }
+    }
+
+    fn step(&mut self, run_to_cycle: u64) -> StepResult {
+        let mut result = Continue;
+        loop {
+            let next_scanline_cycle: u64 = self.cy + CYCLES_PER_SCANLINE;
+            if next_scanline_cycle > run_to_cycle {
+                break;
+            }
+
+            self.render_scanline();
+
+            self.scanline += 1;
+            if self.scanline == (SCREEN_HEIGHT as u8) { 
+                result = NewFrame;
+                self.scanline = 0;
+            }
+
+            self.cy += CYCLES_PER_SCANLINE;
+
+            debug_assert(self.cy % CYCLES_PER_SCANLINE == 0, "at even scanline cycle");
+        }
+
+        return result;
     }
 }
 
