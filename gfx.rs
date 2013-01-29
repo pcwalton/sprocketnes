@@ -32,14 +32,16 @@ pub impl Gfx {
     }
 
     fn blit(&self, ppu_screen: &([u8 * 184320])) {
+        let src_stride = ppu::SCREEN_WIDTH * 3;
+        let dest_stride = SCREEN_WIDTH * 3;
+
         do self.screen.with_lock |pixels| {
             for range(0, ppu::SCREEN_HEIGHT) |y| {
-                for range(0, ppu::SCREEN_WIDTH) |x| {
-                    for range(0, 3) |c| {
-                        let byte = ppu_screen[(y * ppu::SCREEN_WIDTH + x) * 3 + c];
-                        pixels[(y * ppu::SCREEN_WIDTH + x) * 3 + c] = byte;
-                    }
-                }
+                let dest_start = y * dest_stride;
+                let dest = vec::mut_view(pixels, dest_start, dest_start + dest_stride);
+                let src_start = y * src_stride;
+                let src = vec::view(*ppu_screen, src_start, src_start + src_stride);
+                vec::bytes::copy_memory(dest, src, src_stride);
             }
         }
     }
