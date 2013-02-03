@@ -9,7 +9,7 @@ use cpu::Cpu;
 use gfx::Gfx;
 use mapper::Mapper;
 use mem::MemMap;
-use ppu::{NewFrame, Oam, Ppu, Vram};
+use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
 use util::println;
 
@@ -49,7 +49,12 @@ fn start() {
 
     loop {
         cpu.step();
-        if cpu.mem.ppu.step(cpu.cy) == NewFrame {
+
+        let ppu_result = cpu.mem.ppu.step(cpu.cy);
+        if ppu_result.vblank_nmi {
+            cpu.nmi();
+        }
+        if ppu_result.new_frame {
             gfx.blit(cpu.mem.ppu.screen);
             gfx.screen.flip();
             if !check_input() {

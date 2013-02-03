@@ -21,6 +21,7 @@ const BREAK_FLAG:    u8 = 1 << 4;
 const OVERFLOW_FLAG: u8 = 1 << 6;
 const NEGATIVE_FLAG: u8 = 1 << 7;
 
+const NMI_VECTOR:   u16 = 0xfffa; 
 const RESET_VECTOR: u16 = 0xfffc; 
 const BRK_VECTOR:   u16 = 0xfffe;
 
@@ -652,6 +653,11 @@ pub impl<M:Mem> Cpu<M> {
     /// External interfaces
     fn reset(&mut self) {
         self.regs.pc = self.mem.loadw(RESET_VECTOR);
+    }
+    fn nmi(&mut self) {
+        self.pushw(self.regs.pc);
+        self.pushb(self.regs.flags);
+        self.regs.pc = self.mem.loadw(NMI_VECTOR);
     }
 
     /// The constructor.

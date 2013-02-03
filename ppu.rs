@@ -7,7 +7,7 @@
 
 use mem::Mem;
 use rom::Rom;
-use util::debug_assert;
+use util::{debug_assert, debug_print};
 
 use core::uint::range;
 
@@ -18,6 +18,8 @@ use core::uint::range;
 pub const SCREEN_WIDTH: uint = 256;
 pub const SCREEN_HEIGHT: uint = 240;
 pub const CYCLES_PER_SCANLINE: u64 = 124;   // 29781 cycles per frame, 240 scanlines
+pub const VBLANK_SCANLINE: uint = 241;
+pub const LAST_SCANLINE: uint = 261;
 
 //
 // Registers
@@ -45,7 +47,7 @@ enum SpriteSize {
 
 impl PpuCtrl {
     fn base_nametable_addr(self) -> u16           { 0x2000 + (*self & 0x3) as u16 * 0x400 }
-    fn vram_addr_increment(self) -> u16           { if (*self & 0x04) == 0 { 0 } else { 32 } }
+    fn vram_addr_increment(self) -> u16           { if (*self & 0x04) == 0 { 1 } else { 32 } }
     fn sprite_pattern_table_addr(self) -> u16     { if (*self & 0x08) == 0 { 0 } else { 0x1000 } }
     fn background_pattern_table_addr(self) -> u16 { if (*self & 0x10) == 0 { 0 } else { 0x1000 } }
     fn sprite_size(self) -> SpriteSize {
@@ -177,7 +179,7 @@ pub struct Ppu<VM,OM> {
     oam: OM,
 
     screen: ~([u8 * 184320]),  // 256 * 240 * 3
-    scanline: u8,
+    scanline: u16,
     cy: u64
 }
 
@@ -216,9 +218,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
 }
 
 #[deriving_eq]
-pub enum StepResult {
-    Continue,   // No new frame.
-    NewFrame,   // We wrapped around to the next scanline.
+pub struct StepResult {
+    new_frame: bool,    // We wrapped around to the next scanline.
+    vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
 }
 
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
@@ -284,26 +286,47 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     fn render_scanline(&mut self) {
-        // TODO
+        // TODO: Scrolling, mirroring
+        let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
         for range(0, SCREEN_WIDTH) |x| {
-            self.putpixel(x, self.scanline as uint, 0x00ff0000);
+            // TODO: Sprites, tiles
+            let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
+            //let r = (tile & 0xc0);
+            //let g = (tile & 0x38) << 2;
+            //let b = (tile & 0x03) << 5;
+            let (r, g, b) = (tile, tile, tile);
+            self.putpixel(x, self.scanline as uint, (r << 8) | (g << 16) | (b << 24));
+        }
+    }
+
+    fn start_vblank(&mut self, result: &mut StepResult) {
+        self.regs.status.set_in_vblank(true);
+
+        if self.regs.ctrl.vblank_nmi() {
+            debug_print("VBLANK NMI!");
+            result.vblank_nmi = true;
         }
     }
 
     fn step(&mut self, run_to_cycle: u64) -> StepResult {
-        let mut result = Continue;
+        let mut result = StepResult { new_frame: false, vblank_nmi: false };
         loop {
             let next_scanline_cycle: u64 = self.cy + CYCLES_PER_SCANLINE;
             if next_scanline_cycle > run_to_cycle {
                 break;
             }
 
-            self.render_scanline();
+            if self.scanline < (SCREEN_HEIGHT as u16) {
+                self.render_scanline();
+            }
 
             self.scanline += 1;
-            if self.scanline == (SCREEN_HEIGHT as u8) { 
-                result = NewFrame;
+            if self.scanline == (VBLANK_SCANLINE as u16) {
+                self.start_vblank(&mut result);
+            } else if self.scanline == (LAST_SCANLINE as u16) { 
+                result.new_frame = true;
                 self.scanline = 0;
+                self.regs.status.set_in_vblank(false);
             }
 
             self.cy += CYCLES_PER_SCANLINE;
