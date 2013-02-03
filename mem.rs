@@ -22,6 +22,7 @@ pub trait Mem {
 pub trait MemUtil {
     fn loadw(&mut self, addr: u16) -> u16;
     fn storew(&mut self, addr: u16, val: u16);
+    fn loadw_zp(&mut self, addr: u8) -> u16;
 }
 
 impl<M:Mem> M : MemUtil {
@@ -31,6 +32,10 @@ impl<M:Mem> M : MemUtil {
     fn storew(&mut self, addr: u16, val: u16) {
         self.storeb(addr, (val & 0xff) as u8);
         self.storeb(addr + 1, ((val >> 8) & 0xff) as u8);
+    }
+    // Like loadw, but has wraparound behavior on the zero page for address 0xff.
+    fn loadw_zp(&mut self, addr: u8) -> u16 {
+        self.loadb(addr as u16) as u16 | (self.loadb((addr + 1) as u16) as u16 << 8)
     }
 }
 

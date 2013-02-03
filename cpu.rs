@@ -133,14 +133,14 @@ macro_rules! decode_op {
 
             0xa2 => $this.ldx($immediate),
             0xa6 => $this.ldx($zero_page),
-            0xae => $this.ldx($zero_page_y),
-            0xb6 => $this.ldx($absolute),
+            0xb6 => $this.ldx($zero_page_y),
+            0xae => $this.ldx($absolute),
             0xbe => $this.ldx($absolute_y),
 
             0xa0 => $this.ldy($immediate),
             0xa4 => $this.ldy($zero_page),
-            0xac => $this.ldy($zero_page_x),
-            0xb4 => $this.ldy($absolute),
+            0xb4 => $this.ldy($zero_page_x),
+            0xac => $this.ldy($absolute),
             0xbc => $this.ldy($absolute_x),
 
             // Stores
@@ -401,6 +401,10 @@ pub impl<M:Mem> Cpu<M> {
             self.regs.flags &= !flag;
         }
     }
+    fn set_flags(&mut self, val: u8) {
+        // Flags get munged in a strange way relating to the unused bit 5 on the NES.
+        self.regs.flags = (val | 0x30) - 0x10;
+    }
     fn set_zn(&mut self, val: u8) -> u8 {
         self.set_flag(ZERO_FLAG, val == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
@@ -427,11 +431,11 @@ pub impl<M:Mem> Cpu<M> {
         MemoryAddressingMode(self.loadw_bump_pc() + self.regs.y as u16)
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
-        let addr = self.mem.loadb(self.loadb_bump_pc() as u16 + self.regs.x as u16) as u16;
+        let addr = self.mem.loadw_zp(self.loadb_bump_pc() + self.regs.x);
         MemoryAddressingMode(addr)
     }
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
-        let addr = self.mem.loadb(self.loadb_bump_pc() as u16) as u16 + self.regs.y as u16;
+        let addr = self.mem.loadw_zp(self.loadb_bump_pc()) + self.regs.y as u16;
         MemoryAddressingMode(addr)
     }
 
@@ -563,7 +567,7 @@ pub impl<M:Mem> Cpu<M> {
     fn txa(&mut self) { self.regs.a = self.set_zn(self.regs.x) }
     fn tya(&mut self) { self.regs.a = self.set_zn(self.regs.y) }
     fn txs(&mut self) { self.regs.s = self.regs.x }
-    fn tsx(&mut self) { self.regs.x = self.regs.s }
+    fn tsx(&mut self) { self.regs.x = self.set_zn(self.regs.s) }
 
     // Flag operations
     fn clc(&mut self) { self.set_flag(CARRY_FLAG, false) }
@@ -615,7 +619,7 @@ pub impl<M:Mem> Cpu<M> {
         self.regs.pc = self.mem.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
-        self.regs.flags = self.popb();
+        self.set_flags(self.popb());
         self.regs.pc = self.popw(); // NB: no + 1
     }
 
@@ -623,7 +627,7 @@ pub impl<M:Mem> Cpu<M> {
     fn pha(&mut self) { self.pushb(self.regs.a) }
     fn pla(&mut self) { self.regs.a = self.set_zn(self.popb()) }
     fn php(&mut self) { self.pushb(self.regs.flags | BREAK_FLAG) }
-    fn plp(&mut self) { self.regs.flags = (self.popb() | 0x30) - 0x10 }
+    fn plp(&mut self) { self.set_flags(self.popb()) }
 
     // No operation
     fn nop(&mut self) {}

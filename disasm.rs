@@ -135,8 +135,8 @@ pub impl<M:Mem> Disassembler<M> {
     fn absolute(&mut self) -> ~str           { self.disw_bump_pc()                 }
     fn absolute_x(&mut self) -> ~str         { self.disw_bump_pc() + ~",X"         }
     fn absolute_y(&mut self) -> ~str         { self.disw_bump_pc() + ~",Y"         }
-    fn indexed_indirect_x(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~"),X" }
-    fn indirect_indexed_y(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~",Y)" }
+    fn indexed_indirect_x(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~",X)" }
+    fn indirect_indexed_y(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~"),Y" }
 
     // The main disassembly routine.
     #[inline(never)]
