@@ -45,7 +45,7 @@ fn start() {
     let mut cpu = Cpu::new(memmap);
 
     // TODO: Add a flag to not reset for nestest.log 
-    //cpu.reset();
+    cpu.reset();
 
     loop {
         cpu.step();

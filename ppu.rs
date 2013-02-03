@@ -290,11 +290,22 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
         for range(0, SCREEN_WIDTH) |x| {
             // TODO: Sprites, tiles
+
+            // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
+
+            // TODO: Right pattern table
+            let pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
+            let plane0 = self.vram.loadb(pattern_offset);
+            let plane1 = self.vram.loadb(pattern_offset + 8);
+            let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
+            let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
+            let color = (bit1 << 1) | bit0;
+
             //let r = (tile & 0xc0);
             //let g = (tile & 0x38) << 2;
             //let b = (tile & 0x03) << 5;
-            let (r, g, b) = (tile, tile, tile);
+            let (r, g, b) = ((color << 6) as u32, (color << 6) as u32, (color << 6) as u32);
             self.putpixel(x, self.scanline as uint, (r << 8) | (g << 16) | (b << 24));
         }
     }
