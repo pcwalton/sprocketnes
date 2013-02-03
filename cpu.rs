@@ -406,11 +406,6 @@ pub impl<M:Mem> Cpu<M> {
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
         val
     }
-    fn set_znv(&mut self, val: u8) -> u8 {
-        let _ = self.set_zn(val);
-        self.set_flag(OVERFLOW_FLAG, self.get_flag(CARRY_FLAG) ^ self.get_flag(NEGATIVE_FLAG));
-        val
-    }
 
     // Addressing modes
     fn zero_page(&mut self) -> MemoryAddressingMode {
@@ -463,25 +458,33 @@ pub impl<M:Mem> Cpu<M> {
     // Arithmetic
     #[inline(always)]
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        let val = am.load(&mut *self);
+        let val = am.load(self);
         let mut result = self.regs.a as u32 + val as u32;
         if self.get_flag(CARRY_FLAG) {
             result += 1;
         }
 
-        (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) != 0);
-        (&mut *self).regs.a = self.set_znv(result as u8);
+        self.set_flag(CARRY_FLAG, (result & 0x100) != 0);
+
+        let result = result as u8;
+        self.set_flag(OVERFLOW_FLAG,
+                      (self.regs.a ^ val) & 0x80 == 0 && (self.regs.a ^ result) & 0x80 == 0x80);
+        self.regs.a = self.set_zn(result);
     }
     #[inline(always)]
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        let val = am.load(&mut *self);
+        let val = am.load(self);
         let mut result = self.regs.a as u32 - val as u32;
         if !self.get_flag(CARRY_FLAG) {
             result -= 1;
         }
 
-        (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) == 0);
-        (&mut *self).regs.a = self.set_znv(result as u8);
+        self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
+
+        let result = result as u8;
+        self.set_flag(OVERFLOW_FLAG,
+                      (self.regs.a ^ result) & 0x80 != 0 && (self.regs.a ^ val) & 0x80 == 0x80);
+        self.regs.a = self.set_zn(result);
     }
 
     // Comparisons
