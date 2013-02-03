@@ -294,21 +294,31 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             // TODO: Sprites, palettes
 
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
-            let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
+            let r, g, b;
+            if self.regs.mask.show_background() {
+                let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
 
-            let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
-            pattern_offset += self.regs.ctrl.background_pattern_table_addr();
+                let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
+                pattern_offset += self.regs.ctrl.background_pattern_table_addr();
 
-            let plane0 = self.vram.loadb(pattern_offset);
-            let plane1 = self.vram.loadb(pattern_offset + 8);
-            let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
-            let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
-            let color = (bit1 << 1) | bit0;
+                let plane0 = self.vram.loadb(pattern_offset);
+                let plane1 = self.vram.loadb(pattern_offset + 8);
+                let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
+                let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
+                let color = (bit1 << 1) | bit0;
 
-            //let r = (tile & 0xc0);
-            //let g = (tile & 0x38) << 2;
-            //let b = (tile & 0x03) << 5;
-            let (r, g, b) = ((color << 6) as u32, (color << 6) as u32, (color << 6) as u32);
+                //let r = (tile & 0xc0);
+                //let g = (tile & 0x38) << 2;
+                //let b = (tile & 0x03) << 5;
+                r = (color << 6) as u32;
+                g = r;
+                b = r;
+            } else {
+                r = 0;
+                g = 0;
+                b = 0;
+            }
+
             self.putpixel(x, self.scanline as uint, (r << 8) | (g << 16) | (b << 24));
         }
     }
