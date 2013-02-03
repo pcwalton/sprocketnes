@@ -291,13 +291,14 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
         for range(0, SCREEN_WIDTH) |x| {
-            // TODO: Sprites, tiles
+            // TODO: Sprites, palettes
 
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
 
-            // TODO: Right pattern table
-            let pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
+            let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
+            pattern_offset += self.regs.ctrl.background_pattern_table_addr();
+
             let plane0 = self.vram.loadb(pattern_offset);
             let plane1 = self.vram.loadb(pattern_offset + 8);
             let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;

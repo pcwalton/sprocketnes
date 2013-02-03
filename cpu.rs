@@ -336,7 +336,7 @@ pub struct Cpu<M> {
 // FIXME: This should not need to be public! Sigh. Resolve bug.
 pub impl<M:Mem> Cpu<M> {
     // Debugging
-    #[cfg(debug)]
+    #[cfg(cpudebug)]
     fn trace(&mut self) {
         let mut disassembler = Disassembler { pc: self.regs.pc, mem: &mut self.mem };
         println(fmt!(
@@ -351,6 +351,8 @@ pub impl<M:Mem> Cpu<M> {
             self.cy as uint
         ));
     }
+    #[cfg(debug)]
+    fn trace(&mut self) {}
     #[cfg(ndebug)]
     fn trace(&mut self) {}
 
