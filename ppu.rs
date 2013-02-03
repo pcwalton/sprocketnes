@@ -126,6 +126,7 @@ pub impl Vram {
 }
 
 pub impl Vram : Mem {
+    #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
             return self.rom.chr[addr]
@@ -279,6 +280,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     // Rendering
     //
 
+    #[inline(always)]
     fn putpixel(&mut self, x: uint, y: uint, color: u32) {
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = (color >> 24) as u8;
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = (color >> 16) as u8;
