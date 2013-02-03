@@ -21,14 +21,6 @@ use core::task::PlatformThread;
 use core::{libc, os, str};
 use sdl;
 
-// FIXME: This is wrong; we should DRAIN the event queue.
-fn check_input() -> bool {
-    match sdl::event::poll_event() {
-        sdl::event::KeyUpEvent(*) => false,
-        _ => true
-    }
-}
-
 fn start() {
     let args = os::args();
     if args.len() < 2 {
@@ -44,7 +36,7 @@ fn start() {
     let mut mapper = Mapper::new(&rom);
     let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
     let mut input = Input::new();
-    let mut memmap = MemMap::new(ppu, mapper);
+    let mut memmap = MemMap::new(ppu, input, mapper);
     let mut cpu = Cpu::new(memmap);
 
     // TODO: Add a flag to not reset for nestest.log 
@@ -62,7 +54,7 @@ fn start() {
             gfx.blit(cpu.mem.ppu.screen);
             gfx.screen.flip();
 
-            match input.check_input() {
+            match cpu.mem.input.check_input() {
                 input::Continue => {}
                 input::Quit => break
             }

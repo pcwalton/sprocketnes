@@ -5,6 +5,7 @@
 // Author: Patrick Walton
 //
 
+use input::Input;
 use mapper::Mapper;
 use ppu::{Oam, Ppu, Vram};
 use util::debug_print;
@@ -59,28 +60,29 @@ pub impl Ram : Mem {
 pub struct MemMap {
     ram: Ram,
     ppu: Ppu<Vram,Oam>,
+    input: Input,
     mapper: Mapper,
 }
 
 pub impl MemMap {
-    static fn new(ppu: Ppu<Vram/&a,Oam>, mapper: Mapper/&a) -> MemMap/&a {
+    static fn new(ppu: Ppu<Vram/&a,Oam>, input: Input, mapper: Mapper/&a) -> MemMap/&a {
         MemMap {
             ram: Ram { data: [ 0, ..0x800 ] },
             ppu: ppu,
+            input: input,
             mapper: mapper
         }
     }
 }
 
-pub impl MemMap : Mem {
+impl Mem for MemMap {
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {
             self.ram.loadb(addr)
         } else if addr < 0x4000 {
             self.ppu.loadb(addr)
         } else if addr < 0x4018 {
-            debug_print("I/O regs unimplemented");
-            0
+            self.input.loadb(addr)
         } else {
             (self.mapper.loadb)(&mut self.mapper, addr)
         }
@@ -91,7 +93,7 @@ pub impl MemMap : Mem {
         } else if addr < 0x4000 {
             self.ppu.storeb(addr, val)
         } else if addr < 0x4018 {
-            debug_print("I/O regs unimplemented")
+            self.input.storeb(addr, val)
         } else {
             (self.mapper.storeb)(&mut self.mapper, addr, val)
         }
