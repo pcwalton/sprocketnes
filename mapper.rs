@@ -41,14 +41,17 @@ pub impl Mapper {
 // TODO: RAM.
 pub struct Nrom;
 
-// TODO: Support 32K ROMs (NROM-256).
 pub impl Nrom {
     fn loadb(self, this: &mut Mapper, addr: u16) -> u8 {
-        if addr <= 0x8000 {
+        if addr < 0x8000 {
             0   // FIXME
         } else {
             // FIXME: Unsafe get for speed?
-            this.rom.prg[addr & 0x3fff]
+            if this.rom.prg.len() > 16384 {
+                this.rom.prg[addr & 0x7fff]
+            } else {
+                this.rom.prg[addr & 0x3fff]
+            }
         }
     }
     fn storeb(self, _: &mut Mapper, _: u16, _: u8) {
