@@ -10,6 +10,7 @@ extern mod sdl;
 mod cpu;
 mod disasm;
 mod gfx;
+mod input;
 mod main;
 mod mapper;
 mod mem;

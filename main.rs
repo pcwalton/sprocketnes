@@ -7,6 +7,8 @@
 
 use cpu::Cpu;
 use gfx::Gfx;
+use input::Input;
+use input;
 use mapper::Mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
@@ -41,6 +43,7 @@ fn start() {
     let gfx = Gfx::new();
     let mut mapper = Mapper::new(&rom);
     let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
+    let mut input = Input::new();
     let mut memmap = MemMap::new(ppu, mapper);
     let mut cpu = Cpu::new(memmap);
 
@@ -54,20 +57,15 @@ fn start() {
         if ppu_result.vblank_nmi {
             cpu.nmi();
         }
+
         if ppu_result.new_frame {
             gfx.blit(cpu.mem.ppu.screen);
             gfx.screen.flip();
-            if !check_input() {
-                break;
+
+            match input.check_input() {
+                input::Continue => {}
+                input::Quit => break
             }
-        }
-    }
-
-
-    loop {
-        match sdl::event::poll_event() {
-            sdl::event::KeyUpEvent(*) => break,
-            _ => {}
         }
     }
 }
