@@ -489,7 +489,7 @@ pub impl<M:Mem> Cpu<M> {
         let y = am.load(&mut *self);
         let mut result = x as u32 - y as u32;
         (&mut *self).set_flag(CARRY_FLAG, (result & 0x100) == 0);
-        (&mut *self).regs.a = (&mut *self).set_zn(result as u8);
+        let _ = (&mut *self).set_zn(result as u8);
     }
     fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.a, am) }
     fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.x, am) }
@@ -618,9 +618,9 @@ pub impl<M:Mem> Cpu<M> {
 
     // Stack operations
     fn pha(&mut self) { self.pushb(self.regs.a) }
-    fn pla(&mut self) { self.regs.a = self.popb() }
-    fn php(&mut self) { self.pushb(self.regs.flags) }
-    fn plp(&mut self) { self.regs.flags = self.popb() }
+    fn pla(&mut self) { self.regs.a = self.set_zn(self.popb()) }
+    fn php(&mut self) { self.pushb(self.regs.flags | BREAK_FLAG) }
+    fn plp(&mut self) { self.regs.flags = (self.popb() | 0x30) - 0x10 }
 
     // No operation
     fn nop(&mut self) {}
