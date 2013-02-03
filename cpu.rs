@@ -416,10 +416,10 @@ pub impl<M:Mem> Cpu<M> {
         MemoryAddressingMode(self.loadb_bump_pc() as u16)
     }
     fn zero_page_x(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadb_bump_pc() as u16 + self.regs.x as u16)
+        MemoryAddressingMode((self.loadb_bump_pc() + self.regs.x) as u16)
     }
     fn zero_page_y(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadb_bump_pc() as u16 + self.regs.y as u16)
+        MemoryAddressingMode((self.loadb_bump_pc() + self.regs.y) as u16)
     }
     fn absolute(&mut self) -> MemoryAddressingMode {
         MemoryAddressingMode(self.loadw_bump_pc())
@@ -597,10 +597,11 @@ pub impl<M:Mem> Cpu<M> {
     // Jumps
     fn jmp(&mut self) { self.regs.pc = self.loadw_bump_pc() }
     fn jmpi(&mut self) {
+        let addr = self.loadw_bump_pc();
+
         // Replicate the famous CPU bug...
-        let pc_high = self.regs.pc & 0xff00;
-        let lo = self.loadb_bump_pc();
-        let hi = self.mem.loadb((self.regs.pc & 0x00ff) | pc_high);
+        let lo = self.mem.loadb(addr);
+        let hi = self.mem.loadb((addr & 0xff00) | ((addr + 1) & 0x00ff));
 
         self.regs.pc = (hi as u16 << 8) | lo as u16;
     }
