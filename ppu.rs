@@ -21,6 +21,25 @@ pub const CYCLES_PER_SCANLINE: u64 = 124;   // 29781 cycles per frame, 240 scanl
 pub const VBLANK_SCANLINE: uint = 241;
 pub const LAST_SCANLINE: uint = 261;
 
+const PALETTE: [u8 * 192] = [
+    124,124,124,    0,0,252,        0,0,188,        68,40,188,
+    148,0,132,      168,0,32,       168,16,0,       136,20,0,
+    80,48,0,        0,120,0,        0,104,0,        0,88,0,
+    0,64,88,        0,0,0,          0,0,0,          0,0,0,
+    188,188,188,    0,120,248,      0,88,248,       104,68,252,
+    216,0,204,      228,0,88,       248,56,0,       228,92,16,
+    172,124,0,      0,184,0,        0,168,0,        0,168,68,
+    0,136,136,      0,0,0,          0,0,0,          0,0,0,
+    248,248,248,    60,188,252,     104,136,252,    152,120,248,
+    248,120,248,    248,88,152,     248,120,88,     252,160,68,
+    248,184,0,      184,248,24,     88,216,84,      88,248,152,
+    0,232,216,      120,120,120,    0,0,0,          0,0,0,
+    252,252,252,    164,228,252,    184,184,248,    216,184,248,
+    248,184,248,    248,164,192,    240,208,176,    252,224,168,
+    248,216,120,    216,248,120,    184,248,184,    184,248,216,
+    0,252,252,      248,216,248,    0,0,0,          0,0,0
+];
+
 //
 // Registers
 //
@@ -281,10 +300,10 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     //
 
     #[inline(always)]
-    fn putpixel(&mut self, x: uint, y: uint, color: u32) {
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = (color >> 24) as u8;
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = (color >> 16) as u8;
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = (color >> 8) as u8;
+    fn putpixel(&mut self, x: uint, y: uint, r: u8, g: u8, b: u8) {
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = r as u8;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = g as u8;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = b as u8;
     }
 
     fn render_scanline(&mut self) {
@@ -296,30 +315,35 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let r, g, b;
             if self.regs.mask.show_background() {
+                // Load the tile number from the nametable.
                 let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
 
+                // Compute the pattern offset.
                 let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
                 pattern_offset += self.regs.ctrl.background_pattern_table_addr();
 
+                // Determine the color of this pixel.
                 let plane0 = self.vram.loadb(pattern_offset);
                 let plane1 = self.vram.loadb(pattern_offset + 8);
                 let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
                 let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
                 let color = (bit1 << 1) | bit0;
 
-                //let r = (tile & 0xc0);
-                //let g = (tile & 0x38) << 2;
-                //let b = (tile & 0x03) << 5;
-                r = (color << 6) as u32;
-                g = r;
-                b = r;
+                // Fetch the palette from VRAM.
+                // FIXME: Use the attribute to figure out which palette to use.
+                let palette_index = self.vram.loadb(0x3f00 + (color as u16)) & 0x3f;
+
+                r = PALETTE[palette_index * 3 + 0];
+                g = PALETTE[palette_index * 3 + 1];
+                b = PALETTE[palette_index * 3 + 2];
             } else {
+                // FIXME: Use universal background color from palette.
                 r = 0;
                 g = 0;
                 b = 0;
             }
 
-            self.putpixel(x, self.scanline as uint, (r << 8) | (g << 16) | (b << 24));
+            self.putpixel(x, self.scanline as uint, r, g, b);
         }
     }
 
