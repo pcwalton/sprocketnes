@@ -461,8 +461,12 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                     let tile_color;
                     match sprite.tiles(self) {
                         SpriteTiles8x8(tile) => {
-                            let x = x - sprite.x;
-                            let y = self.scanline as u8 - sprite.y;
+                            let mut x = x - sprite.x;
+                            if sprite.flip_horizontal() { x = 7 - x; }
+
+                            let mut y = self.scanline as u8 - sprite.y;
+                            if sprite.flip_vertical() { y = 7 - y; }
+
                             debug_assert(x < 8, "sprite X miscalculation");
                             debug_assert(y < 8, "sprite Y miscalculation");
 
