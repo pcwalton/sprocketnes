@@ -227,13 +227,18 @@ impl Sprite {
     fn flip_horizontal(&self) -> bool   { (self.attribute_byte & 0x40) != 0 }
     fn flip_vertical(&self) -> bool     { (self.attribute_byte & 0x80) != 0 }
 
-    // Quick test to see whether the given point is in the bounding box of this sprite.
-    fn in_bounding_box<VM,OM>(&self, ppu: &Ppu<VM,OM>, x: u8, y: u8) -> bool {
-        if x < self.x || x >= self.x + 8 || y < self.y { return false; }
+    // Quick test to see whether this sprite is on the given scanline.
+    fn on_scanline<VM,OM>(&self, ppu: &Ppu<VM,OM>, y: u8) -> bool {
+        if y < self.y { return false; }
         match ppu.regs.ctrl.sprite_size() {
             SpriteSize8x8 => y < self.y + 8,
             SpriteSize8x16 => y < self.y + 16
         }
+    }
+
+    // Quick test to see whether the given point is in the bounding box of this sprite.
+    fn in_bounding_box<VM,OM>(&self, ppu: &Ppu<VM,OM>, x: u8, y: u8) -> bool {
+        x >= self.x && x < self.x + 8 && self.on_scanline(ppu, y)
     }
 }
 
@@ -414,26 +419,52 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     #[inline(never)]
-    fn get_sprite_pixel(&mut self, x: u8, color: &mut Rgb) {
-        for self.each_sprite |sprite, index| {
-            // Don't need to consider this sprite if we aren't in its bounding box.
-            if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
-                loop;
+    fn get_sprite_pixel(&mut self, visible_sprites: &[Option<u8> * 8], x: u8, color: &mut Rgb) {
+        for visible_sprites.each |&visible_sprite_opt| {
+            match visible_sprite_opt {
+                None => return,
+                Some(index) => {
+                    let sprite = self.make_sprite_info(index as u16);
+
+                    // Don't need to consider this sprite if we aren't in its bounding box.
+                    if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
+                        loop;
+                    }
+
+                    //println(fmt!("rendering sprite %d", i as int));
+
+                    if index == 0 {
+                        self.regs.status.set_sprite_zero_hit(true);
+                    }
+
+                    *color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
+                }
             }
-
-            //println(fmt!("rendering sprite %d", i as int));
-
-            if index == 0 {
-                self.regs.status.set_sprite_zero_hit(true);
-            }
-
-            *color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
         }
+    }
+
+    fn compute_visible_sprites(&mut self) -> [Option<u8> * 8] {
+        let mut count = 0;
+        let mut result = [None, ..8];
+        for self.each_sprite |sprite, index| {
+            if sprite.on_scanline(self, self.scanline as u8) {
+                if count < 8 {
+                    result[count] = Some(index);
+                    count += 1;
+                } else {
+                    self.regs.status.set_sprite_overflow(true);
+                    return result;
+                }
+            }
+        }
+        result
     }
 
     fn render_scanline(&mut self) {
         // TODO: Scrolling, mirroring
+        let visible_sprites = self.compute_visible_sprites();
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
+
         for range(0, SCREEN_WIDTH) |x| {
             // TODO: Attributes
 
@@ -447,7 +478,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             }
 
             if self.regs.mask.show_sprites() {
-                self.get_sprite_pixel(x as u8, &mut color);
+                self.get_sprite_pixel(&visible_sprites, x as u8, &mut color);
             }
 
             //println(fmt!("%?", self.make_sprite_info(0)));
