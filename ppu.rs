@@ -326,6 +326,18 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     //
+    // Color utilities
+    //
+
+    fn get_color(&self, palette_index: u8) -> Rgb {
+        Rgb {
+            r: PALETTE[palette_index * 3 + 0],
+            g: PALETTE[palette_index * 3 + 1],
+            b: PALETTE[palette_index * 3 + 2],
+        }
+    }
+
+    //
     // Register manipulation
     //
 
@@ -426,12 +438,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // Fetch the palette from VRAM.
         // FIXME: Use the attribute to figure out which palette to use.
         let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
-
-        Rgb {
-            r: PALETTE[palette_index * 3 + 0],
-            g: PALETTE[palette_index * 3 + 1],
-            b: PALETTE[palette_index * 3 + 2],
-        }
+        self.get_color(palette_index)
     }
 
     #[inline(never)]
@@ -451,7 +458,26 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                         self.regs.status.set_sprite_zero_hit(true);
                     }
 
-                    *color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
+                    let tile_color;
+                    match sprite.tiles(self) {
+                        SpriteTiles8x8(tile) => {
+                            let x = x - sprite.x;
+                            let y = self.scanline as u8 - sprite.y;
+                            debug_assert(x < 8, "sprite X miscalculation");
+                            debug_assert(y < 8, "sprite Y miscalculation");
+
+                            tile_color = self.get_pattern_pixel(Sprite, tile, x, y);
+                        }
+                        SpriteTiles8x16(*) => {
+                            die!(~"8x16 sprite rendering unimplemented");
+                        }
+                    }
+
+                    // Fetch the palette from VRAM.
+                    // FIXME: Use the OAM data to figure out which palette to use.
+                    // TODO: Sprite X, Y flip.
+                    let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
+                    *color = self.get_color(palette_index);
                 }
             }
         }
