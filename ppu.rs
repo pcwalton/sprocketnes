@@ -386,6 +386,51 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = color.b;
     }
 
+    #[inline(never)]
+    fn get_background_pixel(&mut self, x: u8, nametable_offset: u16) -> Rgb {
+        // Load the tile number from the nametable.
+        let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
+
+        // Compute the pattern offset.
+        let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
+        pattern_offset += self.regs.ctrl.background_pattern_table_addr();
+
+        // Determine the color of this pixel.
+        let plane0 = self.vram.loadb(pattern_offset);
+        let plane1 = self.vram.loadb(pattern_offset + 8);
+        let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
+        let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
+        let tile_color = (bit1 << 1) | bit0;
+
+        // Fetch the palette from VRAM.
+        // FIXME: Use the attribute to figure out which palette to use.
+        let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
+
+        Rgb {
+            r: PALETTE[palette_index * 3 + 0],
+            g: PALETTE[palette_index * 3 + 1],
+            b: PALETTE[palette_index * 3 + 2],
+        }
+    }
+
+    #[inline(never)]
+    fn get_sprite_pixel(&mut self, x: u8, color: &mut Rgb) {
+        for self.each_sprite |sprite, index| {
+            // Don't need to consider this sprite if we aren't in its bounding box.
+            if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
+                loop;
+            }
+
+            //println(fmt!("rendering sprite %d", i as int));
+
+            if index == 0 {
+                self.regs.status.set_sprite_zero_hit(true);
+            }
+
+            *color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
+        }
+    }
+
     fn render_scanline(&mut self) {
         // TODO: Scrolling, mirroring
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
@@ -395,49 +440,14 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut color;
             if self.regs.mask.show_background() {
-                // Load the tile number from the nametable.
-                let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
-
-                // Compute the pattern offset.
-                let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
-                pattern_offset += self.regs.ctrl.background_pattern_table_addr();
-
-                // Determine the color of this pixel.
-                let plane0 = self.vram.loadb(pattern_offset);
-                let plane1 = self.vram.loadb(pattern_offset + 8);
-                let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
-                let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
-                let tile_color = (bit1 << 1) | bit0;
-
-                // Fetch the palette from VRAM.
-                // FIXME: Use the attribute to figure out which palette to use.
-                let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
-
-                color = Rgb {
-                    r: PALETTE[palette_index * 3 + 0],
-                    g: PALETTE[palette_index * 3 + 1],
-                    b: PALETTE[palette_index * 3 + 2],
-                };
+                color = self.get_background_pixel(x as u8, nametable_offset);
             } else {
                 // FIXME: Use universal background color from palette.
                 color = Rgb { r: 0, g: 0, b: 0 };
             }
 
             if self.regs.mask.show_sprites() {
-                for self.each_sprite |sprite, index| {
-                    // Don't need to consider this sprite if we aren't in its bounding box.
-                    if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
-                        loop;
-                    }
-
-                    //println(fmt!("rendering sprite %d", i as int));
-
-                    if index == 0 {
-                        self.regs.status.set_sprite_zero_hit(true);
-                    }
-
-                    color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
-                }
+                self.get_sprite_pixel(x as u8, &mut color);
             }
 
             //println(fmt!("%?", self.make_sprite_info(0)));
@@ -458,6 +468,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         }
     }
 
+    #[inline(never)]
     fn step(&mut self, run_to_cycle: u64) -> StepResult {
         let mut result = StepResult { new_frame: false, vblank_nmi: false };
         loop {
