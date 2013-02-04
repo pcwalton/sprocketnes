@@ -300,6 +300,11 @@ struct Rgb {
     b: u8,
 }
 
+enum PatternPixelKind {
+    Background,
+    Sprite,
+}
+
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
         Ppu {
@@ -391,21 +396,32 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = color.b;
     }
 
-    #[inline(never)]
-    fn get_background_pixel(&mut self, x: u8, nametable_offset: u16) -> Rgb {
-        // Load the tile number from the nametable.
-        let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
-
+    // Returns the color (pre-palette lookup) of pixel (x,y) within the given tile.
+    #[inline(always)]
+    fn get_pattern_pixel(&mut self, kind: PatternPixelKind, tile: u16, x: u8, y: u8) -> u8 {
         // Compute the pattern offset.
-        let mut pattern_offset = (tile << 4) as u16 + (self.scanline as u16) % 8;
-        pattern_offset += self.regs.ctrl.background_pattern_table_addr();
+        let mut pattern_offset = (tile << 4) + (y as u16);
+        match kind {
+            Background => pattern_offset += self.regs.ctrl.background_pattern_table_addr(),
+            Sprite     => pattern_offset += self.regs.ctrl.sprite_pattern_table_addr(),
+        }
 
         // Determine the color of this pixel.
         let plane0 = self.vram.loadb(pattern_offset);
         let plane1 = self.vram.loadb(pattern_offset + 8);
         let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
         let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
-        let tile_color = (bit1 << 1) | bit0;
+        (bit1 << 1) | bit0
+    }
+
+    // FIXME: Remove inline(never) from here. It's only here for perf profiling purposes.
+    #[inline(never)]
+    fn get_background_pixel(&mut self, x: u8, nametable_offset: u16) -> Rgb {
+        // Load the tile number from the nametable.
+        let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u16;
+
+        let y = (self.scanline % 8) as u8;
+        let tile_color = self.get_pattern_pixel(Background, tile, x % 8, y);
 
         // Fetch the palette from VRAM.
         // FIXME: Use the attribute to figure out which palette to use.
@@ -430,8 +446,6 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                     if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
                         loop;
                     }
-
-                    //println(fmt!("rendering sprite %d", i as int));
 
                     if index == 0 {
                         self.regs.status.set_sprite_zero_hit(true);
@@ -464,6 +478,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let visible_sprites = self.compute_visible_sprites();
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
+        nametable_offset += self.regs.scroll.x as u16 / 8;
 
         for range(0, SCREEN_WIDTH) |x| {
             // TODO: Attributes
@@ -480,8 +495,6 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             if self.regs.mask.show_sprites() {
                 self.get_sprite_pixel(&visible_sprites, x as u8, &mut color);
             }
-
-            //println(fmt!("%?", self.make_sprite_info(0)));
 
             self.putpixel(x, self.scanline as uint, color);
         }
