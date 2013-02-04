@@ -7,7 +7,7 @@
 
 use mem::Mem;
 use rom::Rom;
-use util::{debug_assert, debug_print};
+use util::{debug_assert, debug_print, println};
 
 use core::uint::range;
 
@@ -367,9 +367,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&Sprite) -> bool) {
+    fn each_sprite(&mut self, f: &fn(&Sprite, u8) -> bool) {
         for range(0, 64) |i| {
-            if !f(&self.make_sprite_info(i as u16)) {
+            if !f(&self.make_sprite_info(i as u16), i as u8) {
                 break;
             }
         }
@@ -390,7 +390,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
         for range(0, SCREEN_WIDTH) |x| {
-            // TODO: Sprites, attributes
+            // TODO: Attributes
 
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut color;
@@ -424,15 +424,23 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             }
 
             if self.regs.mask.show_sprites() {
-                for self.each_sprite |sprite| {
+                for self.each_sprite |sprite, index| {
                     // Don't need to consider this sprite if we aren't in its bounding box.
                     if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
                         loop;
                     }
 
-                    color = Rgb { r: 0xff, g: 0, b: 0xff };
+                    //println(fmt!("rendering sprite %d", i as int));
+
+                    if index == 0 {
+                        self.regs.status.set_sprite_zero_hit(true);
+                    }
+
+                    color = Rgb { r: 0xff, g: 0, b: 0xff }; // TODO: actual tiles
                 }
             }
+
+            //println(fmt!("%?", self.make_sprite_info(0)));
 
             self.putpixel(x, self.scanline as uint, color);
         }
@@ -440,6 +448,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
     fn start_vblank(&mut self, result: &mut StepResult) {
         self.regs.status.set_in_vblank(true);
+
+        // FIXME: Is this correct? Or does it happen on the *next* frame?
+        self.regs.status.set_sprite_zero_hit(false);
 
         if self.regs.ctrl.vblank_nmi() {
             debug_print("VBLANK NMI!");
