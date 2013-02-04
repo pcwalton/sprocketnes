@@ -228,7 +228,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
             1 => self.regs.mask = PpuMask(val),
             2 => (),    // PPUSTATUS is read-only
             3 => self.regs.oam_addr = val,
-            4 => fail ~"OAM write unimplemented",
+            4 => self.write_oamdata(val),
             5 => self.update_ppuscroll(val),
             6 => self.update_ppuaddr(val),
             7 => self.write_ppudata(val),
@@ -280,6 +280,11 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         }
     }
 
+    fn write_oamdata(&mut self, val: u8) {
+        self.oam.storeb(self.regs.oam_addr as u16, val);
+        self.regs.oam_addr += 1;
+    }
+
     fn update_ppuaddr(&mut self, val: u8) {
         self.regs.addr = (self.regs.addr << 8) | (val as u16);
     }
@@ -310,7 +315,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
         for range(0, SCREEN_WIDTH) |x| {
-            // TODO: Sprites, palettes
+            // TODO: Sprites, attributes
 
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let r, g, b;
@@ -341,6 +346,10 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                 r = 0;
                 g = 0;
                 b = 0;
+            }
+
+            if self.regs.mask.show_sprites() {
+                // TODO
             }
 
             self.putpixel(x, self.scanline as uint, r, g, b);

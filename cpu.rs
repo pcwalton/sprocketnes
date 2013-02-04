@@ -9,6 +9,8 @@ use disasm::Disassembler;
 use mem::{Mem, MemUtil};
 use util::println;
 
+use core::uint::range;
+
 //
 // Constants
 //
@@ -91,8 +93,8 @@ impl<M:Mem> ImmediateAddressingMode : AddressingMode<M> {
 
 struct MemoryAddressingMode(u16);
 impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
-    fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.mem.loadb(**self) }
-    fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.mem.storeb(**self, val) }
+    fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
+    fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
 }
 
 //
@@ -333,10 +335,24 @@ pub struct Cpu<M> {
     mem: M,
 }
 
-// FIXME: This should not need to be public! Sigh. Resolve bug.
-pub impl<M:Mem> Cpu<M> {
+// The CPU implements Mem so that it can handle writes to the DMA register.
+impl<M:Mem> Mem for Cpu<M> {
+    fn loadb(&mut self, addr: u16) -> u8 { self.mem.loadb(addr) }
+
+    fn storeb(&mut self, addr: u16, val: u8) {
+        // Handle OAM_DMA.
+        if addr == 0x4014 {
+            self.dma(val);
+            return;
+        }
+
+        self.mem.storeb(addr, val)
+    }
+}
+
+impl<M:Mem> Cpu<M> {
     // Debugging
-    #[cfg(cpudebug)]
+    #[cfg(cpuspew)]
     fn trace(&mut self) {
         let mut disassembler = Disassembler { pc: self.regs.pc, mem: &mut self.mem };
         println(fmt!(
@@ -351,45 +367,54 @@ pub impl<M:Mem> Cpu<M> {
             self.cy as uint
         ));
     }
-    #[cfg(debug)]
+    #[cfg(ncpuspew)]
     fn trace(&mut self) {}
-    #[cfg(ndebug)]
-    fn trace(&mut self) {}
+
+    // Performs DMA to the OAMDATA ($2004) register.
+    fn dma(&mut self, hi_addr: u8) {
+        for range(hi_addr as uint << 8, (hi_addr + 1) as uint << 8) |addr| {
+            self.storeb(0x2004, self.loadb(addr as u16));
+
+            // FIXME: The last address sometimes takes 1 cycle, sometimes 2 -- NESdev isn't very
+            // clear on this.
+            self.cy += 2;
+        }
+    }
 
     // Memory access helpers
     /// Loads the byte at the program counter and increments the program counter.
     fn loadb_bump_pc(&mut self) -> u8 {
-        let val = self.mem.loadb(self.regs.pc);
+        let val = self.loadb(self.regs.pc);
         self.regs.pc += 1;
         val
     }
     /// Loads two bytes (little-endian) at the program counter and bumps the program counter over
     /// them.
     fn loadw_bump_pc(&mut self) -> u16 {
-        let val = self.mem.loadw(self.regs.pc);
+        let val = self.loadw(self.regs.pc);
         self.regs.pc += 2;
         val
     }
 
     // Stack helpers
     fn pushb(&mut self, val: u8) {
-        self.mem.storeb(0x100 + self.regs.s as u16, val);
+        self.storeb(0x100 + self.regs.s as u16, val);
         self.regs.s -= 1;
     }
     fn pushw(&mut self, val: u16) {
-        // FIXME: Is this correct? FCEU has two self.mem.storeb()s here. Might have different
+        // FIXME: Is this correct? FCEU has two self.storeb()s here. Might have different
         // semantics...
-        self.mem.storew(0x100 + (self.regs.s - 1) as u16, val);
+        self.storew(0x100 + (self.regs.s - 1) as u16, val);
         self.regs.s -= 2;
     }
     fn popb(&mut self) -> u8 {
-        let val = self.mem.loadb(0x100 + self.regs.s as u16 + 1);
+        let val = self.loadb(0x100 + self.regs.s as u16 + 1);
         self.regs.s += 1;
         val
     }
     fn popw(&mut self) -> u16 {
         // FIXME: See comment in pushw().
-        let val = self.mem.loadw(0x100 + self.regs.s as u16 + 1);
+        let val = self.loadw(0x100 + self.regs.s as u16 + 1);
         self.regs.s += 2;
         val
     }
@@ -433,11 +458,11 @@ pub impl<M:Mem> Cpu<M> {
         MemoryAddressingMode(self.loadw_bump_pc() + self.regs.y as u16)
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
-        let addr = self.mem.loadw_zp(self.loadb_bump_pc() + self.regs.x);
+        let addr = self.loadw_zp(self.loadb_bump_pc() + self.regs.x);
         MemoryAddressingMode(addr)
     }
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
-        let addr = self.mem.loadw_zp(self.loadb_bump_pc()) + self.regs.y as u16;
+        let addr = self.loadw_zp(self.loadb_bump_pc()) + self.regs.y as u16;
         MemoryAddressingMode(addr)
     }
 
@@ -602,8 +627,8 @@ pub impl<M:Mem> Cpu<M> {
         let addr = self.loadw_bump_pc();
 
         // Replicate the famous CPU bug...
-        let lo = self.mem.loadb(addr);
-        let hi = self.mem.loadb((addr & 0xff00) | ((addr + 1) & 0x00ff));
+        let lo = self.loadb(addr);
+        let hi = self.loadb((addr & 0xff00) | ((addr + 1) & 0x00ff));
 
         self.regs.pc = (hi as u16 << 8) | lo as u16;
     }
@@ -619,7 +644,7 @@ pub impl<M:Mem> Cpu<M> {
         self.pushw(self.regs.pc + 1);
         self.pushb(self.regs.flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
         self.set_flag(IRQ_FLAG, true);
-        self.regs.pc = self.mem.loadw(BRK_VECTOR);
+        self.regs.pc = self.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
         self.set_flags(self.popb());
@@ -662,12 +687,12 @@ pub impl<M:Mem> Cpu<M> {
 
     /// External interfaces
     fn reset(&mut self) {
-        self.regs.pc = self.mem.loadw(RESET_VECTOR);
+        self.regs.pc = self.loadw(RESET_VECTOR);
     }
     fn nmi(&mut self) {
         self.pushw(self.regs.pc);
         self.pushb(self.regs.flags);
-        self.regs.pc = self.mem.loadw(NMI_VECTOR);
+        self.regs.pc = self.loadw(NMI_VECTOR);
     }
 
     /// The constructor.
