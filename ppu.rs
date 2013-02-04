@@ -174,21 +174,67 @@ pub impl Vram : Mem {
     }
 }
 
-// Object Attribute Memory (OAM).
+//
+// Object Attribute Memory (OAM)
+//
 
 pub struct Oam {
     oam: [u8 * 0x100]
 }
 
-pub impl Oam {
+impl Oam {
     static fn new() -> Oam {
         Oam { oam: [ 0, ..0x100 ] }
     }
 }
 
-pub impl Oam : Mem {
+impl Mem for Oam {
     fn loadb(&mut self, addr: u16) -> u8     { self.oam[addr] }
     fn storeb(&mut self, addr: u16, val: u8) { self.oam[addr] = val }
+}
+
+struct Sprite {
+    x: u8,
+    y: u8,
+    tile_index_byte: u8,
+    attribute_byte: u8,
+}
+
+// Specifies the indices of the tiles that make up this sprite.
+enum SpriteTiles {
+    SpriteTiles8x8(u16),
+    SpriteTiles8x16(u16, u16)
+}
+
+impl Sprite {
+    fn tiles<VM,OM>(&self, ppu: &Ppu<VM,OM>) -> SpriteTiles {
+        let base = ppu.regs.ctrl.sprite_pattern_table_addr();
+        match ppu.regs.ctrl.sprite_size() {
+            SpriteSize8x8 => SpriteTiles8x8(self.tile_index_byte as u16 | base),
+            SpriteSize8x16 => {
+                // We ignore the base set in PPUCTRL here.
+                let mut first = (self.tile_index_byte & !1) as u16;
+                if (self.tile_index_byte & 1) != 0 {
+                    first += 0x1000;
+                }
+                SpriteTiles8x16(first, first + 1)
+            }
+        }
+    }
+
+    fn palette(&self) -> u8             { (self.attribute_byte & 3) + 4 }
+    fn priority(&self) -> bool          { (self.attribute_byte & 0x20) != 0 }
+    fn flip_horizontal(&self) -> bool   { (self.attribute_byte & 0x40) != 0 }
+    fn flip_vertical(&self) -> bool     { (self.attribute_byte & 0x80) != 0 }
+
+    // Quick test to see whether the given point is in the bounding box of this sprite.
+    fn in_bounding_box<VM,OM>(&self, ppu: &Ppu<VM,OM>, x: u8, y: u8) -> bool {
+        if x < self.x || x >= self.x + 8 || y < self.y { return false; }
+        match ppu.regs.ctrl.sprite_size() {
+            SpriteSize8x8 => y < self.y + 8,
+            SpriteSize8x16 => y < self.y + 16
+        }
+    }
 }
 
 // The main PPU structure. This structure is separate from the PPU memory just as the CPU is.
@@ -241,6 +287,12 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
 pub struct StepResult {
     new_frame: bool,    // We wrapped around to the next scanline.
     vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
+}
+
+struct Rgb {
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
@@ -301,14 +353,37 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     //
+    // Sprites
+    //
+
+    #[inline(always)]
+    fn make_sprite_info(&mut self, index: u16) -> Sprite {
+        Sprite {
+            y: self.oam.loadb(index * 4 + 0),
+            tile_index_byte: self.oam.loadb(index * 4 + 1),
+            attribute_byte: self.oam.loadb(index * 4 + 2),
+            x: self.oam.loadb(index * 4 + 3),
+        }
+    }
+
+    #[inline(always)]
+    fn each_sprite(&mut self, f: &fn(&Sprite) -> bool) {
+        for range(0, 64) |i| {
+            if !f(&self.make_sprite_info(i as u16)) {
+                break;
+            }
+        }
+    }
+
+    //
     // Rendering
     //
 
     #[inline(always)]
-    fn putpixel(&mut self, x: uint, y: uint, r: u8, g: u8, b: u8) {
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = r as u8;
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = g as u8;
-        self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = b as u8;
+    fn putpixel(&mut self, x: uint, y: uint, color: Rgb) {
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = color.r;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = color.g;
+        self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = color.b;
     }
 
     fn render_scanline(&mut self) {
@@ -318,7 +393,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             // TODO: Sprites, attributes
 
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
-            let r, g, b;
+            let mut color;
             if self.regs.mask.show_background() {
                 // Load the tile number from the nametable.
                 let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u32;
@@ -332,27 +407,34 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                 let plane1 = self.vram.loadb(pattern_offset + 8);
                 let bit0 = (plane0 >> (7 - ((x % 8) as u8))) & 1;
                 let bit1 = (plane1 >> (7 - ((x % 8) as u8))) & 1;
-                let color = (bit1 << 1) | bit0;
+                let tile_color = (bit1 << 1) | bit0;
 
                 // Fetch the palette from VRAM.
                 // FIXME: Use the attribute to figure out which palette to use.
-                let palette_index = self.vram.loadb(0x3f00 + (color as u16)) & 0x3f;
+                let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
 
-                r = PALETTE[palette_index * 3 + 0];
-                g = PALETTE[palette_index * 3 + 1];
-                b = PALETTE[palette_index * 3 + 2];
+                color = Rgb {
+                    r: PALETTE[palette_index * 3 + 0],
+                    g: PALETTE[palette_index * 3 + 1],
+                    b: PALETTE[palette_index * 3 + 2],
+                };
             } else {
                 // FIXME: Use universal background color from palette.
-                r = 0;
-                g = 0;
-                b = 0;
+                color = Rgb { r: 0, g: 0, b: 0 };
             }
 
             if self.regs.mask.show_sprites() {
-                // TODO
+                for self.each_sprite |sprite| {
+                    // Don't need to consider this sprite if we aren't in its bounding box.
+                    if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
+                        loop;
+                    }
+
+                    color = Rgb { r: 0xff, g: 0, b: 0xff };
+                }
             }
 
-            self.putpixel(x, self.scanline as uint, r, g, b);
+            self.putpixel(x, self.scanline as uint, color);
         }
     }
 
