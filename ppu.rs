@@ -158,7 +158,7 @@ pub impl Vram : Mem {
             let addr = addr & 0x1f;
             return self.palette[addr]
         }
-        fail ~"invalid VRAM read"
+        die!(~"invalid VRAM read")
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
@@ -263,11 +263,11 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
             1 => *self.regs.mask,
             2 => *self.regs.status,
             3 => 0, // OAMADDR is read-only
-            4 => fail ~"OAM read unimplemented",
+            4 => die!(~"OAM read unimplemented"),
             5 => 0, // PPUSCROLL is read-only
             6 => 0, // PPUADDR is read-only
             7 => self.read_ppudata(),
-            _ => fail ~"can't happen"
+            _ => die!(~"can't happen")
         }
     }
 
@@ -283,7 +283,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
             5 => self.update_ppuscroll(val),
             6 => self.update_ppuaddr(val),
             7 => self.write_ppudata(val),
-            _ => fail ~"can't happen"
+            _ => die!(~"can't happen")
         }
     }
 }
@@ -328,7 +328,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     //
     // Color utilities
     //
-
+    #[inline(always)]
     fn get_color(&self, palette_index: u8) -> Rgb {
         Rgb {
             r: PALETTE[palette_index * 3 + 0],
@@ -427,7 +427,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     // FIXME: Remove inline(never) from here. It's only here for perf profiling purposes.
-    #[inline(never)]
+    #[inline(always)]
     fn get_background_pixel(&mut self, x: u8, nametable_offset: u16) -> Rgb {
         // Load the tile number from the nametable.
         let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u16;
@@ -441,7 +441,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         self.get_color(palette_index)
     }
 
-    #[inline(never)]
+    #[inline(always)]
     fn get_sprite_pixel(&mut self, visible_sprites: &[Option<u8> * 8], x: u8, color: &mut Rgb) {
         for visible_sprites.each |&visible_sprite_opt| {
             match visible_sprite_opt {

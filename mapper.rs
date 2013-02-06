@@ -27,7 +27,7 @@ pub impl Mapper {
                 loadb:  |this, addr|      Nrom.loadb(this, addr),
                 storeb: |this, addr, val| Nrom.storeb(this, addr, val),
             },
-            _ => fail ~"unsupported mapper"
+            _ => die!(~"unsupported mapper")
         }
     }
 }
