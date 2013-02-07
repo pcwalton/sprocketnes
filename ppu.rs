@@ -428,7 +428,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
     // FIXME: Remove inline(never) from here. It's only here for perf profiling purposes.
     #[inline(always)]
-    fn get_background_pixel(&mut self, x: u8) -> Rgb {
+    fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) {
         // Compute the tile index and the pixel offset within that tile.
         let (x_index, y_index) = (x as u16 / 8, self.scanline as u16 / 8);
         let (xsub, ysub) = (x % 8, (self.scanline % 8) as u8);
@@ -440,6 +440,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
         // Fetch the pattern color.
         let pattern_color = self.get_pattern_pixel(Background, tile, xsub, ysub);
+        if pattern_color == 0 {
+            return;     // Transparent.
+        }
 
         // Now load the attribute bits from the attribute table.
         let group = y_index / 4 * 8 + x_index / 4;
@@ -455,7 +458,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // Determine the final color and fetch the palette from VRAM.
         let tile_color = (attr_table_color << 2) | pattern_color;
         let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
-        self.get_color(palette_index)
+        *color = self.get_color(palette_index);
     }
 
     #[inline(always)]
@@ -494,6 +497,11 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                         }
                     }
 
+                    // If the pattern color was zero, this part of the sprite is transparent.
+                    if pattern_color == 0 {
+                        return;
+                    }
+
                     // Determine final tile color and do the palette lookup.
                     let tile_color = (sprite.palette() << 2) | pattern_color;
                     let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
@@ -526,12 +534,10 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
         for range(0, SCREEN_WIDTH) |x| {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
-            let mut color;
+            // FIXME: Use universal background color from palette.
+            let mut color = Rgb { r: 0, g: 0, b: 0 };
             if self.regs.mask.show_background() {
-                color = self.get_background_pixel(x as u8);
-            } else {
-                // FIXME: Use universal background color from palette.
-                color = Rgb { r: 0, g: 0, b: 0 };
+                self.get_background_pixel(x as u8, &mut color);
             }
 
             if self.regs.mask.show_sprites() {
