@@ -251,6 +251,7 @@ pub struct Ppu<VM,OM> {
 
     screen: ~([u8 * 184320]),  // 256 * 240 * 3
     scanline: u16,
+    ppudata_buffer: u8,
     cy: u64
 }
 
@@ -321,6 +322,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
             screen: ~([ 0, ..184320 ]),
             scanline: 0,
+            ppudata_buffer: 0,
             cy: 0
         }
     }
@@ -369,9 +371,18 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     fn read_ppudata(&mut self) -> u8 {
-        let val = self.vram.loadb(self.regs.addr);
+        let addr = self.regs.addr;
+        let mut val = self.vram.loadb(addr);
         self.regs.addr += self.regs.ctrl.vram_addr_increment();
-        val
+
+        // Emulate the PPU buffering quirk.
+        if addr < 0x3f00 {
+            let buffered_val = self.ppudata_buffer;
+            self.ppudata_buffer = val;
+            buffered_val
+        } else {
+            val
+        }
     }
 
     //
