@@ -331,9 +331,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     #[inline(always)]
     fn get_color(&self, palette_index: u8) -> Rgb {
         Rgb {
-            r: PALETTE[palette_index * 3 + 0],
+            r: PALETTE[palette_index * 3 + 2],
             g: PALETTE[palette_index * 3 + 1],
-            b: PALETTE[palette_index * 3 + 2],
+            b: PALETTE[palette_index * 3 + 0],
         }
     }
 
@@ -428,15 +428,32 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
     // FIXME: Remove inline(never) from here. It's only here for perf profiling purposes.
     #[inline(always)]
-    fn get_background_pixel(&mut self, x: u8, nametable_offset: u16) -> Rgb {
-        // Load the tile number from the nametable.
-        let tile = self.vram.loadb(nametable_offset + (x as u16 / 8)) as u16;
+    fn get_background_pixel(&mut self, x: u8) -> Rgb {
+        // Compute the tile index and the pixel offset within that tile.
+        let (x_index, y_index) = (x as u16 / 8, self.scanline as u16 / 8);
+        let (xsub, ysub) = (x % 8, (self.scanline % 8) as u8);
 
-        let y = (self.scanline % 8) as u8;
-        let tile_color = self.get_pattern_pixel(Background, tile, x % 8, y);
+        // Compute the nametable address and load the tile number from the nametable.
+        let tile_offset = 32 * y_index + x_index;
+        let tile = self.vram.loadb(0x2000 + tile_offset) as u16;
+        //nametable_offset += self.regs.scroll.x as u16 / 8;
 
-        // Fetch the palette from VRAM.
-        // FIXME: Use the attribute to figure out which palette to use.
+        // Fetch the pattern color.
+        let pattern_color = self.get_pattern_pixel(Background, tile, xsub, ysub);
+
+        // Now load the attribute bits from the attribute table.
+        let group = y_index / 4 * 8 + x_index / 4;
+        let attr_byte = self.vram.loadb(0x23c0 + group);
+        let (left, top) = (x_index % 4 < 2, y_index % 4 < 2);
+        let attr_table_color = match (left, top) {
+            (true, true) => attr_byte & 0x3,
+            (false, true) => (attr_byte >> 2) & 0x3,
+            (true, false) => (attr_byte >> 4) & 0x3,
+            (false, false) => (attr_byte >> 6) & 0x3
+        };
+
+        // Determine the final color and fetch the palette from VRAM.
+        let tile_color = (attr_table_color << 2) | pattern_color;
         let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
         self.get_color(palette_index)
     }
@@ -507,16 +524,12 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     fn render_scanline(&mut self) {
         // TODO: Scrolling, mirroring
         let visible_sprites = self.compute_visible_sprites();
-        let mut nametable_offset = 0x2000 + 32 * (self.scanline / 8);
-        nametable_offset += self.regs.scroll.x as u16 / 8;
 
         for range(0, SCREEN_WIDTH) |x| {
-            // TODO: Attributes
-
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut color;
             if self.regs.mask.show_background() {
-                color = self.get_background_pixel(x as u8, nametable_offset);
+                color = self.get_background_pixel(x as u8);
             } else {
                 // FIXME: Use universal background color from palette.
                 color = Rgb { r: 0, g: 0, b: 0 };
