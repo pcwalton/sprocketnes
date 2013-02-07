@@ -475,7 +475,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                         self.regs.status.set_sprite_zero_hit(true);
                     }
 
-                    let tile_color;
+                    let pattern_color;
                     match sprite.tiles(self) {
                         SpriteTiles8x8(tile) => {
                             let mut x = x - sprite.x;
@@ -487,16 +487,15 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                             debug_assert(x < 8, "sprite X miscalculation");
                             debug_assert(y < 8, "sprite Y miscalculation");
 
-                            tile_color = self.get_pattern_pixel(Sprite, tile, x, y);
+                            pattern_color = self.get_pattern_pixel(Sprite, tile, x, y);
                         }
                         SpriteTiles8x16(*) => {
                             die!(~"8x16 sprite rendering unimplemented");
                         }
                     }
 
-                    // Fetch the palette from VRAM.
-                    // FIXME: Use the OAM data to figure out which palette to use.
-                    // TODO: Sprite X, Y flip.
+                    // Determine final tile color and do the palette lookup.
+                    let tile_color = (sprite.palette() << 2) | pattern_color;
                     let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
                     *color = self.get_color(palette_index);
                 }
