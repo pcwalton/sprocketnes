@@ -13,7 +13,7 @@ use sdl::sdl;
 use sdl::video::{DoubleBuf, HWSurface, Surface};
 use sdl::video;
 
-const SCREEN_WIDTH: uint = 320;
+const SCREEN_WIDTH: uint = 256;
 const SCREEN_HEIGHT: uint = 240;
 
 pub struct Gfx {
@@ -32,17 +32,8 @@ pub impl Gfx {
     }
 
     fn blit(&self, ppu_screen: &([u8 * 184320])) {
-        let src_stride = ppu::SCREEN_WIDTH * 3;
-        let dest_stride = SCREEN_WIDTH * 3;
-
         do self.screen.with_lock |pixels| {
-            for range(0, ppu::SCREEN_HEIGHT) |y| {
-                let dest_start = y * dest_stride;
-                let dest = vec::mut_view(pixels, dest_start, dest_start + dest_stride);
-                let src_start = y * src_stride;
-                let src = vec::view(*ppu_screen, src_start, src_start + src_stride);
-                vec::bytes::copy_memory(dest, src, src_stride);
-            }
+            vec::bytes::copy_memory(pixels, *ppu_screen, ppu_screen.len());
         }
     }
 }
