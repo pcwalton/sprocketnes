@@ -168,7 +168,10 @@ pub impl Vram : Mem {
             let addr = addr & 0x0fff;
             self.nametables[addr] = val;
         } else if addr < 0x4000 {   // Palette area
-            let addr = addr & 0x1f;
+            let mut addr = addr & 0x1f;
+            if addr == 0x10 {
+                addr = 0x00;    // Mirror sprite background color into universal background color.
+            }
             self.palette[addr] = val;
         }
     }
@@ -543,10 +546,13 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let visible_sprites = self.compute_visible_sprites();
 
+        let background_color_index = self.vram.loadb(0x3f00) & 0x3f;
+        let background_color = self.get_color(background_color_index);
+
         for range(0, SCREEN_WIDTH) |x| {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
-            // FIXME: Use universal background color from palette.
-            let mut color = Rgb { r: 0, g: 0, b: 0 };
+            let mut color = background_color;
+
             if self.regs.mask.show_background() {
                 self.get_background_pixel(x as u8, &mut color);
             }
