@@ -64,7 +64,8 @@ enum SpriteSize {
 }
 
 impl PpuCtrl {
-    fn base_nametable_addr(self) -> u16           { 0x2000 + (*self & 0x3) as u16 * 0x400 }
+    fn x_scroll_offset(self) -> u16               { if (*self & 0x01) == 0 { 0 } else { 256 } }
+    fn y_scroll_offset(self) -> u16               { if (*self & 0x02) == 0 { 0 } else { 240 } }
     fn vram_addr_increment(self) -> u16           { if (*self & 0x04) == 0 { 1 } else { 32 } }
     fn sprite_pattern_table_addr(self) -> u16     { if (*self & 0x08) == 0 { 0 } else { 0x1000 } }
     fn background_pattern_table_addr(self) -> u16 { if (*self & 0x10) == 0 { 0 } else { 0x1000 } }
@@ -129,7 +130,7 @@ enum PpuScrollDir {
 
 pub struct Vram {
     rom: &Rom,
-    nametables: [u8 * 0x1000],  // 4 nametables, 0x400 each
+    nametables: [u8 * 0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
     palette: [u8 * 0x20],
 }
 
@@ -137,7 +138,7 @@ pub impl Vram {
     static fn new(rom: &a/Rom) -> Vram/&a {
         Vram {
             rom: rom,
-            nametables: [ 0, ..0x1000 ],
+            nametables: [ 0, ..0x800 ],
             palette: [ 0, ..0x20 ]
         }
     }
@@ -150,7 +151,7 @@ pub impl Vram : Mem {
             return self.rom.chr[addr]
         }
         if addr < 0x3f00 {          // Name table area
-            let addr = addr & 0x0fff;
+            let addr = addr & 0x07ff;
             return self.nametables[addr]
         }
         if addr < 0x4000 {          // Palette area
@@ -308,6 +309,12 @@ enum PatternPixelKind {
     Sprite,
 }
 
+struct NametableAddr {
+    base: u16,
+    x_index: u8,
+    y_index: u8,
+}
+
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
         Ppu {
@@ -332,6 +339,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     //
     // Color utilities
     //
+
     #[inline(always)]
     fn get_color(&self, palette_index: u8) -> Rgb {
         Rgb {
@@ -388,8 +396,33 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     //
-    // Sprites
+    // Background rendering helpers
     //
+
+    fn x_scroll_offset(&self) -> u16 {
+        self.regs.scroll.x as u16 + self.regs.ctrl.x_scroll_offset()
+    }
+    fn y_scroll_offset(&self) -> u16 {
+        self.regs.scroll.y as u16 + self.regs.ctrl.y_scroll_offset()
+    }
+
+    fn nametable_addr(&mut self, mut x_index: u16, mut y_index: u16) -> NametableAddr {
+        x_index %= 64;
+        y_index %= 60;
+
+        let nametable_base = match (x_index >= 32, y_index >= 30) {
+            (false, false)  => 0x2000,
+            (true, false)   => 0x2400,
+            (false, true)   => 0x2800,
+            (true, true)    => 0x2c00,
+        };
+
+        NametableAddr {
+            base: nametable_base,
+            x_index: (x_index % 32) as u8,
+            y_index: (y_index % 30) as u8
+        }
+    }
 
     #[inline(always)]
     fn make_sprite_info(&mut self, index: u16) -> Sprite {
@@ -439,27 +472,28 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         (bit1 << 1) | bit0
     }
 
-    // FIXME: Remove inline(never) from here. It's only here for perf profiling purposes.
     #[inline(always)]
     fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) {
-        // Compute the tile index and the pixel offset within that tile.
-        let (x_index, y_index) = (x as u16 / 8, self.scanline as u16 / 8);
-        let (xsub, ysub) = (x % 8, (self.scanline % 8) as u8);
+        // Adjust X and Y to account for scrolling.
+        let x = x as u16 + self.x_scroll_offset();
+        let y = self.scanline as u16 + self.y_scroll_offset();
+
+        // Compute the nametable address, tile index, and pixel offset within that tile.
+        let NametableAddr { base, x_index, y_index } = self.nametable_addr(x / 8, y / 8);
+        let (xsub, ysub) = ((x % 8) as u8, (y % 8) as u8);
 
         // Compute the nametable address and load the tile number from the nametable.
-        let tile_offset = 32 * y_index + x_index;
-        let tile = self.vram.loadb(0x2000 + tile_offset) as u16;
-        //nametable_offset += self.regs.scroll.x as u16 / 8;
+        let tile = self.vram.loadb(base + 32 * (y_index as u16) + (x_index as u16));
 
         // Fetch the pattern color.
-        let pattern_color = self.get_pattern_pixel(Background, tile, xsub, ysub);
+        let pattern_color = self.get_pattern_pixel(Background, tile as u16, xsub, ysub);
         if pattern_color == 0 {
             return;     // Transparent.
         }
 
         // Now load the attribute bits from the attribute table.
         let group = y_index / 4 * 8 + x_index / 4;
-        let attr_byte = self.vram.loadb(0x23c0 + group);
+        let attr_byte = self.vram.loadb(base + 0x3c0 + (group as u16));
         let (left, top) = (x_index % 4 < 2, y_index % 4 < 2);
         let attr_table_color = match (left, top) {
             (true, true) => attr_byte & 0x3,
