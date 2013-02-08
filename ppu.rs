@@ -49,7 +49,7 @@ struct Regs {
     status: PpuStatus,  // PPUSTATUS: 0x2002
     oam_addr: u8,       // OAMADDR: 0x2003
     scroll: PpuScroll,  // PPUSCROLL: 0x2005
-    addr: u16,          // PPUADDR: 0x2006
+    addr: PpuAddr,      // PPUADDR: 0x2006
 }
 
 //
@@ -126,6 +126,20 @@ enum PpuScrollDir {
     YDir,
 }
 
+//
+// PPUADDR: 0x2006
+//
+
+struct PpuAddr {
+    val: u16,
+    next: PpuAddrByte
+}
+
+enum PpuAddrByte {
+    Hi,
+    Lo,
+}
+
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
@@ -165,7 +179,7 @@ pub impl Vram : Mem {
             return                  // Attempt to write to CHR-ROM; ignore.
         }
         if addr < 0x3f00 {          // Name table area
-            let addr = addr & 0x0fff;
+            let addr = addr & 0x07ff;
             self.nametables[addr] = val;
         } else if addr < 0x4000 {   // Palette area
             let mut addr = addr & 0x1f;
@@ -255,6 +269,12 @@ pub struct Ppu<VM,OM> {
     screen: ~([u8 * 184320]),  // 256 * 240 * 3
     scanline: u16,
     ppudata_buffer: u8,
+
+    // NB: These two cannot always be computed from PPUCTRL and PPUSCROLL, because PPUADDR *also*
+    // updates the scroll position. This is important to emulate.
+    scroll_x: u16,
+    scroll_y: u16,
+
     cy: u64
 }
 
@@ -265,7 +285,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
         match addr & 7 {
             0 => *self.regs.ctrl,
             1 => *self.regs.mask,
-            2 => *self.regs.status,
+            2 => self.read_ppustatus(),
             3 => 0, // OAMADDR is read-only
             4 => die!(~"OAM read unimplemented"),
             5 => 0, // PPUSCROLL is read-only
@@ -279,7 +299,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
     fn storeb(&mut self, addr: u16, val: u8) {
         debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
         match addr & 7 {
-            0 => self.regs.ctrl = PpuCtrl(val),
+            0 => self.update_ppuctrl(val),
             1 => self.regs.mask = PpuMask(val),
             2 => (),    // PPUSTATUS is read-only
             3 => self.regs.oam_addr = val,
@@ -324,7 +344,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                 status: PpuStatus(0),
                 oam_addr: 0,
                 scroll: PpuScroll { x: 0, y: 0, next: XDir },
-                addr: 0,
+                addr: PpuAddr { val: 0, next: Hi },
             },
             vram: vram,
             oam: oam,
@@ -332,6 +352,10 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             screen: ~([ 0, ..184320 ]),
             scanline: 0,
             ppudata_buffer: 0,
+
+            scroll_x: 0,
+            scroll_y: 0,
+
             cy: 0
         }
     }
@@ -353,13 +377,24 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     // Register manipulation
     //
 
+    fn update_ppuctrl(&mut self, val: u8) {
+        self.regs.ctrl = PpuCtrl(val);
+
+        self.scroll_x = (self.scroll_x & 0xff) | self.regs.ctrl.x_scroll_offset();
+        self.scroll_y = (self.scroll_y & 0xff) | self.regs.ctrl.y_scroll_offset();
+    }
+
     fn update_ppuscroll(&mut self, val: u8) {
         match self.regs.scroll.next {
             XDir => {
+                self.scroll_x = (self.scroll_x & 0xff00) | (val as u16);
+
                 self.regs.scroll.x = val;
                 self.regs.scroll.next = YDir;
             }
             YDir => {
+                self.scroll_y = (self.scroll_y & 0xff00) | (val as u16);
+
                 self.regs.scroll.y = val;
                 self.regs.scroll.next = XDir;
             }
@@ -372,18 +407,43 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     fn update_ppuaddr(&mut self, val: u8) {
-        self.regs.addr = (self.regs.addr << 8) | (val as u16);
+        match self.regs.addr.next {
+            Hi => {
+                self.regs.addr.val = (self.regs.addr.val & 0x00ff) | ((val as u16) << 8);
+                self.regs.addr.next = Lo;
+            }
+            Lo => {
+                self.regs.addr.val = (self.regs.addr.val & 0xff00) | (val as u16);
+                self.regs.addr.next = Hi;
+
+                // Adjust the scroll registers.
+                // TODO: This is pretty much a hack. The right way is to precisely emulate the PPU
+                // internal registers.
+                // TODO: Y scrolling.
+                let addr = self.regs.addr.val & 0x07ff;
+                let xscroll_base = if addr < 0x400 { 0 } else { 256 };
+                self.scroll_x = (self.scroll_x & 0xff) | xscroll_base;
+            }
+        }
+    }
+
+    fn read_ppustatus(&mut self) -> u8 {
+        // Reset latch.
+        self.regs.scroll.next = XDir;
+        self.regs.addr.next = Hi;
+
+        *self.regs.status
     }
 
     fn write_ppudata(&mut self, val: u8) {
-        self.vram.storeb(self.regs.addr, val);
-        self.regs.addr += self.regs.ctrl.vram_addr_increment();
+        self.vram.storeb(self.regs.addr.val, val);
+        self.regs.addr.val += self.regs.ctrl.vram_addr_increment();
     }
 
     fn read_ppudata(&mut self) -> u8 {
-        let addr = self.regs.addr;
+        let addr = self.regs.addr.val;
         let mut val = self.vram.loadb(addr);
-        self.regs.addr += self.regs.ctrl.vram_addr_increment();
+        self.regs.addr.val += self.regs.ctrl.vram_addr_increment();
 
         // Emulate the PPU buffering quirk.
         if addr < 0x3f00 {
@@ -398,13 +458,6 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     //
     // Background rendering helpers
     //
-
-    fn x_scroll_offset(&self) -> u16 {
-        self.regs.scroll.x as u16 + self.regs.ctrl.x_scroll_offset()
-    }
-    fn y_scroll_offset(&self) -> u16 {
-        self.regs.scroll.y as u16 + self.regs.ctrl.y_scroll_offset()
-    }
 
     fn nametable_addr(&mut self, mut x_index: u16, mut y_index: u16) -> NametableAddr {
         x_index %= 64;
@@ -475,8 +528,8 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     #[inline(always)]
     fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) {
         // Adjust X and Y to account for scrolling.
-        let x = x as u16 + self.x_scroll_offset();
-        let y = self.scanline as u16 + self.y_scroll_offset();
+        let x = x as u16 + self.scroll_x;
+        let y = self.scanline as u16 + self.scroll_y;
 
         // Compute the nametable address, tile index, and pixel offset within that tile.
         let NametableAddr { base, x_index, y_index } = self.nametable_addr(x / 8, y / 8);
