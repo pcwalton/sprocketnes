@@ -2,11 +2,11 @@
 the Rust programming language.
 
 Its purpose is to serve as a *technology demonstration* to show how the Rust
-programming language is suitable for systems software such as emulators. It is
-not intended to be a world-class, production-quality emulator. `sprocketnes`
-is also designed to be a relatively clean example codebase, showing off
-various Rust idioms. The Rust garbage collector is not used in this project,
-and unsafe code is kept to a minimum.
+programming language is suitable for systems software such as emulators. It
+has many shortcomings and not intended to be a production-quality emulator.
+`sprocketnes` is also designed to be a relatively clean example codebase,
+showing off various Rust idioms. The Rust garbage collector is not used in
+this project, and unsafe code is kept to a minimum.
 
 The NES was chosen for this project because:
 
