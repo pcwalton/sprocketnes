@@ -525,8 +525,9 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         (bit1 << 1) | bit0
     }
 
+    // Returns true if the background was opaque here, false otherwise.
     #[inline(always)]
-    fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) {
+    fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) -> bool {
         // Adjust X and Y to account for scrolling.
         let x = x as u16 + self.scroll_x;
         let y = self.scanline as u16 + self.scroll_y;
@@ -541,7 +542,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // Fetch the pattern color.
         let pattern_color = self.get_pattern_pixel(Background, tile as u16, xsub, ysub);
         if pattern_color == 0 {
-            return;     // Transparent.
+            return false;   // Transparent.
         }
 
         // Now load the attribute bits from the attribute table.
@@ -559,10 +560,15 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         let tile_color = (attr_table_color << 2) | pattern_color;
         let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
         *color = self.get_color(palette_index);
+        return true;
     }
 
     #[inline(always)]
-    fn get_sprite_pixel(&mut self, visible_sprites: &[Option<u8> * 8], x: u8, color: &mut Rgb) {
+    fn get_sprite_pixel(&mut self,
+                        visible_sprites: &[Option<u8> * 8],
+                        x: u8,
+                        color: &mut Rgb,
+                        background_opaque: bool) {
         for visible_sprites.each |&visible_sprite_opt| {
             match visible_sprite_opt {
                 None => return,
@@ -572,10 +578,6 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                     // Don't need to consider this sprite if we aren't in its bounding box.
                     if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
                         loop;
-                    }
-
-                    if index == 0 {
-                        self.regs.status.set_sprite_zero_hit(true);
                     }
 
                     let pattern_color;
@@ -600,6 +602,12 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                     // If the pattern color was zero, this part of the sprite is transparent.
                     if pattern_color == 0 {
                         return;
+                    }
+
+                    // OK, so we know this pixel is opaque. Now if this is the first sprite and the
+                    // background was not transparent, set sprite 0 hit.
+                    if index == 0 && background_opaque {
+                        self.regs.status.set_sprite_zero_hit(true);
                     }
 
                     // Determine final tile color and do the palette lookup.
@@ -639,12 +647,13 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut color = background_color;
 
+            let mut background_opaque = false;
             if self.regs.mask.show_background() {
-                self.get_background_pixel(x as u8, &mut color);
+                background_opaque = self.get_background_pixel(x as u8, &mut color);
             }
 
             if self.regs.mask.show_sprites() {
-                self.get_sprite_pixel(&visible_sprites, x as u8, &mut color);
+                self.get_sprite_pixel(&visible_sprites, x as u8, &mut color, background_opaque);
             }
 
             self.putpixel(x, self.scanline as uint, color);
