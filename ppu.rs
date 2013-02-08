@@ -480,7 +480,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     #[inline(always)]
     fn make_sprite_info(&mut self, index: u16) -> Sprite {
         Sprite {
-            y: self.oam.loadb(index * 4 + 0),
+            y: self.oam.loadb(index * 4 + 0) + 1,
             tile_index_byte: self.oam.loadb(index * 4 + 1),
             attribute_byte: self.oam.loadb(index * 4 + 2),
             x: self.oam.loadb(index * 4 + 3),
