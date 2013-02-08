@@ -19,6 +19,18 @@ The NES was chosen for this project because:
   graphics and sound, so it's a good demonstration of the performance of Rust
   code.
 
+The controls are as follows:
+
+* A: Z
+
+* B: X
+
+* Start: Enter
+
+* Select: Right shift
+
+* D-Pad: Arrows
+
 There are numerous demos and games available for free for use with this
 emulator at http://nesdev.com/.
 
