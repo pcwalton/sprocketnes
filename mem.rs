@@ -1,7 +1,6 @@
 //
 // sprocketnes/mem.rs
 //
-// Copyright (c) 2013 Mozilla Foundation
 // Author: Patrick Walton
 //
 

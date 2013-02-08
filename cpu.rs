@@ -1,7 +1,6 @@
 //
 // sprocketnes/cpu.rs
 //
-// Copyright (c) 2012 Mozilla Foundation
 // Author: Patrick Walton
 //
 
