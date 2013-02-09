@@ -612,7 +612,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
                     // If the pattern color was zero, this part of the sprite is transparent.
                     if pattern_color == 0 {
-                        return None;
+                        loop;
                     }
 
                     // OK, so we know this pixel is opaque. Now if this is the first sprite and the
