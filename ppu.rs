@@ -239,10 +239,13 @@ impl Sprite {
         }
     }
 
-    fn palette(&self) -> u8             { (self.attribute_byte & 3) + 4 }
-    fn priority(&self) -> bool          { (self.attribute_byte & 0x20) != 0 }
-    fn flip_horizontal(&self) -> bool   { (self.attribute_byte & 0x40) != 0 }
-    fn flip_vertical(&self) -> bool     { (self.attribute_byte & 0x80) != 0 }
+    fn palette(&self) -> u8                 { (self.attribute_byte & 3) + 4 }
+    fn flip_horizontal(&self) -> bool       { (self.attribute_byte & 0x40) != 0 }
+    fn flip_vertical(&self) -> bool         { (self.attribute_byte & 0x80) != 0 }
+
+    fn priority(&self) -> SpritePriority {
+        if (self.attribute_byte & 0x20) == 0 { AboveBg } else { BelowBg }
+    }
 
     // Quick test to see whether this sprite is on the given scanline.
     fn on_scanline<VM,OM>(&self, ppu: &Ppu<VM,OM>, y: u8) -> bool {
@@ -333,6 +336,16 @@ struct NametableAddr {
     base: u16,
     x_index: u8,
     y_index: u8,
+}
+
+struct SpriteColor {
+    priority: SpritePriority,
+    color: Rgb,
+}
+
+enum SpritePriority {
+    AboveBg,
+    BelowBg,
 }
 
 pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
@@ -527,7 +540,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
     // Returns true if the background was opaque here, false otherwise.
     #[inline(always)]
-    fn get_background_pixel(&mut self, x: u8, color: &mut Rgb) -> bool {
+    fn get_background_pixel(&mut self, x: u8) -> Option<Rgb> {
         // Adjust X and Y to account for scrolling.
         let x = x as u16 + self.scroll_x;
         let y = self.scanline as u16 + self.scroll_y;
@@ -542,7 +555,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // Fetch the pattern color.
         let pattern_color = self.get_pattern_pixel(Background, tile as u16, xsub, ysub);
         if pattern_color == 0 {
-            return false;   // Transparent.
+            return None;    // Transparent.
         }
 
         // Now load the attribute bits from the attribute table.
@@ -559,19 +572,17 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // Determine the final color and fetch the palette from VRAM.
         let tile_color = (attr_table_color << 2) | pattern_color;
         let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
-        *color = self.get_color(palette_index);
-        return true;
+        return Some(self.get_color(palette_index));
     }
 
-    #[inline(always)]
     fn get_sprite_pixel(&mut self,
                         visible_sprites: &[Option<u8> * 8],
                         x: u8,
-                        color: &mut Rgb,
-                        background_opaque: bool) {
+                        background_opaque: bool)
+                     -> Option<SpriteColor> {
         for visible_sprites.each |&visible_sprite_opt| {
             match visible_sprite_opt {
-                None => return,
+                None => return None,
                 Some(index) => {
                     let sprite = self.make_sprite_info(index as u16);
 
@@ -601,7 +612,7 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
                     // If the pattern color was zero, this part of the sprite is transparent.
                     if pattern_color == 0 {
-                        return;
+                        return None;
                     }
 
                     // OK, so we know this pixel is opaque. Now if this is the first sprite and the
@@ -613,10 +624,13 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                     // Determine final tile color and do the palette lookup.
                     let tile_color = (sprite.palette() << 2) | pattern_color;
                     let palette_index = self.vram.loadb(0x3f00 + (tile_color as u16)) & 0x3f;
-                    *color = self.get_color(palette_index);
+                    let final_color = self.get_color(palette_index);
+
+                    return Some(SpriteColor { priority: sprite.priority(), color: final_color });
                 }
             }
         }
+        return None;
     }
 
     fn compute_visible_sprites(&mut self) -> [Option<u8> * 8] {
@@ -640,21 +654,31 @@ pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         // TODO: Scrolling, mirroring
         let visible_sprites = self.compute_visible_sprites();
 
-        let background_color_index = self.vram.loadb(0x3f00) & 0x3f;
-        let background_color = self.get_color(background_color_index);
+        let backdrop_color_index = self.vram.loadb(0x3f00) & 0x3f;
+        let backdrop_color = self.get_color(backdrop_color_index);
 
         for range(0, SCREEN_WIDTH) |x| {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
-            let mut color = background_color;
-
-            let mut background_opaque = false;
+            let mut background_color = None;
             if self.regs.mask.show_background() {
-                background_opaque = self.get_background_pixel(x as u8, &mut color);
+                background_color = self.get_background_pixel(x as u8);
             }
 
+            let mut sprite_color = None;
             if self.regs.mask.show_sprites() {
-                self.get_sprite_pixel(&visible_sprites, x as u8, &mut color, background_opaque);
+                sprite_color = self.get_sprite_pixel(&visible_sprites,
+                                                     x as u8,
+                                                     background_color.is_some());
             }
+
+            // Combine colors using priority.
+            let color = match (background_color, sprite_color) {
+                (None, None) => backdrop_color,
+                (Some(color), None) => color,
+                (Some(color), Some(SpriteColor { priority: BelowBg, _ })) => color,
+                (None, Some(SpriteColor { priority: BelowBg, color: color })) => color,
+                (_, Some(SpriteColor { priority: AboveBg, color: color })) => color,
+            };
 
             self.putpixel(x, self.scanline as uint, color);
         }

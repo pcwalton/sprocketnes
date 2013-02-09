@@ -17,12 +17,15 @@ pub fn println(s: &str) {
     }
 }
 
-#[inline(always)]
+#[cfg(debug)]
 pub fn debug_assert(cond: bool, msg: &static/str) {
     if !cond {
         println(msg);
     }
 }
+
+#[cfg(ndebug)]
+pub fn debug_assert(_: bool, _: &static/str) {}
 
 #[cfg(debug)]
 pub fn debug_print(msg: &static/str) {
@@ -30,6 +33,6 @@ pub fn debug_print(msg: &static/str) {
 }
 
 #[cfg(ndebug)]
-pub fn debug_print(msg: &static/str) {}
+pub fn debug_print(_: &static/str) {}
 
 
