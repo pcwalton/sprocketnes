@@ -1,5 +1,6 @@
 RUSTC?=rustc
 RUSTFLAGS?=--cfg ndebug --cfg ncpuspew -O
+RUSTLDFLAGS?=-L .
 
 .PHONY: all
 all:	nes
