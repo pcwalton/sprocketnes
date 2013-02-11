@@ -103,167 +103,152 @@ impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
 //
 
 macro_rules! decode_op {
-    (
-        op: $op:expr,
-        this: $this:expr,
-        modes: [
-            $immediate:expr,
-            $accumulator:expr,
-            $zero_page:expr,
-            $zero_page_x:expr,
-            $zero_page_y:expr,
-            $absolute:expr,
-            $absolute_x:expr,
-            $absolute_y:expr,
-            $indexed_indirect_x:expr,
-            $indirect_indexed_y:expr
-        ]
-    ) => {
+    (op: $op:expr, this: $this:expr) => {
         // We try to keep this in the same order as the implementations above.
         // TODO: Use arm macros to fix some of this duplication.
         match $op {
             // Loads
-            0xa1 => $this.lda($indexed_indirect_x),
-            0xa5 => $this.lda($zero_page),
-            0xa9 => $this.lda($immediate),
-            0xad => $this.lda($absolute),
-            0xb1 => $this.lda($indirect_indexed_y),
-            0xb5 => $this.lda($zero_page_x),
-            0xb9 => $this.lda($absolute_y),
-            0xbd => $this.lda($absolute_x),
+            0xa1 => $this.lda($this.indexed_indirect_x()),
+            0xa5 => $this.lda($this.zero_page()),
+            0xa9 => $this.lda($this.immediate()),
+            0xad => $this.lda($this.absolute()),
+            0xb1 => $this.lda($this.indirect_indexed_y()),
+            0xb5 => $this.lda($this.zero_page_x()),
+            0xb9 => $this.lda($this.absolute_y()),
+            0xbd => $this.lda($this.absolute_x()),
 
-            0xa2 => $this.ldx($immediate),
-            0xa6 => $this.ldx($zero_page),
-            0xb6 => $this.ldx($zero_page_y),
-            0xae => $this.ldx($absolute),
-            0xbe => $this.ldx($absolute_y),
+            0xa2 => $this.ldx($this.immediate()),
+            0xa6 => $this.ldx($this.zero_page()),
+            0xb6 => $this.ldx($this.zero_page_y()),
+            0xae => $this.ldx($this.absolute()),
+            0xbe => $this.ldx($this.absolute_y()),
 
-            0xa0 => $this.ldy($immediate),
-            0xa4 => $this.ldy($zero_page),
-            0xb4 => $this.ldy($zero_page_x),
-            0xac => $this.ldy($absolute),
-            0xbc => $this.ldy($absolute_x),
+            0xa0 => $this.ldy($this.immediate()),
+            0xa4 => $this.ldy($this.zero_page()),
+            0xb4 => $this.ldy($this.zero_page_x()),
+            0xac => $this.ldy($this.absolute()),
+            0xbc => $this.ldy($this.absolute_x()),
 
             // Stores
-            0x85 => $this.sta($zero_page),
-            0x95 => $this.sta($zero_page_x),
-            0x8d => $this.sta($absolute),
-            0x9d => $this.sta($absolute_x),
-            0x99 => $this.sta($absolute_y),
-            0x81 => $this.sta($indexed_indirect_x),
-            0x91 => $this.sta($indirect_indexed_y),
+            0x85 => $this.sta($this.zero_page()),
+            0x95 => $this.sta($this.zero_page_x()),
+            0x8d => $this.sta($this.absolute()),
+            0x9d => $this.sta($this.absolute_x()),
+            0x99 => $this.sta($this.absolute_y()),
+            0x81 => $this.sta($this.indexed_indirect_x()),
+            0x91 => $this.sta($this.indirect_indexed_y()),
 
-            0x86 => $this.stx($zero_page),
-            0x96 => $this.stx($zero_page_y),
-            0x8e => $this.stx($absolute),
+            0x86 => $this.stx($this.zero_page()),
+            0x96 => $this.stx($this.zero_page_y()),
+            0x8e => $this.stx($this.absolute()),
 
-            0x84 => $this.sty($zero_page),
-            0x94 => $this.sty($zero_page_x),
-            0x8c => $this.sty($absolute),
+            0x84 => $this.sty($this.zero_page()),
+            0x94 => $this.sty($this.zero_page_x()),
+            0x8c => $this.sty($this.absolute()),
 
             // Arithmetic
-            0x69 => $this.adc($immediate),
-            0x65 => $this.adc($zero_page),
-            0x75 => $this.adc($zero_page_x),
-            0x6d => $this.adc($absolute),
-            0x7d => $this.adc($absolute_x),
-            0x79 => $this.adc($absolute_y),
-            0x61 => $this.adc($indexed_indirect_x),
-            0x71 => $this.adc($indirect_indexed_y),
+            0x69 => $this.adc($this.immediate()),
+            0x65 => $this.adc($this.zero_page()),
+            0x75 => $this.adc($this.zero_page_x()),
+            0x6d => $this.adc($this.absolute()),
+            0x7d => $this.adc($this.absolute_x()),
+            0x79 => $this.adc($this.absolute_y()),
+            0x61 => $this.adc($this.indexed_indirect_x()),
+            0x71 => $this.adc($this.indirect_indexed_y()),
 
-            0xe9 => $this.sbc($immediate),
-            0xe5 => $this.sbc($zero_page),
-            0xf5 => $this.sbc($zero_page_x),
-            0xed => $this.sbc($absolute),
-            0xfd => $this.sbc($absolute_x),
-            0xf9 => $this.sbc($absolute_y),
-            0xe1 => $this.sbc($indexed_indirect_x),
-            0xf1 => $this.sbc($indirect_indexed_y),
+            0xe9 => $this.sbc($this.immediate()),
+            0xe5 => $this.sbc($this.zero_page()),
+            0xf5 => $this.sbc($this.zero_page_x()),
+            0xed => $this.sbc($this.absolute()),
+            0xfd => $this.sbc($this.absolute_x()),
+            0xf9 => $this.sbc($this.absolute_y()),
+            0xe1 => $this.sbc($this.indexed_indirect_x()),
+            0xf1 => $this.sbc($this.indirect_indexed_y()),
 
             // Comparisons
-            0xc9 => $this.cmp($immediate),
-            0xc5 => $this.cmp($zero_page),
-            0xd5 => $this.cmp($zero_page_x),
-            0xcd => $this.cmp($absolute),
-            0xdd => $this.cmp($absolute_x),
-            0xd9 => $this.cmp($absolute_y),
-            0xc1 => $this.cmp($indexed_indirect_x),
-            0xd1 => $this.cmp($indirect_indexed_y),
+            0xc9 => $this.cmp($this.immediate()),
+            0xc5 => $this.cmp($this.zero_page()),
+            0xd5 => $this.cmp($this.zero_page_x()),
+            0xcd => $this.cmp($this.absolute()),
+            0xdd => $this.cmp($this.absolute_x()),
+            0xd9 => $this.cmp($this.absolute_y()),
+            0xc1 => $this.cmp($this.indexed_indirect_x()),
+            0xd1 => $this.cmp($this.indirect_indexed_y()),
 
-            0xe0 => $this.cpx($immediate),
-            0xe4 => $this.cpx($zero_page),
-            0xec => $this.cpx($absolute),
+            0xe0 => $this.cpx($this.immediate()),
+            0xe4 => $this.cpx($this.zero_page()),
+            0xec => $this.cpx($this.absolute()),
 
-            0xc0 => $this.cpy($immediate),
-            0xc4 => $this.cpy($zero_page),
-            0xcc => $this.cpy($absolute),
+            0xc0 => $this.cpy($this.immediate()),
+            0xc4 => $this.cpy($this.zero_page()),
+            0xcc => $this.cpy($this.absolute()),
 
             // Bitwise operations
-            0x29 => $this.and($immediate),
-            0x25 => $this.and($zero_page),
-            0x35 => $this.and($zero_page_x),
-            0x2d => $this.and($absolute),
-            0x3d => $this.and($absolute_x),
-            0x39 => $this.and($absolute_y),
-            0x21 => $this.and($indexed_indirect_x),
-            0x31 => $this.and($indirect_indexed_y),
+            0x29 => $this.and($this.immediate()),
+            0x25 => $this.and($this.zero_page()),
+            0x35 => $this.and($this.zero_page_x()),
+            0x2d => $this.and($this.absolute()),
+            0x3d => $this.and($this.absolute_x()),
+            0x39 => $this.and($this.absolute_y()),
+            0x21 => $this.and($this.indexed_indirect_x()),
+            0x31 => $this.and($this.indirect_indexed_y()),
 
-            0x09 => $this.ora($immediate),
-            0x05 => $this.ora($zero_page),
-            0x15 => $this.ora($zero_page_x),
-            0x0d => $this.ora($absolute),
-            0x1d => $this.ora($absolute_x),
-            0x19 => $this.ora($absolute_y),
-            0x01 => $this.ora($indexed_indirect_x),
-            0x11 => $this.ora($indirect_indexed_y),
+            0x09 => $this.ora($this.immediate()),
+            0x05 => $this.ora($this.zero_page()),
+            0x15 => $this.ora($this.zero_page_x()),
+            0x0d => $this.ora($this.absolute()),
+            0x1d => $this.ora($this.absolute_x()),
+            0x19 => $this.ora($this.absolute_y()),
+            0x01 => $this.ora($this.indexed_indirect_x()),
+            0x11 => $this.ora($this.indirect_indexed_y()),
 
-            0x49 => $this.eor($immediate),
-            0x45 => $this.eor($zero_page),
-            0x55 => $this.eor($zero_page_x),
-            0x4d => $this.eor($absolute),
-            0x5d => $this.eor($absolute_x),
-            0x59 => $this.eor($absolute_y),
-            0x41 => $this.eor($indexed_indirect_x),
-            0x51 => $this.eor($indirect_indexed_y),
+            0x49 => $this.eor($this.immediate()),
+            0x45 => $this.eor($this.zero_page()),
+            0x55 => $this.eor($this.zero_page_x()),
+            0x4d => $this.eor($this.absolute()),
+            0x5d => $this.eor($this.absolute_x()),
+            0x59 => $this.eor($this.absolute_y()),
+            0x41 => $this.eor($this.indexed_indirect_x()),
+            0x51 => $this.eor($this.indirect_indexed_y()),
 
-            0x24 => $this.bit($zero_page),
-            0x2c => $this.bit($absolute),
+            0x24 => $this.bit($this.zero_page()),
+            0x2c => $this.bit($this.absolute()),
 
             // Shifts and rotates
-            0x2a => $this.rol($accumulator),
-            0x26 => $this.rol($zero_page),
-            0x36 => $this.rol($zero_page_x),
-            0x2e => $this.rol($absolute),
-            0x3e => $this.rol($absolute_x),
+            0x2a => $this.rol($this.accumulator()),
+            0x26 => $this.rol($this.zero_page()),
+            0x36 => $this.rol($this.zero_page_x()),
+            0x2e => $this.rol($this.absolute()),
+            0x3e => $this.rol($this.absolute_x()),
 
-            0x6a => $this.ror($accumulator),
-            0x66 => $this.ror($zero_page),
-            0x76 => $this.ror($zero_page_x),
-            0x6e => $this.ror($absolute),
-            0x7e => $this.ror($absolute_x),
+            0x6a => $this.ror($this.accumulator()),
+            0x66 => $this.ror($this.zero_page()),
+            0x76 => $this.ror($this.zero_page_x()),
+            0x6e => $this.ror($this.absolute()),
+            0x7e => $this.ror($this.absolute_x()),
 
-            0x0a => $this.asl($accumulator),
-            0x06 => $this.asl($zero_page),
-            0x16 => $this.asl($zero_page_x),
-            0x0e => $this.asl($absolute),
-            0x1e => $this.asl($absolute_x),
+            0x0a => $this.asl($this.accumulator()),
+            0x06 => $this.asl($this.zero_page()),
+            0x16 => $this.asl($this.zero_page_x()),
+            0x0e => $this.asl($this.absolute()),
+            0x1e => $this.asl($this.absolute_x()),
 
-            0x4a => $this.lsr($accumulator),
-            0x46 => $this.lsr($zero_page),
-            0x56 => $this.lsr($zero_page_x),
-            0x4e => $this.lsr($absolute),
-            0x5e => $this.lsr($absolute_x),
+            0x4a => $this.lsr($this.accumulator()),
+            0x46 => $this.lsr($this.zero_page()),
+            0x56 => $this.lsr($this.zero_page_x()),
+            0x4e => $this.lsr($this.absolute()),
+            0x5e => $this.lsr($this.absolute_x()),
 
             // Increments and decrements
-            0xe6 => $this.inc($zero_page),
-            0xf6 => $this.inc($zero_page_x),
-            0xee => $this.inc($absolute),
-            0xfe => $this.inc($absolute_x),
+            0xe6 => $this.inc($this.zero_page()),
+            0xf6 => $this.inc($this.zero_page_x()),
+            0xee => $this.inc($this.absolute()),
+            0xfe => $this.inc($this.absolute_x()),
 
-            0xc6 => $this.dec($zero_page),
-            0xd6 => $this.dec($zero_page_x),
-            0xce => $this.dec($absolute),
-            0xde => $this.dec($absolute_x),
+            0xc6 => $this.dec($this.zero_page()),
+            0xd6 => $this.dec($this.zero_page_x()),
+            0xce => $this.dec($this.absolute()),
+            0xde => $this.dec($this.absolute_x()),
 
             0xe8 => $this.inx(),
             0xca => $this.dex(),
@@ -438,6 +423,8 @@ impl<M:Mem> Cpu<M> {
     }
 
     // Addressing modes
+    fn immediate(&mut self) -> ImmediateAddressingMode { ImmediateAddressingMode }
+    fn accumulator(&mut self) -> AccumulatorAddressingMode { AccumulatorAddressingMode }
     fn zero_page(&mut self) -> MemoryAddressingMode {
         MemoryAddressingMode(self.loadb_bump_pc() as u16)
     }
@@ -664,22 +651,7 @@ impl<M:Mem> Cpu<M> {
         self.trace();
 
         let op = self.loadb_bump_pc();
-        decode_op!(
-            op: op,
-            this: self,
-            modes: [
-                ImmediateAddressingMode,
-                AccumulatorAddressingMode,
-                self.zero_page(),
-                self.zero_page_x(),
-                self.zero_page_y(),
-                self.absolute(),
-                self.absolute_x(),
-                self.absolute_y(),
-                self.indexed_indirect_x(),
-                self.indirect_indexed_y()
-            ]
-        );
+        decode_op!(op: op, this: self);
 
         self.cy += CYCLE_TABLE[op] as Cycles;
     }

@@ -141,22 +141,7 @@ pub impl<M:Mem> Disassembler<M> {
     #[inline(never)]
     pub fn disassemble(&mut self) -> ~str {
         let op = self.loadb_bump_pc();
-        decode_op!(
-            op: op,
-            this: self,
-            modes: [
-                self.immediate(),
-                self.accumulator(),
-                self.zero_page(),
-                self.zero_page_x(),
-                self.zero_page_y(),
-                self.absolute(),
-                self.absolute_x(),
-                self.absolute_y(),
-                self.indexed_indirect_x(),
-                self.indirect_indexed_y()
-            ]
-        )
+        decode_op!(op: op, this: self)
     }
 }
 
