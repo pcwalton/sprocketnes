@@ -19,9 +19,7 @@ The NES was chosen for this project because:
 
 * Because of its popularity, its workings are relatively well-documented.
 
-* It requires decent processing power to emulate accurately with proper
-  graphics and sound, so it's a good demonstration of the performance of Rust
-  code.
+* It's CPU-bound, so it can serve as a benchmark to help optimize Rust code.
 
 The controls are as follows:
 
