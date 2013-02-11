@@ -19,7 +19,7 @@ pub struct Gfx {
     screen: ~Surface
 }
 
-pub impl Gfx {
+impl Gfx {
     static fn new() -> Gfx {
         sdl::init([ InitVideo, InitTimer ]);
         let screen = video::set_video_mode(SCREEN_WIDTH as int,

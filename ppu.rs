@@ -148,31 +148,24 @@ pub struct Vram {
     palette: [u8 * 0x20],
 }
 
-pub impl Vram {
+impl Vram {
     static fn new(rom: &a/Rom) -> Vram/&a {
-        Vram {
-            rom: rom,
-            nametables: [ 0, ..0x800 ],
-            palette: [ 0, ..0x20 ]
-        }
+        Vram { rom: rom, nametables: [ 0, ..0x800 ], palette: [ 0, ..0x20 ] }
     }
 }
 
-pub impl Vram : Mem {
+impl Mem for Vram {
     #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
-            return self.rom.chr[addr]
+            self.rom.chr[addr]
+        } else if addr < 0x3f00 {   // Name table area
+            self.nametables[addr & 0x07ff]
+        } else if addr < 0x4000 {   // Palette area
+            self.palette[addr & 0x1f]
+        } else {
+            die!(~"invalid VRAM read")
         }
-        if addr < 0x3f00 {          // Name table area
-            let addr = addr & 0x07ff;
-            return self.nametables[addr]
-        }
-        if addr < 0x4000 {          // Palette area
-            let addr = addr & 0x1f;
-            return self.palette[addr]
-        }
-        die!(~"invalid VRAM read")
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
@@ -281,7 +274,7 @@ pub struct Ppu<VM,OM> {
     cy: u64
 }
 
-pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> : Mem {
+impl<VM:Mem,OM:Mem> Mem for Ppu<VM,OM> {
     // Performs a load of the PPU register at the given CPU address.
     fn loadb(&mut self, addr: u16) -> u8 {
         debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
@@ -348,7 +341,7 @@ enum SpritePriority {
     BelowBg,
 }
 
-pub impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
+impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
         Ppu {
             regs: Regs {

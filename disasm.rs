@@ -13,8 +13,7 @@ pub struct Disassembler<M> {
     mem: &mut M
 }
 
-// FIXME: This should not need to be public! Sigh. Resolve bug.
-pub impl<M:Mem> Disassembler<M> {
+impl<M:Mem> Disassembler<M> {
     //
     // Loads and byte-to-string conversion
     //

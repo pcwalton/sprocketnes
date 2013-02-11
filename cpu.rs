@@ -76,13 +76,13 @@ trait AddressingMode<M> {
 }
 
 struct AccumulatorAddressingMode;
-impl<M:Mem> AccumulatorAddressingMode : AddressingMode<M> {
+impl<M:Mem> AddressingMode<M> for AccumulatorAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.regs.a }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.regs.a = val }
 }
 
 struct ImmediateAddressingMode;
-impl<M:Mem> ImmediateAddressingMode : AddressingMode<M> {
+impl<M:Mem> AddressingMode<M> for ImmediateAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb_bump_pc() }
     fn store(&self, _: &mut Cpu<M>, _: u8) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
@@ -91,7 +91,7 @@ impl<M:Mem> ImmediateAddressingMode : AddressingMode<M> {
 }
 
 struct MemoryAddressingMode(u16);
-impl<M:Mem> MemoryAddressingMode : AddressingMode<M> {
+impl<M:Mem> AddressingMode<M> for MemoryAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
 }

@@ -13,7 +13,7 @@ use core::vec;
 
 // Blech! This really should go in the standard library!
 struct Fd(c_int);
-impl Fd : Drop {
+impl Drop for Fd {
     fn finalize(&self) {
         unsafe {
             libc::close(**self);
@@ -27,8 +27,7 @@ pub struct Rom {
     chr: ~[u8],         // CHR-ROM
 }
 
-// FIXME: `pub` should not be required here! Sigh. Resolve bug.
-pub impl Rom {
+impl Rom {
     static fn from_fd(fd: c_int) -> Rom {
         let read: &fn(sz: size_t) -> ~[u8] = |sz| {
             unsafe {

@@ -18,7 +18,7 @@ pub struct Mapper {
     storeb: ~fn(this: &mut Mapper, addr: u16, val: u8),
 }
 
-pub impl Mapper {
+impl Mapper {
     static fn new(rom: &a/Rom) -> Mapper/&a {
         match rom.header.mapper() {
             0 => Mapper {
@@ -40,7 +40,7 @@ pub impl Mapper {
 // TODO: RAM.
 pub struct Nrom;
 
-pub impl Nrom {
+impl Nrom {
     fn loadb(self, this: &mut Mapper, addr: u16) -> u8 {
         if addr < 0x8000 {
             0   // FIXME

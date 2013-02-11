@@ -25,7 +25,7 @@ pub trait MemUtil {
     fn loadw_zp(&mut self, addr: u8) -> u16;
 }
 
-impl<M:Mem> M : MemUtil {
+impl<M:Mem> MemUtil for M {
     fn loadw(&mut self, addr: u16) -> u16 {
         self.loadb(addr) as u16 | (self.loadb(addr + 1) as u16 << 8)
     }
@@ -47,7 +47,7 @@ pub struct Ram {
     data: [u8 * 0x800]
 }
 
-pub impl Ram : Mem {
+impl Mem for Ram {
     fn loadb(&mut self, addr: u16) -> u8     { self.data[addr & 0x7ff] }
     fn storeb(&mut self, addr: u16, val: u8) { self.data[addr & 0x7ff] = val }
 }
@@ -63,7 +63,7 @@ pub struct MemMap {
     mapper: Mapper,
 }
 
-pub impl MemMap {
+impl MemMap {
     static fn new(ppu: Ppu<Vram/&a,Oam>, input: Input, mapper: Mapper/&a) -> MemMap/&a {
         MemMap {
             ram: Ram { data: [ 0, ..0x800 ] },
