@@ -43,13 +43,10 @@ impl<M:Mem> MemUtil for M {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram {
-    data: [u8 * 0x800]
-}
-
+pub struct Ram([u8 * 0x800]);
 impl Mem for Ram {
-    fn loadb(&mut self, addr: u16) -> u8     { self.data[addr & 0x7ff] }
-    fn storeb(&mut self, addr: u16, val: u8) { self.data[addr & 0x7ff] = val }
+    fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
+    fn storeb(&mut self, addr: u16, val: u8) { self[addr & 0x7ff] = val }
 }
 
 //
@@ -65,12 +62,7 @@ pub struct MemMap {
 
 impl MemMap {
     static fn new(ppu: Ppu<Vram/&a,Oam>, input: Input, mapper: Mapper/&a) -> MemMap/&a {
-        MemMap {
-            ram: Ram { data: [ 0, ..0x800 ] },
-            ppu: ppu,
-            input: input,
-            mapper: mapper
-        }
+        MemMap { ram: Ram([ 0, ..0x800 ]), ppu: ppu, input: input, mapper: mapper }
     }
 }
 
