@@ -6,7 +6,7 @@
 
 use mem::Mem;
 
-use sdl::event::{KeyDownEvent, KeyUpEvent, KeyboardEvent, NoEvent};
+use sdl::event::{KeyDownEvent, KeyUpEvent, KeyboardEvent, NoEvent, QuitEvent};
 use sdl::event;
 use sdl::keyboard::{SDLKDown, SDLKEscape, SDLKLeft, SDLKRShift, SDLKReturn, SDLKRight, SDLKUp};
 use sdl::keyboard::{SDLKx, SDLKz};
@@ -121,6 +121,7 @@ impl Input {
                     }
                 }
                 KeyUpEvent(ref key_event) => self.handle_gamepad_event(key_event, false),
+                QuitEvent => return Quit,
                 _ => {}
             }
         }
