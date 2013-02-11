@@ -30,35 +30,32 @@ pub struct Rom {
 // FIXME: `pub` should not be required here! Sigh. Resolve bug.
 pub impl Rom {
     static fn from_fd(fd: c_int) -> Rom {
-        // Unsafe, I know... but I want to read into a POD struct and Rust can't prove that safe
-        // right now.
-        unsafe {
-            let mut header = INesHeader {
-                magic: [ 0, ..4 ],
-                prg_rom_size: 0,
-                chr_rom_size: 0,
-                flags_6: 0,
-                flags_7: 0,
-                prg_ram_size: 0,
-                flags_9: 0,
-                flags_10: 0,
-                zero: [ 0, ..5 ]
-            };
-            let sz = size_of::<INesHeader>() as size_t;
-            assert libc::read(fd, transmute(&mut header), sz) as size_t == sz;
-
-            assert header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ];
-
-            let read: &fn(sz: size_t) -> ~[u8] = |sz| {
+        let read: &fn(sz: size_t) -> ~[u8] = |sz| {
+            unsafe {
                 let mut result = vec::from_elem(sz as uint, 0);
                 assert libc::read(fd, transmute(&mut result[0]), sz) as size_t == sz;
                 result
-            };
+            }
+        };
 
-            let prg_rom = read(header.prg_rom_size as size_t * 16384);
-            let chr_rom = read(header.chr_rom_size as size_t * 8192);
-            Rom { header: header, prg: prg_rom, chr: chr_rom }
-        }
+        let buffer = read(size_of::<INesHeader>() as size_t);
+        let header = INesHeader {
+            magic: [ buffer[0], buffer[1], buffer[2], buffer[3] ],
+            prg_rom_size: buffer[4],
+            chr_rom_size: buffer[5],
+            flags_6: buffer[6],
+            flags_7: buffer[7],
+            prg_ram_size: buffer[8],
+            flags_9: buffer[9],
+            flags_10: buffer[10],
+            zero: [ 0, ..5 ]
+        };
+
+        assert header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ];
+
+        let prg_rom = read(header.prg_rom_size as size_t * 16384);
+        let chr_rom = read(header.chr_rom_size as size_t * 8192);
+        Rom { header: header, prg: prg_rom, chr: chr_rom }
     }
 
     static fn from_path(path: &str) -> Rom {
