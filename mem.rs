@@ -4,6 +4,7 @@
 // Author: Patrick Walton
 //
 
+use apu::Apu;
 use input::Input;
 use mapper::Mapper;
 use ppu::{Oam, Ppu, Vram};
@@ -58,11 +59,16 @@ pub struct MemMap {
     ppu: Ppu<Vram,Oam>,
     input: Input,
     mapper: Mapper,
+    apu: Apu,
 }
 
 impl MemMap {
-    static fn new(ppu: Ppu<Vram/&a,Oam>, input: Input, mapper: Mapper/&a) -> MemMap/&a {
-        MemMap { ram: Ram([ 0, ..0x800 ]), ppu: ppu, input: input, mapper: mapper }
+    static fn new(ppu: Ppu<Vram/&a,Oam>,
+                  input: Input,
+                  mapper: Mapper/&a,
+                  apu: Apu)
+               -> MemMap/&a {
+        MemMap { ram: Ram([ 0, ..0x800 ]), ppu: ppu, input: input, mapper: mapper, apu: apu }
     }
 }
 
@@ -72,8 +78,10 @@ impl Mem for MemMap {
             self.ram.loadb(addr)
         } else if addr < 0x4000 {
             self.ppu.loadb(addr)
-        } else if addr < 0x4018 {
+        } else if addr == 0x4016 {
             self.input.loadb(addr)
+        } else if addr <= 0x4018 {
+            self.apu.loadb(addr)
         } else {
             (self.mapper.loadb)(&mut self.mapper, addr)
         }
@@ -83,8 +91,10 @@ impl Mem for MemMap {
             self.ram.storeb(addr, val)
         } else if addr < 0x4000 {
             self.ppu.storeb(addr, val)
-        } else if addr < 0x4018 {
+        } else if addr == 0x4016 {
             self.input.storeb(addr, val)
+        } else if addr <= 0x4018 {
+            self.apu.storeb(addr, val)
         } else {
             (self.mapper.storeb)(&mut self.mapper, addr, val)
         }

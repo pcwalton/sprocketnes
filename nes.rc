@@ -6,6 +6,7 @@
 
 extern mod sdl;
 
+mod apu;
 mod cpu;
 mod disasm;
 mod gfx;

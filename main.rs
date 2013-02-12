@@ -4,6 +4,7 @@
 // Author: Patrick Walton
 //
 
+use apu::Apu;
 use cpu::Cpu;
 use gfx::Gfx;
 use input::Input;
@@ -35,7 +36,8 @@ fn start() {
     let mut mapper = Mapper::new(&rom);
     let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
     let mut input = Input::new();
-    let mut memmap = MemMap::new(ppu, input, mapper);
+    let mut apu = Apu::new();
+    let mut memmap = MemMap::new(ppu, input, mapper, apu);
     let mut cpu = Cpu::new(memmap);
 
     // TODO: Add a flag to not reset for nestest.log 
@@ -43,6 +45,8 @@ fn start() {
 
     loop {
         cpu.step();
+
+        cpu.mem.apu.step();
 
         let ppu_result = cpu.mem.ppu.step(cpu.cy);
         if ppu_result.vblank_nmi {
@@ -59,6 +63,8 @@ fn start() {
             }
         }
     }
+
+    cpu.mem.apu.close();
 }
 
 fn main() {
