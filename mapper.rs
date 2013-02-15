@@ -8,7 +8,7 @@ use mem::Mem;
 use rom::Rom;
 
 pub struct Mapper {
-    rom: &Rom,
+    rom: *Rom,
 
     // FIXME: ~fn is awful here; we need the function region work.
     // FIXME: We should trait-ify this. It's hard because of the region in Rom though. I guess we
@@ -19,14 +19,16 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    static fn new(rom: &a/Rom) -> Mapper/&a {
-        match rom.header.mapper() {
-            0 => Mapper {
-                rom: rom,
-                loadb:  |this, addr|      Nrom.loadb(this, addr),
-                storeb: |this, addr, val| Nrom.storeb(this, addr, val),
-            },
-            _ => die!(~"unsupported mapper")
+    static fn new(rom: *Rom) -> Mapper {
+        unsafe {
+            match (*rom).header.mapper() {
+                0 => Mapper {
+                    rom: rom,
+                    loadb:  |this, addr|      Nrom.loadb(this, addr),
+                    storeb: |this, addr, val| Nrom.storeb(this, addr, val),
+                },
+                _ => die!(~"unsupported mapper")
+            }
         }
     }
 }
@@ -45,11 +47,13 @@ impl Nrom {
         if addr < 0x8000 {
             0   // FIXME
         } else {
-            // FIXME: Unsafe get for speed?
-            if this.rom.prg.len() > 16384 {
-                this.rom.prg[addr & 0x7fff]
-            } else {
-                this.rom.prg[addr & 0x3fff]
+            unsafe {
+                // FIXME: Unsafe get for speed?
+                if (*this.rom).prg.len() > 16384 {
+                    (*this.rom).prg[addr & 0x7fff]
+                } else {
+                    (*this.rom).prg[addr & 0x3fff]
+                }
             }
         }
     }

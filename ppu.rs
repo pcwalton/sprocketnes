@@ -143,13 +143,13 @@ enum PpuAddrByte {
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
-    rom: &Rom,
+    rom: *Rom,
     nametables: [u8 * 0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
     palette: [u8 * 0x20],
 }
 
 impl Vram {
-    static fn new(rom: &a/Rom) -> Vram/&a {
+    static fn new(rom: *Rom) -> Vram {
         Vram { rom: rom, nametables: [ 0, ..0x800 ], palette: [ 0, ..0x20 ] }
     }
 }
@@ -158,7 +158,7 @@ impl Mem for Vram {
     #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
-            self.rom.chr[addr]
+            unsafe { (*self.rom).chr[addr] }
         } else if addr < 0x3f00 {   // Name table area
             self.nametables[addr & 0x07ff]
         } else if addr < 0x4000 {   // Palette area
@@ -494,9 +494,10 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&Sprite, u8) -> bool) {
+    fn each_sprite(&mut self, f: &fn(&mut Ppu<VM,OM>, &Sprite, u8) -> bool) {
         for range(0, 64) |i| {
-            if !f(&self.make_sprite_info(i as u16), i as u8) {
+            let sprite = self.make_sprite_info(i as u16);
+            if !f(self, &sprite, i as u8) {
                 break;
             }
         }
@@ -629,13 +630,13 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     fn compute_visible_sprites(&mut self) -> [Option<u8> * 8] {
         let mut count = 0;
         let mut result = [None, ..8];
-        for self.each_sprite |sprite, index| {
-            if sprite.on_scanline(self, self.scanline as u8) {
+        for self.each_sprite |this, sprite, index| {
+            if sprite.on_scanline(this, this.scanline as u8) {
                 if count < 8 {
                     result[count] = Some(index);
                     count += 1;
                 } else {
-                    self.regs.status.set_sprite_overflow(true);
+                    this.regs.status.set_sprite_overflow(true);
                     return result;
                 }
             }

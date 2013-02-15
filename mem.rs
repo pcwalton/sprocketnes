@@ -63,11 +63,11 @@ pub struct MemMap {
 }
 
 impl MemMap {
-    static fn new(ppu: Ppu<Vram/&a,Oam>,
+    static fn new(ppu: Ppu<Vram,Oam>,
                   input: Input,
-                  mapper: Mapper/&a,
+                  mapper: Mapper,
                   apu: Apu)
-               -> MemMap/&a {
+               -> MemMap {
         MemMap { ram: Ram([ 0, ..0x800 ]), ppu: ppu, input: input, mapper: mapper, apu: apu }
     }
 }

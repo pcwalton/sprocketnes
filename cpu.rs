@@ -103,152 +103,152 @@ impl<M:Mem> AddressingMode<M> for MemoryAddressingMode {
 //
 
 macro_rules! decode_op {
-    (op: $op:expr, this: $this:expr) => {
+    (op: $op:expr, this: $this:ident) => {
         // We try to keep this in the same order as the implementations above.
         // TODO: Use arm macros to fix some of this duplication.
         match $op {
             // Loads
-            0xa1 => $this.lda($this.indexed_indirect_x()),
-            0xa5 => $this.lda($this.zero_page()),
-            0xa9 => $this.lda($this.immediate()),
-            0xad => $this.lda($this.absolute()),
-            0xb1 => $this.lda($this.indirect_indexed_y()),
-            0xb5 => $this.lda($this.zero_page_x()),
-            0xb9 => $this.lda($this.absolute_y()),
-            0xbd => $this.lda($this.absolute_x()),
+            0xa1 => { let v = $this.indexed_indirect_x(); $this.lda(v) }
+            0xa5 => { let v = $this.zero_page(); $this.lda(v) }
+            0xa9 => { let v = $this.immediate(); $this.lda(v) }
+            0xad => { let v = $this.absolute(); $this.lda(v) }
+            0xb1 => { let v = $this.indirect_indexed_y(); $this.lda(v) }
+            0xb5 => { let v = $this.zero_page_x(); $this.lda(v) }
+            0xb9 => { let v = $this.absolute_y(); $this.lda(v) }
+            0xbd => { let v = $this.absolute_x(); $this.lda(v) }
 
-            0xa2 => $this.ldx($this.immediate()),
-            0xa6 => $this.ldx($this.zero_page()),
-            0xb6 => $this.ldx($this.zero_page_y()),
-            0xae => $this.ldx($this.absolute()),
-            0xbe => $this.ldx($this.absolute_y()),
+            0xa2 => { let v = $this.immediate(); $this.ldx(v) }
+            0xa6 => { let v = $this.zero_page(); $this.ldx(v) }
+            0xb6 => { let v = $this.zero_page_y(); $this.ldx(v) }
+            0xae => { let v = $this.absolute(); $this.ldx(v) }
+            0xbe => { let v = $this.absolute_y(); $this.ldx(v) }
 
-            0xa0 => $this.ldy($this.immediate()),
-            0xa4 => $this.ldy($this.zero_page()),
-            0xb4 => $this.ldy($this.zero_page_x()),
-            0xac => $this.ldy($this.absolute()),
-            0xbc => $this.ldy($this.absolute_x()),
+            0xa0 => { let v = $this.immediate(); $this.ldy(v) }
+            0xa4 => { let v = $this.zero_page(); $this.ldy(v) }
+            0xb4 => { let v = $this.zero_page_x(); $this.ldy(v) }
+            0xac => { let v = $this.absolute(); $this.ldy(v) }
+            0xbc => { let v = $this.absolute_x(); $this.ldy(v) }
 
             // Stores
-            0x85 => $this.sta($this.zero_page()),
-            0x95 => $this.sta($this.zero_page_x()),
-            0x8d => $this.sta($this.absolute()),
-            0x9d => $this.sta($this.absolute_x()),
-            0x99 => $this.sta($this.absolute_y()),
-            0x81 => $this.sta($this.indexed_indirect_x()),
-            0x91 => $this.sta($this.indirect_indexed_y()),
+            0x85 => { let v = $this.zero_page(); $this.sta(v) }
+            0x95 => { let v = $this.zero_page_x(); $this.sta(v) }
+            0x8d => { let v = $this.absolute(); $this.sta(v) }
+            0x9d => { let v = $this.absolute_x(); $this.sta(v) }
+            0x99 => { let v = $this.absolute_y(); $this.sta(v) }
+            0x81 => { let v = $this.indexed_indirect_x(); $this.sta(v) }
+            0x91 => { let v = $this.indirect_indexed_y(); $this.sta(v) }
 
-            0x86 => $this.stx($this.zero_page()),
-            0x96 => $this.stx($this.zero_page_y()),
-            0x8e => $this.stx($this.absolute()),
+            0x86 => { let v = $this.zero_page(); $this.stx(v) }
+            0x96 => { let v = $this.zero_page_y(); $this.stx(v) }
+            0x8e => { let v = $this.absolute(); $this.stx(v) }
 
-            0x84 => $this.sty($this.zero_page()),
-            0x94 => $this.sty($this.zero_page_x()),
-            0x8c => $this.sty($this.absolute()),
+            0x84 => { let v = $this.zero_page(); $this.sty(v) }
+            0x94 => { let v = $this.zero_page_x(); $this.sty(v) }
+            0x8c => { let v = $this.absolute(); $this.sty(v) }
 
             // Arithmetic
-            0x69 => $this.adc($this.immediate()),
-            0x65 => $this.adc($this.zero_page()),
-            0x75 => $this.adc($this.zero_page_x()),
-            0x6d => $this.adc($this.absolute()),
-            0x7d => $this.adc($this.absolute_x()),
-            0x79 => $this.adc($this.absolute_y()),
-            0x61 => $this.adc($this.indexed_indirect_x()),
-            0x71 => $this.adc($this.indirect_indexed_y()),
+            0x69 => { let v = $this.immediate(); $this.adc(v) }
+            0x65 => { let v = $this.zero_page(); $this.adc(v) }
+            0x75 => { let v = $this.zero_page_x(); $this.adc(v) }
+            0x6d => { let v = $this.absolute(); $this.adc(v) }
+            0x7d => { let v = $this.absolute_x(); $this.adc(v) }
+            0x79 => { let v = $this.absolute_y(); $this.adc(v) }
+            0x61 => { let v = $this.indexed_indirect_x(); $this.adc(v) }
+            0x71 => { let v = $this.indirect_indexed_y(); $this.adc(v) }
 
-            0xe9 => $this.sbc($this.immediate()),
-            0xe5 => $this.sbc($this.zero_page()),
-            0xf5 => $this.sbc($this.zero_page_x()),
-            0xed => $this.sbc($this.absolute()),
-            0xfd => $this.sbc($this.absolute_x()),
-            0xf9 => $this.sbc($this.absolute_y()),
-            0xe1 => $this.sbc($this.indexed_indirect_x()),
-            0xf1 => $this.sbc($this.indirect_indexed_y()),
+            0xe9 => { let v = $this.immediate(); $this.sbc(v) }
+            0xe5 => { let v = $this.zero_page(); $this.sbc(v) }
+            0xf5 => { let v = $this.zero_page_x(); $this.sbc(v) }
+            0xed => { let v = $this.absolute(); $this.sbc(v) }
+            0xfd => { let v = $this.absolute_x(); $this.sbc(v) }
+            0xf9 => { let v = $this.absolute_y(); $this.sbc(v) }
+            0xe1 => { let v = $this.indexed_indirect_x(); $this.sbc(v) }
+            0xf1 => { let v = $this.indirect_indexed_y(); $this.sbc(v) }
 
             // Comparisons
-            0xc9 => $this.cmp($this.immediate()),
-            0xc5 => $this.cmp($this.zero_page()),
-            0xd5 => $this.cmp($this.zero_page_x()),
-            0xcd => $this.cmp($this.absolute()),
-            0xdd => $this.cmp($this.absolute_x()),
-            0xd9 => $this.cmp($this.absolute_y()),
-            0xc1 => $this.cmp($this.indexed_indirect_x()),
-            0xd1 => $this.cmp($this.indirect_indexed_y()),
+            0xc9 => { let v = $this.immediate(); $this.cmp(v) }
+            0xc5 => { let v = $this.zero_page(); $this.cmp(v) }
+            0xd5 => { let v = $this.zero_page_x(); $this.cmp(v) }
+            0xcd => { let v = $this.absolute(); $this.cmp(v) }
+            0xdd => { let v = $this.absolute_x(); $this.cmp(v) }
+            0xd9 => { let v = $this.absolute_y(); $this.cmp(v) }
+            0xc1 => { let v = $this.indexed_indirect_x(); $this.cmp(v) }
+            0xd1 => { let v = $this.indirect_indexed_y(); $this.cmp(v) }
 
-            0xe0 => $this.cpx($this.immediate()),
-            0xe4 => $this.cpx($this.zero_page()),
-            0xec => $this.cpx($this.absolute()),
+            0xe0 => { let v = $this.immediate(); $this.cpx(v) }
+            0xe4 => { let v = $this.zero_page(); $this.cpx(v) }
+            0xec => { let v = $this.absolute(); $this.cpx(v) }
 
-            0xc0 => $this.cpy($this.immediate()),
-            0xc4 => $this.cpy($this.zero_page()),
-            0xcc => $this.cpy($this.absolute()),
+            0xc0 => { let v = $this.immediate(); $this.cpy(v) }
+            0xc4 => { let v = $this.zero_page(); $this.cpy(v) }
+            0xcc => { let v = $this.absolute(); $this.cpy(v) }
 
             // Bitwise operations
-            0x29 => $this.and($this.immediate()),
-            0x25 => $this.and($this.zero_page()),
-            0x35 => $this.and($this.zero_page_x()),
-            0x2d => $this.and($this.absolute()),
-            0x3d => $this.and($this.absolute_x()),
-            0x39 => $this.and($this.absolute_y()),
-            0x21 => $this.and($this.indexed_indirect_x()),
-            0x31 => $this.and($this.indirect_indexed_y()),
+            0x29 => { let v = $this.immediate(); $this.and(v) }
+            0x25 => { let v = $this.zero_page(); $this.and(v) }
+            0x35 => { let v = $this.zero_page_x(); $this.and(v) }
+            0x2d => { let v = $this.absolute(); $this.and(v) }
+            0x3d => { let v = $this.absolute_x(); $this.and(v) }
+            0x39 => { let v = $this.absolute_y(); $this.and(v) }
+            0x21 => { let v = $this.indexed_indirect_x(); $this.and(v) }
+            0x31 => { let v = $this.indirect_indexed_y(); $this.and(v) }
 
-            0x09 => $this.ora($this.immediate()),
-            0x05 => $this.ora($this.zero_page()),
-            0x15 => $this.ora($this.zero_page_x()),
-            0x0d => $this.ora($this.absolute()),
-            0x1d => $this.ora($this.absolute_x()),
-            0x19 => $this.ora($this.absolute_y()),
-            0x01 => $this.ora($this.indexed_indirect_x()),
-            0x11 => $this.ora($this.indirect_indexed_y()),
+            0x09 => { let v = $this.immediate(); $this.ora(v) }
+            0x05 => { let v = $this.zero_page(); $this.ora(v) }
+            0x15 => { let v = $this.zero_page_x(); $this.ora(v) }
+            0x0d => { let v = $this.absolute(); $this.ora(v) }
+            0x1d => { let v = $this.absolute_x(); $this.ora(v) }
+            0x19 => { let v = $this.absolute_y(); $this.ora(v) }
+            0x01 => { let v = $this.indexed_indirect_x(); $this.ora(v) }
+            0x11 => { let v = $this.indirect_indexed_y(); $this.ora(v) }
 
-            0x49 => $this.eor($this.immediate()),
-            0x45 => $this.eor($this.zero_page()),
-            0x55 => $this.eor($this.zero_page_x()),
-            0x4d => $this.eor($this.absolute()),
-            0x5d => $this.eor($this.absolute_x()),
-            0x59 => $this.eor($this.absolute_y()),
-            0x41 => $this.eor($this.indexed_indirect_x()),
-            0x51 => $this.eor($this.indirect_indexed_y()),
+            0x49 => { let v = $this.immediate(); $this.eor(v) }
+            0x45 => { let v = $this.zero_page(); $this.eor(v) }
+            0x55 => { let v = $this.zero_page_x(); $this.eor(v) }
+            0x4d => { let v = $this.absolute(); $this.eor(v) }
+            0x5d => { let v = $this.absolute_x(); $this.eor(v) }
+            0x59 => { let v = $this.absolute_y(); $this.eor(v) }
+            0x41 => { let v = $this.indexed_indirect_x(); $this.eor(v) }
+            0x51 => { let v = $this.indirect_indexed_y(); $this.eor(v) }
 
-            0x24 => $this.bit($this.zero_page()),
-            0x2c => $this.bit($this.absolute()),
+            0x24 => { let v = $this.zero_page(); $this.bit(v) }
+            0x2c => { let v = $this.absolute(); $this.bit(v) }
 
             // Shifts and rotates
-            0x2a => $this.rol($this.accumulator()),
-            0x26 => $this.rol($this.zero_page()),
-            0x36 => $this.rol($this.zero_page_x()),
-            0x2e => $this.rol($this.absolute()),
-            0x3e => $this.rol($this.absolute_x()),
+            0x2a => { let v = $this.accumulator(); $this.rol(v) }
+            0x26 => { let v = $this.zero_page(); $this.rol(v) }
+            0x36 => { let v = $this.zero_page_x(); $this.rol(v) }
+            0x2e => { let v = $this.absolute(); $this.rol(v) }
+            0x3e => { let v = $this.absolute_x(); $this.rol(v) }
 
-            0x6a => $this.ror($this.accumulator()),
-            0x66 => $this.ror($this.zero_page()),
-            0x76 => $this.ror($this.zero_page_x()),
-            0x6e => $this.ror($this.absolute()),
-            0x7e => $this.ror($this.absolute_x()),
+            0x6a => { let v = $this.accumulator(); $this.ror(v) }
+            0x66 => { let v = $this.zero_page(); $this.ror(v) }
+            0x76 => { let v = $this.zero_page_x(); $this.ror(v) }
+            0x6e => { let v = $this.absolute(); $this.ror(v) }
+            0x7e => { let v = $this.absolute_x(); $this.ror(v) }
 
-            0x0a => $this.asl($this.accumulator()),
-            0x06 => $this.asl($this.zero_page()),
-            0x16 => $this.asl($this.zero_page_x()),
-            0x0e => $this.asl($this.absolute()),
-            0x1e => $this.asl($this.absolute_x()),
+            0x0a => { let v = $this.accumulator(); $this.asl(v) }
+            0x06 => { let v = $this.zero_page(); $this.asl(v) }
+            0x16 => { let v = $this.zero_page_x(); $this.asl(v) }
+            0x0e => { let v = $this.absolute(); $this.asl(v) }
+            0x1e => { let v = $this.absolute_x(); $this.asl(v) }
 
-            0x4a => $this.lsr($this.accumulator()),
-            0x46 => $this.lsr($this.zero_page()),
-            0x56 => $this.lsr($this.zero_page_x()),
-            0x4e => $this.lsr($this.absolute()),
-            0x5e => $this.lsr($this.absolute_x()),
+            0x4a => { let v = $this.accumulator(); $this.lsr(v) }
+            0x46 => { let v = $this.zero_page(); $this.lsr(v) }
+            0x56 => { let v = $this.zero_page_x(); $this.lsr(v) }
+            0x4e => { let v = $this.absolute(); $this.lsr(v) }
+            0x5e => { let v = $this.absolute_x(); $this.lsr(v) }
 
             // Increments and decrements
-            0xe6 => $this.inc($this.zero_page()),
-            0xf6 => $this.inc($this.zero_page_x()),
-            0xee => $this.inc($this.absolute()),
-            0xfe => $this.inc($this.absolute_x()),
+            0xe6 => { let v = $this.zero_page(); $this.inc(v) }
+            0xf6 => { let v = $this.zero_page_x(); $this.inc(v) }
+            0xee => { let v = $this.absolute(); $this.inc(v) }
+            0xfe => { let v = $this.absolute_x(); $this.inc(v) }
 
-            0xc6 => $this.dec($this.zero_page()),
-            0xd6 => $this.dec($this.zero_page_x()),
-            0xce => $this.dec($this.absolute()),
-            0xde => $this.dec($this.absolute_x()),
+            0xc6 => { let v = $this.zero_page(); $this.dec(v) }
+            0xd6 => { let v = $this.zero_page_x(); $this.dec(v) }
+            0xce => { let v = $this.absolute(); $this.dec(v) }
+            0xde => { let v = $this.absolute_x(); $this.dec(v) }
 
             0xe8 => $this.inx(),
             0xca => $this.dex(),
@@ -355,7 +355,8 @@ impl<M:Mem> Cpu<M> {
     // Performs DMA to the OAMDATA ($2004) register.
     fn dma(&mut self, hi_addr: u8) {
         for range(hi_addr as uint << 8, (hi_addr + 1) as uint << 8) |addr| {
-            self.storeb(0x2004, self.loadb(addr as u16));
+            let val = self.loadb(addr as u16);
+            self.storeb(0x2004, val);
 
             // FIXME: The last address sometimes takes 1 cycle, sometimes 2 -- NESdev isn't very
             // clear on this.
@@ -442,11 +443,13 @@ impl<M:Mem> Cpu<M> {
         MemoryAddressingMode(self.loadw_bump_pc() + self.regs.y as u16)
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
-        let addr = self.loadw_zp(self.loadb_bump_pc() + self.regs.x);
+        let val = self.loadb_bump_pc();
+        let addr = self.loadw_zp(val + self.regs.x);
         MemoryAddressingMode(addr)
     }
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
-        let addr = self.loadw_zp(self.loadb_bump_pc()) + self.regs.y as u16;
+        let val = self.loadb_bump_pc();
+        let addr = self.loadw_zp(val) + self.regs.y as u16;
         MemoryAddressingMode(addr)
     }
 
@@ -455,9 +458,18 @@ impl<M:Mem> Cpu<M> {
     //
 
     // Loads
-    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.a = self.set_zn(am.load(self)) }
-    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.x = self.set_zn(am.load(self)) }
-    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) { self.regs.y = self.set_zn(am.load(self)) }
+    fn lda<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let val = am.load(self);
+        self.regs.a = self.set_zn(val)
+    }
+    fn ldx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let val = am.load(self);
+        self.regs.x = self.set_zn(val)
+    }
+    fn ldy<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let val = am.load(self);
+        self.regs.y = self.set_zn(val)
+    }
 
     // Stores
     fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.a) }
@@ -509,13 +521,16 @@ impl<M:Mem> Cpu<M> {
 
     // Bitwise operations
     fn and<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.regs.a = self.set_zn(am.load(self) & self.regs.a)
+        let val = am.load(self) & self.regs.a;
+        self.regs.a = self.set_zn(val)
     }
     fn ora<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.regs.a = self.set_zn(am.load(self) | self.regs.a)
+        let val = am.load(self) | self.regs.a;
+        self.regs.a = self.set_zn(val)
     }
     fn eor<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.regs.a = self.set_zn(am.load(self) ^ self.regs.a)
+        let val = am.load(self) ^ self.regs.a;
+        self.regs.a = self.set_zn(val)
     }
     fn bit<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
@@ -533,7 +548,8 @@ impl<M:Mem> Cpu<M> {
             result |= 1;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        am.store(self, self.set_zn(result as u8))
+        let val = self.set_zn(result as u8);
+        am.store(self, val)
     }
     fn shr_base<AM:AddressingMode<M>>(&mut self, msb: bool, am: AM) {
         let val = am.load(self);
@@ -543,23 +559,30 @@ impl<M:Mem> Cpu<M> {
             result |= 0x80;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        am.store(self, self.set_zn(result as u8))
+        let val = self.set_zn(result as u8);
+        am.store(self, val)
     }
     fn rol<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.shl_base(self.get_flag(CARRY_FLAG), am)
+        let val = self.get_flag(CARRY_FLAG);
+        self.shl_base(val, am)
     }
     fn ror<AM:AddressingMode<M>>(&mut self, am: AM) {
-        self.shr_base(self.get_flag(CARRY_FLAG), am)
+        let val = self.get_flag(CARRY_FLAG);
+        self.shr_base(val, am)
     }
     fn asl<AM:AddressingMode<M>>(&mut self, am: AM) { self.shl_base(false, am) }
     fn lsr<AM:AddressingMode<M>>(&mut self, am: AM) { self.shr_base(false, am) }
 
     // Increments and decrements
     fn inc<AM:AddressingMode<M>>(&mut self, am: AM) {
-        am.store(self, self.set_zn(am.load(self) + 1))
+        let val = am.load(self);
+        let val = self.set_zn(val + 1);
+        am.store(self, val)
     }
     fn dec<AM:AddressingMode<M>>(&mut self, am: AM) {
-        am.store(self, self.set_zn(am.load(self) - 1))
+        let val = am.load(self);
+        let val = self.set_zn(val - 1);
+        am.store(self, val)
     }
     fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
     fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }
@@ -590,14 +613,38 @@ impl<M:Mem> Cpu<M> {
             self.regs.pc = (self.regs.pc as i32 + disp as i32) as u16;
         }
     }
-    fn bpl(&mut self) { self.bra_base(!self.get_flag(NEGATIVE_FLAG)) }
-    fn bmi(&mut self) { self.bra_base(self.get_flag(NEGATIVE_FLAG))  }
-    fn bvc(&mut self) { self.bra_base(!self.get_flag(OVERFLOW_FLAG)) }
-    fn bvs(&mut self) { self.bra_base(self.get_flag(OVERFLOW_FLAG))  }
-    fn bcc(&mut self) { self.bra_base(!self.get_flag(CARRY_FLAG))    }
-    fn bcs(&mut self) { self.bra_base(self.get_flag(CARRY_FLAG))     }
-    fn bne(&mut self) { self.bra_base(!self.get_flag(ZERO_FLAG))     }
-    fn beq(&mut self) { self.bra_base(self.get_flag(ZERO_FLAG))      }
+    fn bpl(&mut self) {
+        let flag = !self.get_flag(NEGATIVE_FLAG);
+        self.bra_base(flag)
+    }
+    fn bmi(&mut self) {
+        let flag = self.get_flag(NEGATIVE_FLAG);
+        self.bra_base(flag)
+    }
+    fn bvc(&mut self) {
+        let flag = !self.get_flag(OVERFLOW_FLAG);
+        self.bra_base(flag)
+    }
+    fn bvs(&mut self) {
+        let flag = self.get_flag(OVERFLOW_FLAG);
+        self.bra_base(flag)
+    }
+    fn bcc(&mut self) {
+        let flag = !self.get_flag(CARRY_FLAG);
+        self.bra_base(flag)
+    }
+    fn bcs(&mut self) {
+        let flag = self.get_flag(CARRY_FLAG);
+        self.bra_base(flag)
+    }
+    fn bne(&mut self) {
+        let flag = !self.get_flag(ZERO_FLAG);
+        self.bra_base(flag)
+    }
+    fn beq(&mut self) {
+        let flag = self.get_flag(ZERO_FLAG);
+        self.bra_base(flag)
+    }
 
     // Jumps
     fn jmp(&mut self) { self.regs.pc = self.loadw_bump_pc() }
@@ -625,15 +672,22 @@ impl<M:Mem> Cpu<M> {
         self.regs.pc = self.loadw(BRK_VECTOR);
     }
     fn rti(&mut self) {
-        self.set_flags(self.popb());
+        let flags = self.popb();
+        self.set_flags(flags);
         self.regs.pc = self.popw(); // NB: no + 1
     }
 
     // Stack operations
     fn pha(&mut self) { self.pushb(self.regs.a) }
-    fn pla(&mut self) { self.regs.a = self.set_zn(self.popb()) }
+    fn pla(&mut self) {
+        let val = self.popb();
+        self.regs.a = self.set_zn(val)
+    }
     fn php(&mut self) { self.pushb(self.regs.flags | BREAK_FLAG) }
-    fn plp(&mut self) { self.set_flags(self.popb()) }
+    fn plp(&mut self) {
+        let val = self.popb();
+        self.set_flags(val)
+    }
 
     // No operation
     fn nop(&mut self) {}

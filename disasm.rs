@@ -10,7 +10,7 @@ use core::uint;
 
 pub struct Disassembler<M> {
     pc: u16,
-    mem: &mut M
+    mem: *mut M
 }
 
 impl<M:Mem> Disassembler<M> {
@@ -19,12 +19,16 @@ impl<M:Mem> Disassembler<M> {
     //
 
     fn loadb_bump_pc(&mut self) -> u8 {
-        let val = self.mem.loadb(self.pc);
-        self.pc += 1;
-        val
+        unsafe {
+            let val = (&mut *self.mem).loadb(self.pc);
+            self.pc += 1;
+            val
+        }
     }
     fn loadw_bump_pc(&mut self) -> u16 {
-        self.loadb_bump_pc() as u16 | (self.loadb_bump_pc() as u16 << 8)
+        let bottom = self.loadb_bump_pc() as u16;
+        let top = self.loadb_bump_pc() as u16 << 8;
+        bottom | top
     }
 
     fn disb_bump_pc(&mut self) -> ~str { fmt!("$%02X", self.loadb_bump_pc() as uint) }
