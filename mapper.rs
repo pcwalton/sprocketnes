@@ -27,7 +27,7 @@ impl Mapper {
                     loadb:  |this, addr|      Nrom.loadb(this, addr),
                     storeb: |this, addr, val| Nrom.storeb(this, addr, val),
                 },
-                _ => die!(~"unsupported mapper")
+                _ => fail!(~"unsupported mapper")
             }
         }
     }

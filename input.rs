@@ -6,10 +6,9 @@
 
 use mem::Mem;
 
-use sdl::event::{KeyDownEvent, KeyUpEvent, KeyboardEvent, NoEvent, QuitEvent};
+use sdl::event::{DownKey, EscapeKey, LeftKey, RShiftKey, ReturnKey, RightKey, UpKey, XKey, ZKey};
+use sdl::event::{Key, KeyEvent, NoEvent, QuitEvent};
 use sdl::event;
-use sdl::keyboard::{SDLKDown, SDLKEscape, SDLKLeft, SDLKRShift, SDLKReturn, SDLKRight, SDLKUp};
-use sdl::keyboard::{SDLKx, SDLKz};
 
 //
 // The "strobe state": the order in which the NES reads the buttons.
@@ -38,7 +37,7 @@ impl StrobeState {
             STROBE_STATE_DOWN   => state.down,
             STROBE_STATE_LEFT   => state.left,
             STROBE_STATE_RIGHT  => state.right,
-            _                   => die!(~"shouldn't happen")
+            _                   => fail!(~"shouldn't happen")
         }
     }
 
@@ -95,17 +94,17 @@ impl Input {
         }
     }
 
-    fn handle_gamepad_event(&mut self, key_event: &KeyboardEvent, down: bool) {
-        match key_event.keycode {
-            SDLKLeft   => self.gamepad_0.left   = down,
-            SDLKDown   => self.gamepad_0.down   = down,
-            SDLKUp     => self.gamepad_0.up     = down,
-            SDLKRight  => self.gamepad_0.right  = down,
-            SDLKz      => self.gamepad_0.a      = down,
-            SDLKx      => self.gamepad_0.b      = down,
-            SDLKRShift => self.gamepad_0.select = down,
-            SDLKReturn => self.gamepad_0.start  = down,
-            _          => {}
+    fn handle_gamepad_event(&mut self, key: Key, down: bool) {
+        match key {
+            LeftKey   => self.gamepad_0.left   = down,
+            DownKey   => self.gamepad_0.down   = down,
+            UpKey     => self.gamepad_0.up     = down,
+            RightKey  => self.gamepad_0.right  = down,
+            ZKey      => self.gamepad_0.a      = down,
+            XKey      => self.gamepad_0.b      = down,
+            RShiftKey => self.gamepad_0.select = down,
+            ReturnKey => self.gamepad_0.start  = down,
+            _         => {}
         }
     }
 
@@ -113,14 +112,8 @@ impl Input {
         loop {
             match event::poll_event() {
                 NoEvent => break,
-                KeyDownEvent(ref key_event) => {
-                    self.handle_gamepad_event(key_event, true);
-
-                    if key_event.keycode == SDLKEscape {
-                        return Quit;
-                    }
-                }
-                KeyUpEvent(ref key_event) => self.handle_gamepad_event(key_event, false),
+                KeyEvent(EscapeKey, _, _, _) => return Quit,
+                KeyEvent(key, down, _, _) => self.handle_gamepad_event(key, down),
                 QuitEvent => return Quit,
                 _ => {}
             }

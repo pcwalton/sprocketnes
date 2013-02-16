@@ -164,7 +164,7 @@ impl Mem for Vram {
         } else if addr < 0x4000 {   // Palette area
             self.palette[addr & 0x1f]
         } else {
-            die!(~"invalid VRAM read")
+            fail!(~"invalid VRAM read")
         }
     }
     fn storeb(&mut self, addr: u16, val: u8) {
@@ -283,11 +283,11 @@ impl<VM:Mem,OM:Mem> Mem for Ppu<VM,OM> {
             1 => *self.regs.mask,
             2 => self.read_ppustatus(),
             3 => 0, // OAMADDR is read-only
-            4 => die!(~"OAM read unimplemented"),
+            4 => fail!(~"OAM read unimplemented"),
             5 => 0, // PPUSCROLL is read-only
             6 => 0, // PPUADDR is read-only
             7 => self.read_ppudata(),
-            _ => die!(~"can't happen")
+            _ => fail!(~"can't happen")
         }
     }
 
@@ -303,7 +303,7 @@ impl<VM:Mem,OM:Mem> Mem for Ppu<VM,OM> {
             5 => self.update_ppuscroll(val),
             6 => self.update_ppuaddr(val),
             7 => self.write_ppudata(val),
-            _ => die!(~"can't happen")
+            _ => fail!(~"can't happen")
         }
     }
 }
@@ -600,7 +600,7 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                             pattern_color = self.get_pattern_pixel(Sprite, tile, x, y);
                         }
                         SpriteTiles8x16(*) => {
-                            die!(~"8x16 sprite rendering unimplemented");
+                            fail!(~"8x16 sprite rendering unimplemented");
                         }
                     }
 

@@ -86,7 +86,7 @@ impl<M:Mem> AddressingMode<M> for ImmediateAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb_bump_pc() }
     fn store(&self, _: &mut Cpu<M>, _: u8) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
-        die!(~"can't store to immediate")
+        fail!(~"can't store to immediate")
     }
 }
 
@@ -301,7 +301,7 @@ macro_rules! decode_op {
             // No operation
             0xea => $this.nop(),
 
-            _ => die!(~"unimplemented or illegal instruction")
+            _ => fail!(~"unimplemented or illegal instruction")
         }
     }
 }
