@@ -28,21 +28,6 @@ const LENGTH_COUNTERS: [u8 * 32] = [
 // APUPULSE: [0x4000, 0x4008)
 //
 
-enum ApuPulseVolume {
-    ConstantVolume(u8),
-    Envelope(u8),
-}
-
-impl ApuPulseVolume {
-    // TODO: Wrong.
-    fn get(self) -> u8 {
-        match self {
-            ConstantVolume(v) => v,
-            Envelope(v) => v,
-        }
-    }
-}
-
 struct ApuPulseSweep(u8);
 
 impl ApuPulseSweep {
@@ -52,10 +37,24 @@ impl ApuPulseSweep {
     fn shift_count(self) -> u8 { *self & 0x7              }
 }
 
+struct ApuPulseEnvelope {
+    loop_flag: bool,
+    enabled: bool,
+    volume: u8,
+
+    period: u8,
+    counter: u8,
+}
+
+impl ApuPulseEnvelope {
+    static pub fn new() -> ApuPulseEnvelope {
+        ApuPulseEnvelope { loop_flag: false, enabled: false, volume: 0, period: 0, counter: 0 }
+    }
+}
+
 struct ApuPulse {
     duty: u8,
-    envelope_loop: bool,
-    volume: ApuPulseVolume,
+    envelope: ApuPulseEnvelope,
     sweep: ApuPulseSweep,
     timer: u16,
 
@@ -112,8 +111,7 @@ impl Apu {
                 pulses: [
                     ApuPulse {
                         duty: 0,
-                        envelope_loop: false,
-                        volume: ConstantVolume(0),
+                        envelope: ApuPulseEnvelope::new(),
                         sweep: ApuPulseSweep(0),
                         timer: 0,
                         length_id: 0,
@@ -148,11 +146,14 @@ impl Apu {
         match addr & 0x3 {
             0 => {
                 pulse.duty = val >> 6;
-                pulse.envelope_loop = ((val >> 5) & 1) as bool;
-                pulse.volume = if (val >> 4 & 1) == 1 {
-                    ConstantVolume(val & 0xf)
+                pulse.envelope.loop_flag = ((val >> 5) & 1) != 0;
+                pulse.envelope.enabled = ((val >> 4) & 1) == 0;
+                if pulse.envelope.enabled {
+                    pulse.envelope.volume = 15;
+                    pulse.envelope.period = val & 0xf;
+                    pulse.envelope.counter = 0;
                 } else {
-                    Envelope(val & 0xf)
+                    pulse.envelope.volume = val & 0xf;
                 }
             }
             1 => {
@@ -200,7 +201,7 @@ impl Apu {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
-                if pulse.length_left > 0 && !pulse.envelope_loop {
+                if pulse.length_left > 0 && !pulse.envelope.loop_flag {
                     // Envelope loop is overlapped with the length disable bit.
                     pulse.length_left -= 1;
                 }
@@ -222,6 +223,20 @@ impl Apu {
             }
         }
 
+        // 240 Hz operations: envelope and linear counter.
+        for uint::range(0, 2) |i| {
+            let pulse = &mut self.regs.pulses[i];
+            if pulse.envelope.enabled && pulse.envelope.volume > 0 {
+                pulse.envelope.counter += 1;
+                if pulse.envelope.counter >= pulse.envelope.period {
+                    pulse.envelope.counter = 0;
+                    pulse.envelope.volume -= 1;
+                }
+            }
+        }
+
+        // TODO: 60 Hz IRQ.
+
         self.ticks += 1;
     }
 
@@ -235,7 +250,7 @@ impl Apu {
             return;
         }
 
-        if self.regs.pulses[pulse_number].volume.get() == 0 {
+        if self.regs.pulses[pulse_number].envelope.volume == 0 {
             return;
         }
 
@@ -253,7 +268,7 @@ impl Apu {
             let mut waveform_index = 0;
             for uint::range(0, buffer.len()) |i| {
                 if waveform[waveform_index] != 0 {
-                    let val = (self.regs.pulses[pulse_number].volume.get() * 4) as u8;
+                    let val = (self.regs.pulses[pulse_number].envelope.volume * 4) as u8;
                     buffer[i] = val;
                 } else {
                     buffer[i] = 0;
