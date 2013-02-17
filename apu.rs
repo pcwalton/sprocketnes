@@ -5,20 +5,20 @@
 //
 
 use mem::Mem;
+use speex::Resampler;
 
 use core::libc::c_int;
+use core::vec::each_mut;
 use sdl::mixer::Chunk;
 use sdl::mixer;
 
 const CYCLES_PER_TICK: u64 = 7440;
-const RESAMPLING_FACTOR: uint = 40;
+//const NES_SAMPLE_RATE: u32 = 1789800;
+const NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
+const OUTPUT_SAMPLE_RATE: u32 = 44100;
+const TICK_FREQUENCY: u32 = 240;
 
-const PULSE_WAVEFORMS: [[u8 * 8] * 4] = [
-    [ 0, 1, 0, 0, 0, 0, 0, 0 ],
-    [ 0, 1, 1, 0, 0, 0, 0, 0 ],
-    [ 0, 1, 1, 1, 1, 0, 0, 0 ],
-    [ 1, 0, 0, 1, 1, 1, 1, 1 ],
-];
+const PULSE_WAVEFORMS: [u8 * 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
 const LENGTH_COUNTERS: [u8 * 32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
@@ -86,13 +86,22 @@ struct Regs {
     status: ApuStatus,  // $4015: APUSTATUS
 }
 
+struct SampleBuffer {
+    samples: [i16 * 178992],
+    offset: uint,
+}
+
 //
 // General operation
 //
 
 pub struct Apu {
     regs: Regs,
+
+    sample_buffers: ~([SampleBuffer * 5]),
     chunks: [Chunk * 5],
+    resamplers: [Resampler * 5],
+
     cy: u64,
     ticks: u64,
 }
@@ -116,7 +125,8 @@ impl Mem for Apu {
 
 impl Apu {
     static pub fn new() -> Apu {
-        let c = || Chunk::new(vec::from_elem(32768, 0), 127);
+        let c = || Chunk::new(vec::from_elem(4410 * 2, 0), 127);
+        let r = || Resampler::new(1, NES_SAMPLE_RATE, OUTPUT_SAMPLE_RATE, 0).unwrap();
 
         Apu {
             regs: Regs {
@@ -137,7 +147,11 @@ impl Apu {
                 ],
                 status: ApuStatus(0),
             },
+
+            sample_buffers: ~[ SampleBuffer { samples: [ 0, ..178992 ], offset: 0 }, ..5 ],
             chunks: [ c(), c(), c(), c(), c(), ],
+            resamplers: [ r(), r(), r(), r(), r() ],
+
             cy: 0,
             ticks: 0,
         }
@@ -266,55 +280,77 @@ impl Apu {
     }
 
     fn play_pulse(&mut self, pulse_number: uint, channel: c_int) {
-        let mut playing = true;
+        let pulse = &mut self.regs.pulses[pulse_number];
+        let timer = pulse.timer as uint;
 
-        let timer = self.regs.pulses[pulse_number].timer as uint;
+        let mut playing = true;
         if timer == 0 {
             playing = false;
         }
-        if self.regs.pulses[pulse_number].envelope.volume == 0 {
+        if pulse.envelope.volume == 0 {
             playing = false;
         }
-        if self.regs.pulses[pulse_number].length_left == 0 {
+        if pulse.length_left == 0 {
             playing = false;
         }
 
-        if playing {
-            let volume = (self.regs.pulses[pulse_number].envelope.volume * 4) as u8;
-            let wavelen = (self.regs.pulses[pulse_number].timer as uint + 1) * 2;
-            let waveform: &([u8 * 8]) = &PULSE_WAVEFORMS[self.regs.pulses[pulse_number].duty];
-            
-            // Fill the buffer.
+        // Adjust the buffer.
+        let len = NES_SAMPLE_RATE / TICK_FREQUENCY as uint;
+        let mut sample_buffer = &mut self.sample_buffers[channel];
+        sample_buffer.offset += len;
+
+        // Flush the buffer if necessary.
+        if sample_buffer.offset > sample_buffer.samples.len() {
+            assert sample_buffer.offset - sample_buffer.samples.len() == len;
+
             {
-                let buffer = &mut self.chunks[channel].buffer;
-                let waveform_index = &mut self.regs.pulses[pulse_number].waveform_index;
-                let wavelen_count = &mut self.regs.pulses[pulse_number].wavelen_count;
+                let _ = self.resamplers[channel].process(0,
+                                                         sample_buffer.samples,
+                                                         self.chunks[channel].buffer);
 
-                // TODO: We should resample here in a non-clownshoes way. Use libsamplerate I
-                // guess.
-                for uint::range(0, buffer.len() / 2) |buffer_index| {
-                    for uint::range(0, RESAMPLING_FACTOR) |_| {
-                        *wavelen_count += 1;
-                        if *wavelen_count >= wavelen {
-                            *wavelen_count = 0;
-                            *waveform_index = (*waveform_index + 1) % 8;
-                        }
-                    }
+                // Stop whatever is playing in the channel.
+                let _ = mixer::halt_channel(channel as c_int);
 
-                    let val = if waveform[*waveform_index] != 0 { volume } else { 0 };
-                    buffer[buffer_index*2] = 0;
-                    buffer[buffer_index*2+1] = val
-                }
+                // Play the buffer.
+                self.chunks[channel].play(None, channel);
+
+                sample_buffer.offset = len;
+            }
+
+            for vec::each_mut(sample_buffer.samples) |dest| {
+                *dest = 0;
             }
         }
 
-        // Stop whatever is playing in the channel.
-        let _ = mixer::halt_channel(channel as c_int);
-
-        // Play the buffer.
+        // Process sound.
         if playing {
-            self.chunks[channel].play(None, channel);
+            let volume = (pulse.envelope.volume as i16 * 4) << 8;
+            let wavelen = (pulse.timer as uint + 1) * 2;
+            let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];
+            let mut waveform_index = pulse.waveform_index;
+            let mut wavelen_count = pulse.wavelen_count;
+
+            // Fill the buffer.
+            {
+                let mut buffer = vec::mut_slice(sample_buffer.samples,
+                                                sample_buffer.offset - len,
+                                                sample_buffer.offset);
+
+                for vec::each_mut(buffer) |dest| {
+                    wavelen_count += 1;
+                    if wavelen_count >= wavelen {
+                        wavelen_count = 0;
+                        waveform_index = (waveform_index + 1) % 8;
+                    }
+
+                    *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
+                }
+            }
+
+            pulse.waveform_index = waveform_index;
+            pulse.wavelen_count = wavelen_count;
         }
+
     }
 }
 

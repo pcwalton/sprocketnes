@@ -18,3 +18,6 @@ mod ppu;
 mod rom;
 mod util;
 
+// C library support
+mod speex;
+
