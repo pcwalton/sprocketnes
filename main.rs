@@ -46,8 +46,6 @@ fn start() {
     loop {
         cpu.step();
 
-        cpu.mem.apu.step(cpu.cy);
-
         let ppu_result = cpu.mem.ppu.step(cpu.cy);
         if ppu_result.vblank_nmi {
             cpu.nmi();
@@ -62,6 +60,8 @@ fn start() {
                 input::Quit => break
             }
         }
+
+        cpu.mem.apu.step(cpu.cy);
     }
 
     cpu.mem.apu.close();

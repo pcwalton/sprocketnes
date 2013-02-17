@@ -6,6 +6,7 @@
 
 use mem::Mem;
 use speex::Resampler;
+use util;
 
 use core::libc::c_int;
 use core::vec::each_mut;
@@ -101,6 +102,7 @@ pub struct Apu {
     sample_buffers: ~([SampleBuffer * 5]),
     chunks: [Chunk * 5],
     resamplers: [Resampler * 5],
+    last_times: [u64 * 5],
 
     cy: u64,
     ticks: u64,
@@ -151,6 +153,7 @@ impl Apu {
             sample_buffers: ~[ SampleBuffer { samples: [ 0, ..178992 ], offset: 0 }, ..5 ],
             chunks: [ c(), c(), c(), c(), c(), ],
             resamplers: [ r(), r(), r(), r(), r() ],
+            last_times: [ 0, ..5 ],
 
             cy: 0,
             ticks: 0,
@@ -280,6 +283,26 @@ impl Apu {
         self.ticks += 1;
     }
 
+    #[cfg(debug)]
+    static fn report_timing(last_time: &mut u64) {
+        let current_time = util::current_time_millis();
+        if *last_time != 0 {
+            let expected_time = *last_time + 100;
+            let delta = (current_time as i64) - (expected_time as i64);
+            if delta < -2 || delta > 2 {
+                util::println(fmt!("last %u, expected %u, current %u, delta %d",
+                                   *last_time as uint,
+                                   expected_time as uint,
+                                   current_time as uint,
+                                   delta as int));
+            }
+        }
+        *last_time = current_time;
+    }
+
+    #[cfg(ndebug)]
+    static fn report_timing(_: &mut u64) {}
+
     fn play_pulse(&mut self, pulse_number: uint, channel: c_int) {
         let pulse = &mut self.regs.pulses[pulse_number];
         let timer = pulse.timer as uint;
@@ -321,6 +344,9 @@ impl Apu {
             for vec::each_mut(sample_buffer.samples) |dest| {
                 *dest = 0;
             }
+
+            // If debugging, report whether we're ahead or behind.
+            Apu::report_timing(&mut self.last_times[channel]);
         }
 
         // Process sound.
