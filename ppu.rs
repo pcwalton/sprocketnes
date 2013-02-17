@@ -685,7 +685,6 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
         self.regs.status.set_sprite_zero_hit(false);
 
         if self.regs.ctrl.vblank_nmi() {
-            debug_print("VBLANK NMI!");
             result.vblank_nmi = true;
         }
     }

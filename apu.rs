@@ -14,10 +14,10 @@ use sdl::mixer::Chunk;
 use sdl::mixer;
 
 const CYCLES_PER_TICK: u64 = 7439;
-//const NES_SAMPLE_RATE: u32 = 1789800;
 const NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
 const TICK_FREQUENCY: u32 = 240;
+const NES_SAMPLES_PER_TICK: u32 = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
 const PULSE_WAVEFORMS: [u8 * 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
@@ -274,9 +274,12 @@ impl Apu {
             }
         }
 
-        // Now actually play the sound.
+        // Fill the sample buffers.
         self.play_pulse(0, 0);
         self.play_pulse(1, 1);
+
+        // Now play the channels if necessary.
+        self.play_channels();
 
         // TODO: 60 Hz IRQ.
 
@@ -307,77 +310,76 @@ impl Apu {
         let pulse = &mut self.regs.pulses[pulse_number];
         let timer = pulse.timer as uint;
 
-        let mut playing = true;
-        if timer == 0 {
-            playing = false;
-        }
-        if pulse.envelope.volume == 0 {
-            playing = false;
-        }
-        if pulse.length_left == 0 {
-            playing = false;
-        }
-
         // Adjust the buffer.
-        let len = NES_SAMPLE_RATE / TICK_FREQUENCY as uint;
         let mut sample_buffer = &mut self.sample_buffers[channel];
-        sample_buffer.offset += len;
-
-        // Flush the buffer if necessary.
-        if sample_buffer.offset > sample_buffer.samples.len() {
-            assert sample_buffer.offset - sample_buffer.samples.len() == len;
-
-            {
-                let _ = self.resamplers[channel].process(0,
-                                                         sample_buffer.samples,
-                                                         self.chunks[channel].buffer);
-
-                // Stop whatever is playing in the channel.
-                let _ = mixer::halt_channel(channel as c_int);
-
-                // Play the buffer.
-                self.chunks[channel].play(None, channel);
-
-                sample_buffer.offset = len;
-            }
-
-            for vec::each_mut(sample_buffer.samples) |dest| {
-                *dest = 0;
-            }
-
-            // If debugging, report whether we're ahead or behind.
-            Apu::report_timing(&mut self.last_times[channel]);
-        }
+        sample_buffer.offset += NES_SAMPLES_PER_TICK as uint;
 
         // Process sound.
-        if playing {
+        if timer > 0 && pulse.envelope.volume > 0 && pulse.length_left > 0 {
             let volume = (pulse.envelope.volume as i16 * 4) << 8;
             let wavelen = (pulse.timer as uint + 1) * 2;
             let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];
+
+            // Fill the buffer.
+            let mut buffer = vec::mut_slice(sample_buffer.samples,
+                                            sample_buffer.offset - NES_SAMPLES_PER_TICK as uint,
+                                            sample_buffer.offset);
+
+            // TODO: Vectorize this for speed.
             let mut waveform_index = pulse.waveform_index;
             let mut wavelen_count = pulse.wavelen_count;
 
-            // Fill the buffer.
-            {
-                let mut buffer = vec::mut_slice(sample_buffer.samples,
-                                                sample_buffer.offset - len,
-                                                sample_buffer.offset);
-
-                for vec::each_mut(buffer) |dest| {
-                    wavelen_count += 1;
-                    if wavelen_count >= wavelen {
-                        wavelen_count = 0;
-                        waveform_index = (waveform_index + 1) % 8;
-                    }
-
-                    *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
+            for vec::each_mut(buffer) |dest| {
+                wavelen_count += 1;
+                if wavelen_count >= wavelen {
+                    wavelen_count = 0;
+                    waveform_index = (waveform_index + 1) % 8;
                 }
+
+                *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
             }
 
             pulse.waveform_index = waveform_index;
             pulse.wavelen_count = wavelen_count;
         }
+    }
 
+    // Resamples and flushes channel buffers to the audio output device if necessary.
+    fn play_channels(&mut self) {
+        let mut full: [bool * 5] = [ false, ..5 ];
+
+        // First, resample. We do this up front because resampling is expensive, and channels can
+        // get out of sync otherwise.
+        for uint::range(0, 5) |channel| {
+            let mut sample_buffer = &mut self.sample_buffers[channel];
+            if sample_buffer.offset + NES_SAMPLES_PER_TICK as uint > sample_buffer.samples.len() {
+                // Mark this channel as full, and resample it.
+                full[channel] = true;
+                let _ = self.resamplers[channel].process(0,
+                                                         sample_buffer.samples,
+                                                         self.chunks[channel].buffer);
+
+                // Reset the buffer.
+                sample_buffer.offset = 0;
+                for vec::each_mut(sample_buffer.samples) |dest| {
+                    *dest = 0;
+                }
+            }
+        }
+
+        // Next, play the sounds.
+        for full.eachi |channel, &is_full| {
+            if !is_full {
+                loop;
+            }
+
+            // Stop whatever is playing in the channel, and play the buffer.
+            let _ = mixer::halt_channel(channel as c_int);
+            self.chunks[channel].play(Some(channel as c_int), -1);
+
+            // If debugging, report whether we're ahead or behind.
+            Apu::report_timing(&mut self.last_times[channel]);
+        }
     }
 }
 
