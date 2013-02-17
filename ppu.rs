@@ -16,7 +16,7 @@ use core::uint::range;
 
 pub const SCREEN_WIDTH: uint = 256;
 pub const SCREEN_HEIGHT: uint = 240;
-pub const CYCLES_PER_SCANLINE: u64 = 124;   // 29781 cycles per frame, 240 scanlines
+pub const CYCLES_PER_SCANLINE: u64 = 114;   // 29781 cycles per frame, 261 scanlines
 pub const VBLANK_SCANLINE: uint = 241;
 pub const LAST_SCANLINE: uint = 261;
 

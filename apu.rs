@@ -12,7 +12,7 @@ use core::vec::each_mut;
 use sdl::mixer::Chunk;
 use sdl::mixer;
 
-const CYCLES_PER_TICK: u64 = 7440;
+const CYCLES_PER_TICK: u64 = 7439;
 //const NES_SAMPLE_RATE: u32 = 1789800;
 const NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
@@ -208,6 +208,7 @@ impl Apu {
     // Playback
     //
 
+    // FIXME: Thread new frame flag through
     fn step(&mut self, run_to_cycle: u64) {
         loop {
             let next_tick_cycle = self.cy + CYCLES_PER_TICK;
