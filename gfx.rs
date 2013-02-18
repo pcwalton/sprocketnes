@@ -5,9 +5,6 @@
 //
 
 use core::uint::range;
-use sdl::audio::S16LsbAudioFormat;
-use sdl::mixer::Mono;
-use sdl::mixer;
 use sdl::sdl::{InitAudio, InitTimer, InitVideo};
 use sdl::sdl;
 use sdl::video::{DoubleBuf, HWSurface, Surface};
@@ -29,8 +26,8 @@ impl Gfx {
                                            [ HWSurface ],
                                            [ DoubleBuf ]);
 
-        assert mixer::open(44100, S16LsbAudioFormat, Mono, 4410).is_ok();
-        let _ = mixer::allocate_channels(5);
+        //assert mixer::open(44100, S16LsbAudioFormat, Mono, 1024).is_ok();
+        //let _ = mixer::allocate_channels(5);
 
         Gfx { screen: screen.unwrap() }
     }
