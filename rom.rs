@@ -32,7 +32,9 @@ impl Rom {
         let read: &fn(sz: size_t) -> ~[u8] = |sz| {
             unsafe {
                 let mut result = vec::from_elem(sz as uint, 0);
-                assert libc::read(fd, transmute(&mut result[0]), sz) as size_t == sz;
+                if sz != 0 {
+                    assert libc::read(fd, transmute(&mut result[0]), sz) as size_t == sz;
+                }
                 result
             }
         };
