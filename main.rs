@@ -52,41 +52,42 @@ fn start() {
     let gfx = Gfx::new();
     let audio_buffer = audio::open();
 
-    let mut mapper = Mapper::new(&rom);
-    let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
-    let mut input = Input::new();
-    let mut apu = Apu::new(audio_buffer);
-    let mut memmap = MemMap::new(ppu, input, mapper, apu);
-    let mut cpu = Cpu::new(memmap);
+    do Mapper::with_mapper(&rom) |mapper| {
+        let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
+        let mut input = Input::new();
+        let mut apu = Apu::new(audio_buffer);
+        let mut memmap = MemMap::new(ppu, input, mapper, apu);
+        let mut cpu = Cpu::new(memmap);
 
-    // TODO: Add a flag to not reset for nestest.log 
-    cpu.reset();
+        // TODO: Add a flag to not reset for nestest.log
+        cpu.reset();
 
-    let mut last_time = util::current_time_millis();
-    let mut frames = 0;
+        let mut last_time = util::current_time_millis();
+        let mut frames = 0;
 
-    loop {
-        cpu.step();
+        loop {
+            cpu.step();
 
-        let ppu_result = cpu.mem.ppu.step(cpu.cy);
-        if ppu_result.vblank_nmi {
-            cpu.nmi();
-        }
-
-        if ppu_result.new_frame {
-            gfx.blit(cpu.mem.ppu.screen);
-
-            gfx.screen.flip();
-
-            record_fps(&mut last_time, &mut frames);
-
-            match cpu.mem.input.check_input() {
-                input::Continue => {}
-                input::Quit => break
+            let ppu_result = cpu.mem.ppu.step(cpu.cy);
+            if ppu_result.vblank_nmi {
+                cpu.nmi();
             }
-        }
 
-        cpu.mem.apu.step(cpu.cy);
+            if ppu_result.new_frame {
+                gfx.blit(cpu.mem.ppu.screen);
+
+                gfx.screen.flip();
+
+                record_fps(&mut last_time, &mut frames);
+
+                match cpu.mem.input.check_input() {
+                    input::Continue => {}
+                    input::Quit => break
+                }
+            }
+
+            cpu.mem.apu.step(cpu.cy);
+        }
     }
 
     audio::close();

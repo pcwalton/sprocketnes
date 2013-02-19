@@ -7,25 +7,23 @@
 use mem::Mem;
 use rom::Rom;
 
-pub struct Mapper {
-    rom: *Rom,
+use core::cast::transmute;
 
-    // FIXME: ~fn is awful here; we need the function region work.
-    // FIXME: We should trait-ify this. It's hard because of the region in Rom though. I guess we
-    // need region-parameterized &Traits to fix this. Dependent on the function region work.
-    // NB: This exposed a nasty Rust bug! ~IMapper segfaults; see "segfault" branch.
-    loadb: ~fn(this: &mut Mapper, addr: u16) -> u8,
-    storeb: ~fn(this: &mut Mapper, addr: u16, val: u8),
+pub trait Mapper {
+    fn prg_loadb(&mut self, addr: u16) -> u8;
+    fn prg_storeb(&mut self, addr: u16, val: u8);
 }
 
 impl Mapper {
-    static fn new(rom: *Rom) -> Mapper {
+    static fn with_mapper<R>(rom: *Rom, f: &fn(&Mapper) -> R) -> R {
         unsafe {
             match (*rom).header.mapper() {
-                0 => Mapper {
-                    rom: rom,
-                    loadb:  |this, addr|      Nrom.loadb(this, addr),
-                    storeb: |this, addr, val| Nrom.storeb(this, addr, val),
+                0 => {
+                    unsafe {
+                        let mut nrom = Nrom { rom: rom };
+                        let mut nrom_ptr: &static/Nrom = transmute(&mut nrom);  // FIXME: Wat?
+                        f(nrom_ptr as &Mapper)
+                    }
                 },
                 _ => fail!(~"unsupported mapper")
             }
@@ -40,24 +38,26 @@ impl Mapper {
 //
 
 // TODO: RAM.
-pub struct Nrom;
+pub struct Nrom {
+    rom: *Rom,
+}
 
-impl Nrom {
-    fn loadb(self, this: &mut Mapper, addr: u16) -> u8 {
+impl Mapper for Nrom {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x8000 {
             0   // FIXME
         } else {
             unsafe {
                 // FIXME: Unsafe get for speed?
-                if (*this.rom).prg.len() > 16384 {
-                    (*this.rom).prg[addr & 0x7fff]
+                if (*self.rom).prg.len() > 16384 {
+                    (*self.rom).prg[addr & 0x7fff]
                 } else {
-                    (*this.rom).prg[addr & 0x3fff]
+                    (*self.rom).prg[addr & 0x3fff]
                 }
             }
         }
     }
-    fn storeb(self, _: &mut Mapper, _: u16, _: u8) {
+    fn prg_storeb(&mut self, _: u16, _: u8) {
         // TODO
     }
 }
