@@ -45,15 +45,15 @@ fn start() {
         return;
     }
 
-    let rom = Rom::from_path(args[1]);
+    let rom = ~Rom::from_path(args[1]);
     println("Loaded ROM:");
     println(rom.header.to_str());
 
     let gfx = Gfx::new();
     let audio_buffer = audio::open();
 
-    do Mapper::with_mapper(&rom) |mapper| {
-        let mut ppu = Ppu::new(Vram::new(&rom), Oam::new());
+    do Mapper::with_mapper(rom) |mapper| {
+        let mut ppu = Ppu::new(Vram::new(mapper), Oam::new());
         let mut input = Input::new();
         let mut apu = Apu::new(audio_buffer);
         let mut memmap = MemMap::new(ppu, input, mapper, apu);

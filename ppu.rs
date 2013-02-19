@@ -4,10 +4,12 @@
 // Author: Patrick Walton
 //
 
+use mapper::Mapper;
 use mem::Mem;
-use rom::Rom;
 use util::{debug_assert, debug_print, println};
 
+use core::cast::transmute;
+use core::libc::c_void;
 use core::uint::range;
 
 //
@@ -143,14 +145,21 @@ enum PpuAddrByte {
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
-    rom: *Rom,
+    mapper: (*c_void, *c_void),
     nametables: [u8 * 0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
     palette: [u8 * 0x20],
 }
 
 impl Vram {
-    static fn new(rom: *Rom) -> Vram {
-        Vram { rom: rom, nametables: [ 0, ..0x800 ], palette: [ 0, ..0x20 ] }
+    static fn new(mapper: &Mapper) -> Vram {
+        // FIXME: Need to fix &mut self notational problem to eliminate this unsafeness.
+        unsafe {
+            Vram {
+                mapper: transmute(mapper),
+                nametables: [ 0, ..0x800 ],
+                palette: [ 0, ..0x20 ]
+            }
+        }
     }
 }
 
@@ -158,7 +167,10 @@ impl Mem for Vram {
     #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
-            unsafe { (*self.rom).chr[addr] }
+            unsafe {
+                let mut mapper: &Mapper = transmute(self.mapper);
+                mapper.chr_loadb(addr)
+            }
         } else if addr < 0x3f00 {   // Name table area
             self.nametables[addr & 0x07ff]
         } else if addr < 0x4000 {   // Palette area
@@ -169,9 +181,11 @@ impl Mem for Vram {
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
-            return                  // Attempt to write to CHR-ROM; ignore.
-        }
-        if addr < 0x3f00 {          // Name table area
+            unsafe {
+                let mut mapper: &Mapper = transmute(self.mapper);
+                mapper.chr_storeb(addr, val)
+            }
+        } else if addr < 0x3f00 {           // Name table area
             let addr = addr & 0x07ff;
             self.nametables[addr] = val;
         } else if addr < 0x4000 {   // Palette area
