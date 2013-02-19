@@ -20,6 +20,9 @@ The NES was chosen for this project because:
 
 * It's CPU-bound, so it can serve as a benchmark to help optimize Rust code.
 
+* The audio requires some measure of real-time operation, which tests Rust's
+  real-time capabilities.
+
 The controls are as follows:
 
 * A: Z
