@@ -4,6 +4,8 @@
 // Author: Patrick Walton
 //
 
+use util;
+
 use core::cast::transmute;
 use core::libc::{O_RDONLY, c_int, size_t, ssize_t};
 use core::libc;
@@ -55,7 +57,11 @@ impl Rom {
         assert header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ];
 
         let prg_rom = read(header.prg_rom_size as size_t * 16384);
-        let chr_rom = read(header.chr_rom_size as size_t * 8192);
+        let chr_rom = if header.chr_rom_size > 0 {
+            read(header.chr_rom_size as size_t * 8192)
+        } else {
+            ~[]
+        };
         Rom { header: header, prg: prg_rom, chr: chr_rom }
     }
 
