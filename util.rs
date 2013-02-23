@@ -6,9 +6,63 @@
 
 use cast::transmute;
 
-use core::libc::{c_int, c_void, size_t, time_t};
+use core::libc::{c_int, c_void, size_t, ssize_t, time_t};
 use core::libc;
 use core::ptr::null;
+
+pub trait Save {
+    fn save(&mut self, fd: Fd);
+    fn load(&mut self, fd: Fd);
+}
+
+//
+// Standard library I/O replacements
+//
+// The standard library I/O currently uses the garbage collector, which I do not want to use.
+//
+
+// Blech! This really should go in the standard library!
+pub struct Fd(c_int);
+
+impl Drop for Fd {
+    fn finalize(&self) {
+        unsafe {
+            libc::close(**self);
+        }
+    }
+}
+
+impl Fd {
+    pub fn read(&self, sz: size_t) -> ~[u8] {
+        // FIXME: Don't assume that the entire buffer was read in one chunk.
+        unsafe {
+            let mut result = vec::from_elem(sz as uint, 0);
+            if sz != 0 {
+                assert libc::read(**self, transmute(&mut result[0]), sz) as size_t == sz;
+            }
+            result
+        }
+    }
+
+    pub fn write(&self, buf: &[u8]) {
+        unsafe {
+            if buf.len() == 0 {
+                return;
+            }
+
+            let mut offset = 0;
+            while offset < buf.len() {
+                let nwritten = libc::write(**self,
+                                           transmute(&buf[offset]),
+                                           (offset - buf.len()) as size_t);
+                if nwritten < 0 {
+                    fail!();
+                }
+                offset += nwritten as uint;
+            }
+        }
+    }
+}
 
 // Currently io GC's. This is obviously bad. To work around this I am not using it.
 pub fn println(s: &str) {
@@ -19,22 +73,22 @@ pub fn println(s: &str) {
 }
 
 #[cfg(debug)]
-pub fn debug_assert(cond: bool, msg: &static/str) {
+pub fn debug_assert(cond: bool, msg: &str) {
     if !cond {
         println(msg);
     }
 }
 
 #[cfg(ndebug)]
-pub fn debug_assert(_: bool, _: &static/str) {}
+pub fn debug_assert(_: bool, _: &str) {}
 
 #[cfg(debug)]
-pub fn debug_print(msg: &static/str) {
+pub fn debug_print(msg: &str) {
     println(msg);
 }
 
 #[cfg(ndebug)]
-pub fn debug_print(_: &static/str) {}
+pub fn debug_print(_: &str) {}
 
 //
 // Bindings for `gettimeofday(2)`

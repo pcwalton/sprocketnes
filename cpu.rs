@@ -6,7 +6,7 @@
 
 use disasm::Disassembler;
 use mem::{Mem, MemUtil};
-use util::println;
+use util::{Fd, Save, println};
 
 use core::uint::range;
 
@@ -329,6 +329,16 @@ impl<M:Mem> Mem for Cpu<M> {
         } else {
             self.mem.storeb(addr, val)
         }
+    }
+}
+
+// Save state logic.
+impl<M:Mem> Save for Cpu<M> {
+    fn save(&mut self, fd: Fd) {
+        // TODO
+    }
+    fn load(&mut self, fd: Fd) {
+        // TODO
     }
 }
 

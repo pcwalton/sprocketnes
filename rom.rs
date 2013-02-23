@@ -4,6 +4,7 @@
 // Author: Patrick Walton
 //
 
+use util::Fd;
 use util;
 
 use core::cast::transmute;
@@ -13,16 +14,6 @@ use core::str;
 use core::sys::size_of;
 use core::vec;
 
-// Blech! This really should go in the standard library!
-struct Fd(c_int);
-impl Drop for Fd {
-    fn finalize(&self) {
-        unsafe {
-            libc::close(**self);
-        }
-    }
-}
-
 pub struct Rom {
     header: INesHeader,
     prg: ~[u8],         // PRG-ROM
@@ -30,18 +21,8 @@ pub struct Rom {
 }
 
 impl Rom {
-    static fn from_fd(fd: c_int) -> Rom {
-        let read: &fn(sz: size_t) -> ~[u8] = |sz| {
-            unsafe {
-                let mut result = vec::from_elem(sz as uint, 0);
-                if sz != 0 {
-                    assert libc::read(fd, transmute(&mut result[0]), sz) as size_t == sz;
-                }
-                result
-            }
-        };
-
-        let buffer = read(size_of::<INesHeader>() as size_t);
+    static fn from_fd(fd: Fd) -> Rom {
+        let buffer = fd.read(size_of::<INesHeader>() as size_t);
         let header = INesHeader {
             magic: [ buffer[0], buffer[1], buffer[2], buffer[3] ],
             prg_rom_size: buffer[4],
@@ -56,9 +37,9 @@ impl Rom {
 
         assert header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ];
 
-        let prg_rom = read(header.prg_rom_size as size_t * 16384);
+        let prg_rom = fd.read(header.prg_rom_size as size_t * 16384);
         let chr_rom = if header.chr_rom_size > 0 {
-            read(header.chr_rom_size as size_t * 8192)
+            fd.read(header.chr_rom_size as size_t * 8192)
         } else {
             ~[]
         };
@@ -70,7 +51,7 @@ impl Rom {
             do str::as_c_str(path) |c_path| {
                 // FIXME: O_RDONLY should be a c_int in the first place!
                 let fd = Fd(libc::open(c_path, O_RDONLY as c_int, 0));
-                Rom::from_fd(*fd)
+                Rom::from_fd(fd)
             }
         }
     }
