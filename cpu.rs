@@ -62,23 +62,10 @@ struct Regs {
     pc: u16
 }
 
+save_struct!(Regs { a, x, y, s, flags, pc })
+
 impl Regs {
     static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
-}
-
-impl Save for Regs {
-    fn save(&mut self, fd: &Fd) {
-        fd.write([ self.a, self.x, self.y, self.s, self.flags ]);
-        self.pc.save(fd);
-    }
-    fn load(&mut self, fd: &Fd) {
-        self.a.load(fd);
-        self.x.load(fd);
-        self.y.load(fd);
-        self.s.load(fd);
-        self.flags.load(fd);
-        self.pc.load(fd);
-    }
 }
 
 //

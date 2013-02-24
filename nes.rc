@@ -6,6 +6,9 @@
 
 extern mod sdl;
 
+// NB: This must be first to pick up the macro definitions. What a botch.
+mod util;
+
 mod apu;
 mod audio;
 mod cpu;
@@ -17,7 +20,6 @@ mod mapper;
 mod mem;
 mod ppu;
 mod rom;
-mod util;
 
 // C library support
 mod speex;

@@ -54,24 +54,7 @@ struct Regs {
     addr: PpuAddr,      // PPUADDR: 0x2006
 }
 
-impl Save for Regs {
-    fn save(&mut self, fd: &Fd) {
-        self.ctrl.save(fd);
-        self.mask.save(fd);
-        self.status.save(fd);
-        self.oam_addr.save(fd);
-        self.scroll.save(fd);
-        self.addr.save(fd);
-    }
-    fn load(&mut self, fd: &Fd) {
-        self.ctrl.load(fd);
-        self.mask.load(fd);
-        self.status.load(fd);
-        self.oam_addr.load(fd);
-        self.scroll.load(fd);
-        self.addr.load(fd);
-    }
-}
+save_struct!(Regs { ctrl, mask, status, oam_addr, scroll, addr })
 
 //
 // PPUCTRL: 0x2000
@@ -142,33 +125,14 @@ struct PpuScroll {
     next: PpuScrollDir
 }
 
-impl Save for PpuScroll {
-    fn save(&mut self, fd: &Fd) { self.x.save(fd); self.y.save(fd); self.next.save(fd); }
-    fn load(&mut self, fd: &Fd) { self.x.load(fd); self.y.load(fd); self.next.load(fd); }
-}
+save_struct!(PpuScroll { x, y, next })
 
 enum PpuScrollDir {
     XDir,
     YDir,
 }
 
-macro_rules! save_enum(
-    ($name:ident, $val_0:ident, $val_1:ident) => (
-        impl Save for $name {
-            fn save(&mut self, fd: &Fd) {
-                let mut val: u8 = match *self { $val_0 => 0, $val_1 => 1 };
-                val.save(fd)
-            }
-            fn load(&mut self, fd: &Fd) {
-                let mut val: u8 = 0;
-                val.load(fd);
-                *self = if val == 0 { $val_0 } else { $val_1 };
-            }
-        }
-    )
-)
-
-save_enum!(PpuScrollDir, XDir, YDir)
+save_enum!(PpuScrollDir { XDir, YDir })
 
 //
 // PPUADDR: 0x2006
@@ -179,17 +143,14 @@ struct PpuAddr {
     next: PpuAddrByte
 }
 
-impl Save for PpuAddr {
-    fn save(&mut self, fd: &Fd) { self.val.save(fd); self.next.save(fd); }
-    fn load(&mut self, fd: &Fd) { self.val.load(fd); self.next.load(fd); }
-}
+save_struct!(PpuAddr { val, next })
 
 enum PpuAddrByte {
     Hi,
     Lo,
 }
 
-save_enum!(PpuAddrByte, Hi, Lo)
+save_enum!(PpuAddrByte { Hi, Lo })
 
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 

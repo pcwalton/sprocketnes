@@ -52,22 +52,7 @@ struct ApuPulseEnvelope {
     counter: u8,
 }
 
-impl Save for ApuPulseEnvelope {
-    fn save(&mut self, fd: &Fd) {
-        self.disable_length.save(fd);
-        self.enabled.save(fd);
-        self.volume.save(fd);
-        self.period.save(fd);
-        self.counter.save(fd);
-    }
-    fn load(&mut self, fd: &Fd) {
-        self.disable_length.load(fd);
-        self.enabled.load(fd);
-        self.volume.load(fd);
-        self.period.load(fd);
-        self.counter.load(fd);
-    }
-}
+save_struct!(ApuPulseEnvelope { disable_length, enabled, volume, period, counter })
 
 impl ApuPulseEnvelope {
     static fn new() -> ApuPulseEnvelope {
@@ -97,30 +82,11 @@ struct ApuPulse {
     wavelen_count: u64,
 }
 
-impl Save for ApuPulse {
-    fn save(&mut self, fd: &Fd) {
-        self.duty.save(fd);
-        self.envelope.save(fd);
-        self.sweep.save(fd);
-        self.timer.save(fd);
-        self.length_id.save(fd);
-        self.length_left.save(fd);
-        self.sweep_cycle.save(fd);
-        self.waveform_index.save(fd);
-        self.wavelen_count.save(fd);
-    }
-    fn load(&mut self, fd: &Fd) {
-        self.duty.load(fd);
-        self.envelope.load(fd);
-        self.sweep.load(fd);
-        self.timer.load(fd);
-        self.length_id.load(fd);
-        self.length_left.load(fd);
-        self.sweep_cycle.load(fd);
-        self.waveform_index.load(fd);
-        self.wavelen_count.load(fd);
-    }
-}
+save_struct!(ApuPulse {
+    duty, envelope, sweep, timer,
+    length_id, length_left, sweep_cycle,
+    waveform_index, wavelen_count
+})
 
 struct ApuStatus(u8);
 
@@ -170,6 +136,8 @@ pub struct Apu {
     ticks: u64,
 }
 
+save_struct!(Apu { regs, cy, ticks })
+
 impl Mem for Apu {
     fn loadb(&mut self, addr: u16) -> u8 {
         match addr {
@@ -185,11 +153,6 @@ impl Mem for Apu {
             _ => {} // TODO
         }
     }
-}
-
-impl Save for Apu {
-    fn save(&mut self, fd: &Fd) { self.regs.save(fd); self.cy.save(fd); self.ticks.save(fd); }
-    fn load(&mut self, fd: &Fd) { self.regs.load(fd); self.cy.load(fd); self.ticks.load(fd); }
 }
 
 impl Apu {

@@ -125,18 +125,5 @@ impl Mem for MemMap {
     }
 }
 
-impl Save for MemMap {
-    fn save(&mut self, fd: &Fd) {
-        self.ram.save(fd);
-        self.ppu.save(fd);
-        self.apu.save(fd);
-        // TODO: Should save the mapper as well.
-    }
-    fn load(&mut self, fd: &Fd) {
-        self.ram.load(fd);
-        self.ppu.load(fd);
-        self.apu.load(fd);
-        // TODO: Should load the mapper as well.
-    }
-}
+save_struct!(MemMap { ram, ppu, apu })
 

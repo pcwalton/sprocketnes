@@ -144,6 +144,37 @@ impl Save for bool {
     }
 }
 
+// A convenience macro to save and load entire structs.
+macro_rules! save_struct(
+    ($name:ident { $($field:ident),* }) => (
+        impl Save for $name {
+            fn save(&mut self, fd: &Fd) {
+                $(self.$field.save(fd);)*
+            }
+            fn load(&mut self, fd: &Fd) {
+                $(self.$field.load(fd);)*
+            }
+        }
+    )
+)
+
+macro_rules! save_enum(
+    ($name:ident { $val_0:ident, $val_1:ident }) => (
+        impl Save for $name {
+            fn save(&mut self, fd: &Fd) {
+                let mut val: u8 = match *self { $val_0 => 0, $val_1 => 1 };
+                val.save(fd)
+            }
+            fn load(&mut self, fd: &Fd) {
+                let mut val: u8 = 0;
+                val.load(fd);
+                *self = if val == 0 { $val_0 } else { $val_1 };
+            }
+        }
+    )
+)
+
+
 //
 // Miscellaneous routines
 //
