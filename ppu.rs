@@ -6,7 +6,7 @@
 
 use mapper::Mapper;
 use mem::Mem;
-use util::{debug_assert, debug_print, println};
+use util::{Fd, Save, debug_assert, println};
 
 use core::cast::transmute;
 use core::libc::c_void;
@@ -52,6 +52,25 @@ struct Regs {
     oam_addr: u8,       // OAMADDR: 0x2003
     scroll: PpuScroll,  // PPUSCROLL: 0x2005
     addr: PpuAddr,      // PPUADDR: 0x2006
+}
+
+impl Save for Regs {
+    fn save(&mut self, fd: &Fd) {
+        self.ctrl.save(fd);
+        self.mask.save(fd);
+        self.status.save(fd);
+        self.oam_addr.save(fd);
+        self.scroll.save(fd);
+        self.addr.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.ctrl.load(fd);
+        self.mask.load(fd);
+        self.status.load(fd);
+        self.oam_addr.load(fd);
+        self.scroll.load(fd);
+        self.addr.load(fd);
+    }
 }
 
 //
@@ -123,10 +142,33 @@ struct PpuScroll {
     next: PpuScrollDir
 }
 
+impl Save for PpuScroll {
+    fn save(&mut self, fd: &Fd) { self.x.save(fd); self.y.save(fd); self.next.save(fd); }
+    fn load(&mut self, fd: &Fd) { self.x.load(fd); self.y.load(fd); self.next.load(fd); }
+}
+
 enum PpuScrollDir {
     XDir,
     YDir,
 }
+
+macro_rules! save_enum(
+    ($name:ident, $val_0:ident, $val_1:ident) => (
+        impl Save for $name {
+            fn save(&mut self, fd: &Fd) {
+                let mut val: u8 = match *self { $val_0 => 0, $val_1 => 1 };
+                val.save(fd)
+            }
+            fn load(&mut self, fd: &Fd) {
+                let mut val: u8 = 0;
+                val.load(fd);
+                *self = if val == 0 { $val_0 } else { $val_1 };
+            }
+        }
+    )
+)
+
+save_enum!(PpuScrollDir, XDir, YDir)
 
 //
 // PPUADDR: 0x2006
@@ -137,10 +179,17 @@ struct PpuAddr {
     next: PpuAddrByte
 }
 
+impl Save for PpuAddr {
+    fn save(&mut self, fd: &Fd) { self.val.save(fd); self.next.save(fd); }
+    fn load(&mut self, fd: &Fd) { self.val.load(fd); self.next.load(fd); }
+}
+
 enum PpuAddrByte {
     Hi,
     Lo,
 }
+
+save_enum!(PpuAddrByte, Hi, Lo)
 
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
@@ -198,6 +247,17 @@ impl Mem for Vram {
     }
 }
 
+impl Save for Vram {
+    fn save(&mut self, fd: &Fd) {
+        let mut nametables: &mut [u8] = self.nametables; nametables.save(fd);
+        let mut palette: &mut [u8] = self.palette; palette.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        let mut nametables: &mut [u8] = self.nametables; nametables.load(fd);
+        let mut palette: &mut [u8] = self.palette; palette.load(fd);
+    }
+}
+
 //
 // Object Attribute Memory (OAM)
 //
@@ -215,6 +275,11 @@ impl Oam {
 impl Mem for Oam {
     fn loadb(&mut self, addr: u16) -> u8     { self.oam[addr] }
     fn storeb(&mut self, addr: u16, val: u8) { self.oam[addr] = val }
+}
+
+impl Save for Oam {
+    fn save(&mut self, fd: &Fd) { let mut oam: &mut [u8] = self.oam; oam.save(fd); }
+    fn load(&mut self, fd: &Fd) { let mut oam: &mut [u8] = self.oam; oam.load(fd); }
 }
 
 struct Sprite {
@@ -353,6 +418,29 @@ struct SpriteColor {
 enum SpritePriority {
     AboveBg,
     BelowBg,
+}
+
+impl<VM:Mem + Save,OM:Mem + Save> Save for Ppu<VM,OM> {
+    fn save(&mut self, fd: &Fd) {
+        self.regs.save(fd);
+        self.vram.save(fd);
+        self.oam.save(fd);
+        self.scanline.save(fd);
+        self.ppudata_buffer.save(fd);
+        self.scroll_x.save(fd);
+        self.scroll_y.save(fd);
+        self.cy.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.regs.load(fd);
+        self.vram.load(fd);
+        self.oam.load(fd);
+        self.scanline.load(fd);
+        self.ppudata_buffer.load(fd);
+        self.scroll_x.load(fd);
+        self.scroll_y.load(fd);
+        self.cy.load(fd);
+    }
 }
 
 impl<VM:Mem,OM:Mem> Ppu<VM,OM> {

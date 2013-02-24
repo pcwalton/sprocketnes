@@ -7,6 +7,7 @@
 use audio::OutputBuffer;
 use mem::Mem;
 use speex::Resampler;
+use util::{Fd, Save};
 use util;
 
 use core::cast::{forget, transmute};
@@ -51,6 +52,23 @@ struct ApuPulseEnvelope {
     counter: u8,
 }
 
+impl Save for ApuPulseEnvelope {
+    fn save(&mut self, fd: &Fd) {
+        self.disable_length.save(fd);
+        self.enabled.save(fd);
+        self.volume.save(fd);
+        self.period.save(fd);
+        self.counter.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.disable_length.load(fd);
+        self.enabled.load(fd);
+        self.volume.load(fd);
+        self.period.load(fd);
+        self.counter.load(fd);
+    }
+}
+
 impl ApuPulseEnvelope {
     static fn new() -> ApuPulseEnvelope {
         ApuPulseEnvelope {
@@ -76,7 +94,32 @@ struct ApuPulse {
     sweep_cycle: u8,
 
     waveform_index: u8,
-    wavelen_count: uint,
+    wavelen_count: u64,
+}
+
+impl Save for ApuPulse {
+    fn save(&mut self, fd: &Fd) {
+        self.duty.save(fd);
+        self.envelope.save(fd);
+        self.sweep.save(fd);
+        self.timer.save(fd);
+        self.length_id.save(fd);
+        self.length_left.save(fd);
+        self.sweep_cycle.save(fd);
+        self.waveform_index.save(fd);
+        self.wavelen_count.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.duty.load(fd);
+        self.envelope.load(fd);
+        self.sweep.load(fd);
+        self.timer.load(fd);
+        self.length_id.load(fd);
+        self.length_left.load(fd);
+        self.sweep_cycle.load(fd);
+        self.waveform_index.load(fd);
+        self.wavelen_count.load(fd);
+    }
 }
 
 struct ApuStatus(u8);
@@ -89,6 +132,23 @@ struct Regs {
     pulses: [ApuPulse * 2],
     status: ApuStatus,  // $4015: APUSTATUS
 }
+
+impl Save for Regs {
+    fn save(&mut self, fd: &Fd) {
+        self.pulses[0].save(fd);
+        self.pulses[1].save(fd);
+        self.status.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.pulses[0].load(fd);
+        self.pulses[1].load(fd);
+        self.status.load(fd);
+    }
+}
+
+//
+// Sample buffers
+//
 
 struct SampleBuffer {
     samples: [i16 * 178992],
@@ -108,7 +168,6 @@ pub struct Apu {
 
     cy: u64,
     ticks: u64,
-    last_frame_time: u64,
 }
 
 impl Mem for Apu {
@@ -126,6 +185,11 @@ impl Mem for Apu {
             _ => {} // TODO
         }
     }
+}
+
+impl Save for Apu {
+    fn save(&mut self, fd: &Fd) { self.regs.save(fd); self.cy.save(fd); self.ticks.save(fd); }
+    fn load(&mut self, fd: &Fd) { self.regs.load(fd); self.cy.load(fd); self.ticks.load(fd); }
 }
 
 impl Apu {
@@ -157,7 +221,6 @@ impl Apu {
 
             cy: 0,
             ticks: 0,
-            last_frame_time: 0,
         }
     }
 
@@ -301,7 +364,7 @@ impl Apu {
         // Process sound.
         if timer > 0 && pulse.envelope.volume > 0 && pulse.length_left > 0 {
             let volume = (pulse.envelope.volume as i16 * 4) << 8;
-            let wavelen = (pulse.timer as uint + 1) * 2;
+            let wavelen = (pulse.timer as u64 + 1) * 2;
             let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];
 
             // Fill the buffer.

@@ -8,7 +8,7 @@ use apu::Apu;
 use input::Input;
 use mapper::Mapper;
 use ppu::{Oam, Ppu, Vram};
-use util::debug_print;
+use util::{Fd, Save, debug_print};
 
 use core::cast::transmute;
 use core::libc::c_void;
@@ -48,9 +48,15 @@ impl<M:Mem> MemUtil for M {
 //
 
 pub struct Ram([u8 * 0x800]);
+
 impl Mem for Ram {
     fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
     fn storeb(&mut self, addr: u16, val: u8) { self[addr & 0x7ff] = val }
+}
+
+impl Save for Ram {
+    fn save(&mut self, fd: &Fd) { let mut array: &mut [u8] = **self; array.save(fd) }
+    fn load(&mut self, fd: &Fd) { let mut array: &mut [u8] = **self; array.load(fd) }
 }
 
 //
@@ -116,6 +122,21 @@ impl Mem for MemMap {
                 mapper.prg_storeb(addr, val)
             }
         }
+    }
+}
+
+impl Save for MemMap {
+    fn save(&mut self, fd: &Fd) {
+        self.ram.save(fd);
+        self.ppu.save(fd);
+        self.apu.save(fd);
+        // TODO: Should save the mapper as well.
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.ram.load(fd);
+        self.ppu.load(fd);
+        self.apu.load(fd);
+        // TODO: Should load the mapper as well.
     }
 }
 

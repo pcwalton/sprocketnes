@@ -66,6 +66,21 @@ impl Regs {
     static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
 }
 
+impl Save for Regs {
+    fn save(&mut self, fd: &Fd) {
+        fd.write([ self.a, self.x, self.y, self.s, self.flags ]);
+        self.pc.save(fd);
+    }
+    fn load(&mut self, fd: &Fd) {
+        self.a.load(fd);
+        self.x.load(fd);
+        self.y.load(fd);
+        self.s.load(fd);
+        self.flags.load(fd);
+        self.pc.load(fd);
+    }
+}
+
 //
 // Addressing modes
 //
@@ -333,13 +348,9 @@ impl<M:Mem> Mem for Cpu<M> {
 }
 
 // Save state logic.
-impl<M:Mem> Save for Cpu<M> {
-    fn save(&mut self, fd: Fd) {
-        // TODO
-    }
-    fn load(&mut self, fd: Fd) {
-        // TODO
-    }
+impl<M:Mem + Save> Save for Cpu<M> {
+    fn save(&mut self, fd: &Fd) { self.cy.save(fd); self.regs.save(fd); self.mem.save(fd); }
+    fn load(&mut self, fd: &Fd) { self.cy.load(fd); self.regs.load(fd); self.mem.load(fd); }
 }
 
 impl<M:Mem> Cpu<M> {

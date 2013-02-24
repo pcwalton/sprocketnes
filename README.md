@@ -23,7 +23,7 @@ The NES was chosen for this project because:
 * The audio requires some measure of real-time operation, which tests Rust's
   real-time capabilities.
 
-The controls are as follows:
+The main controls are as follows:
 
 * A: Z
 
@@ -34,6 +34,14 @@ The controls are as follows:
 * Select: Right shift
 
 * D-Pad: Arrows
+
+Other keys:
+
+* Save state: S
+
+* Load state: L
+
+* Quit: Escape
 
 If you want to build `sprocketnes`, you will first need `rust-sdl`, available
 at https://github.com/brson/rust-sdl. You will also need the Speex codec

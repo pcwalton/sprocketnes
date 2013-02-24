@@ -6,14 +6,11 @@
 
 use cast::transmute;
 
-use core::libc::{c_int, c_void, size_t, ssize_t, time_t};
+use core::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, off_t, size_t};
+use core::libc::{ssize_t, time_t};
 use core::libc;
 use core::ptr::null;
-
-pub trait Save {
-    fn save(&mut self, fd: Fd);
-    fn load(&mut self, fd: Fd);
-}
+use core::str;
 
 //
 // Standard library I/O replacements
@@ -33,36 +30,123 @@ impl Drop for Fd {
 }
 
 impl Fd {
-    pub fn read(&self, sz: size_t) -> ~[u8] {
-        // FIXME: Don't assume that the entire buffer was read in one chunk.
+    static pub fn open(path: &str, mode: OpenMode) -> Fd {
         unsafe {
-            let mut result = vec::from_elem(sz as uint, 0);
-            if sz != 0 {
-                assert libc::read(**self, transmute(&mut result[0]), sz) as size_t == sz;
+            let fd_mode = match mode {
+                ForReading => O_RDONLY,
+                ForWriting => O_WRONLY | O_CREAT | O_TRUNC
+            } as c_int;
+            do str::as_c_str(path) |c_path| {
+                Fd(libc::open(c_path, fd_mode, 493))
             }
-            result
+        }
+    }
+
+    pub fn read(&self, buf: &mut [u8]) {
+        unsafe {
+            let mut offset = 0;
+            while offset < buf.len() {
+                let nread = libc::read(**self,
+                                       transmute(&mut buf[offset]),
+                                       (buf.len() - offset) as size_t);
+                if nread <= 0 {
+                    fail!();
+                }
+                offset += nread as uint;
+            }
         }
     }
 
     pub fn write(&self, buf: &[u8]) {
         unsafe {
-            if buf.len() == 0 {
-                return;
-            }
-
             let mut offset = 0;
             while offset < buf.len() {
                 let nwritten = libc::write(**self,
                                            transmute(&buf[offset]),
-                                           (offset - buf.len()) as size_t);
-                if nwritten < 0 {
+                                           (buf.len() - offset) as size_t);
+                if nwritten <= 0 {
                     fail!();
                 }
                 offset += nwritten as uint;
             }
         }
     }
+
+    pub fn tell(&self) -> off_t { unsafe { libc::lseek(**self, 0, SEEK_CUR as c_int) } }
 }
+
+pub enum OpenMode {
+    ForReading,
+    ForWriting,
+}
+
+//
+// A tiny custom serialization infrastructure, used for savestates.
+//
+// TODO: Use the standard library's ToBytes and add a FromBytes -- or don't; this is such a small
+// amount of code it barely seems worth it.
+//
+
+pub trait Save {
+    fn save(&mut self, fd: &Fd);
+    fn load(&mut self, fd: &Fd);
+}
+
+impl Save for u8 {
+    fn save(&mut self, fd: &Fd) { fd.write([ *self ]) }
+    fn load(&mut self, fd: &Fd) { let mut buf = [ 0 ]; fd.read(buf); *self = buf[0]; }
+}
+
+impl Save for u16 {
+    fn save(&mut self, fd: &Fd) { fd.write([ *self as u8, (*self >> 8) as u8 ]) }
+    fn load(&mut self, fd: &Fd) {
+        let mut buf = [ 0, 0 ];
+        fd.read(buf);
+        *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
+    }
+}
+
+impl Save for u64 {
+    fn save(&mut self, fd: &Fd) {
+        let mut buf = [ 0, ..8 ];
+        for uint::range(0, 8) |i| {
+            buf[i] = ((*self) >> (i * 8)) as u8;
+        }
+        fd.write(buf);
+    }
+    fn load(&mut self, fd: &Fd) {
+        let mut buf = [ 0, ..8 ];
+        fd.read(buf);
+        *self = 0;
+        for uint::range(0, 8) |i| {
+            *self = *self | (buf[i] as u64 << (i * 8));
+        }
+    }
+}
+
+impl Save for &mut [u8] {
+    fn save(&mut self, fd: &Fd) {
+        // FIXME: Unsafe due to stupid borrow check bug.
+        unsafe {
+            let x: &(&[u8]) = transmute(self);
+            fd.write(*x);
+        }
+    }
+    fn load(&mut self, fd: &Fd) { fd.read(*self) }
+}
+
+impl Save for bool {
+    fn save(&mut self, fd: &Fd) { fd.write([ if *self { 0 } else { 1 } ]) }
+    fn load(&mut self, fd: &Fd) {
+        let mut val: [u8 * 1] = [ 0 ];
+        fd.read(val);
+        *self = val[0] != 0
+    }
+}
+
+//
+// Miscellaneous routines
+//
 
 // Currently io GC's. This is obviously bad. To work around this I am not using it.
 pub fn println(s: &str) {

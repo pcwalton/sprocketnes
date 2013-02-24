@@ -6,8 +6,8 @@
 
 use mem::Mem;
 
-use sdl::event::{DownKey, EscapeKey, LeftKey, RShiftKey, ReturnKey, RightKey, UpKey, XKey, ZKey};
-use sdl::event::{Key, KeyEvent, NoEvent, QuitEvent};
+use sdl::event::{DownKey, EscapeKey, LKey, LeftKey, RShiftKey, ReturnKey, RightKey, SKey, UpKey};
+use sdl::event::{Key, KeyEvent, NoEvent, QuitEvent, XKey, ZKey};
 use sdl::event;
 
 //
@@ -74,6 +74,8 @@ pub struct Input {
 pub enum InputResult {
     Continue,   // Keep playing.
     Quit,       // Quit the emulator.
+    SaveState,  // Save a state.
+    LoadState,  // Load a state.
 }
 
 impl Input {
@@ -113,6 +115,8 @@ impl Input {
             match event::poll_event() {
                 NoEvent => break,
                 KeyEvent(EscapeKey, _, _, _) => return Quit,
+                KeyEvent(SKey, true, _, _) => return SaveState,
+                KeyEvent(LKey, true, _, _) => return LoadState,
                 KeyEvent(key, down, _, _) => self.handle_gamepad_event(key, down),
                 QuitEvent => return Quit,
                 _ => {}

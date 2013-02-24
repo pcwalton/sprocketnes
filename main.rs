@@ -14,7 +14,7 @@ use mapper::Mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
-use util::println;
+use util::{Fd, ForReading, ForWriting, Save, println};
 use util;
 
 use core::cast::transmute;
@@ -75,14 +75,13 @@ fn start() {
 
             if ppu_result.new_frame {
                 gfx.blit(cpu.mem.ppu.screen);
-
                 gfx.screen.flip();
-
                 record_fps(&mut last_time, &mut frames);
-
                 match cpu.mem.input.check_input() {
                     input::Continue => {}
-                    input::Quit => break
+                    input::Quit => break,
+                    input::SaveState => cpu.save(&Fd::open("state.sav", ForWriting)),
+                    input::LoadState => cpu.load(&Fd::open("state.sav", ForReading)),
                 }
             }
 
