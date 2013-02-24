@@ -7,7 +7,7 @@
 use apu::Apu;
 use audio;
 use cpu::Cpu;
-use gfx::Gfx;
+use gfx::{Gfx, Scale, Scale1x, Scale3x};
 use input::Input;
 use input;
 use mapper::Mapper;
@@ -17,17 +17,14 @@ use rom::Rom;
 use util::{Fd, ForReading, ForWriting, Save, println};
 use util;
 
-use core::cast::transmute;
-use core::libc::size_t;
-use core::task::PlatformThread;
-use core::{libc, os, str};
+use core::os;
 use sdl;
 
 #[cfg(debug)]
 fn record_fps(last_time: &mut u64, frames: &mut uint) {
     let now = util::current_time_millis();
     if now >= *last_time + 1000 {
-        util::println(fmt!("%u FPS", *frames));
+        println(fmt!("%u FPS", *frames));
         *frames = 0;
         *last_time = now;
     } else {
@@ -38,18 +35,66 @@ fn record_fps(last_time: &mut u64, frames: &mut uint) {
 #[cfg(ndebug)]
 fn record_fps(_: &mut u64, _: &mut uint) {}
 
-fn start() {
+//
+// Argument parsing
+//
+
+struct Options {
+    rom_path: ~str,
+    scale: Scale,
+}
+
+fn usage() {
+    println("usage: sprocketnes [options] <path-to-rom>");
+    println("options:");
+    println("    -1 scale by 1x (default)");
+    println("    -3 scale by 3x");
+}
+
+fn parse_args() -> Option<Options> {
+    let mut options = Options { rom_path: ~"", scale: Scale1x };
+
     let args = os::args();
-    if args.len() < 2 {
-        println("usage: sprocketnes <path-to-rom>");
-        return;
+    for args.eachi |i, arg| {
+        if i == 0 {
+            loop;
+        }
+
+        if str::eq_slice(*arg, "-1") {
+            options.scale = Scale1x;
+        } else if str::eq_slice(*arg, "-3") {
+            options.scale = Scale3x;
+        } else if arg[0] == ('-' as u8) {
+            usage();
+            return None;
+        } else {
+            options.rom_path = copy *arg;
+        }
     }
 
-    let rom = ~Rom::from_path(args[1]);
+    if options.rom_path.len() == 0 {
+        usage();
+        return None;
+    }
+
+    Some(options)
+}
+
+//
+// Entry point and main loop
+//
+
+fn start() {
+    let options = match parse_args() {
+        Some(options) => options,
+        None => return
+    };
+
+    let rom = ~Rom::from_path(options.rom_path);
     println("Loaded ROM:");
     println(rom.header.to_str());
 
-    let gfx = Gfx::new();
+    let gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
     do Mapper::with_mapper(rom) |mapper| {
