@@ -7,7 +7,7 @@
 use apu::Apu;
 use audio;
 use cpu::Cpu;
-use gfx::{Gfx, Scale, Scale1x, Scale3x};
+use gfx::{Gfx, Scale, Scale1x, Scale2x, Scale3x};
 use input::Input;
 use input;
 use mapper::Mapper;
@@ -48,6 +48,7 @@ fn usage() {
     println("usage: sprocketnes [options] <path-to-rom>");
     println("options:");
     println("    -1 scale by 1x (default)");
+    println("    -2 scale by 2x");
     println("    -3 scale by 3x");
 }
 
@@ -62,6 +63,8 @@ fn parse_args() -> Option<Options> {
 
         if str::eq_slice(*arg, "-1") {
             options.scale = Scale1x;
+        } else if str::eq_slice(*arg, "-2") {
+            options.scale = Scale2x;
         } else if str::eq_slice(*arg, "-3") {
             options.scale = Scale3x;
         } else if arg[0] == ('-' as u8) {
