@@ -66,6 +66,31 @@ impl ApuEnvelope {
     }
 
     fn loops(self) -> bool { self.disable_length }
+
+    // Channels that support the APU Envelope support writing to the registers in the same way.
+    fn storeb(&mut self, addr: u16, val: u8) {
+        match addr & 0x3 {
+            0 => {
+                self.disable_length = ((val >> 5) & 1) != 0;
+                self.enabled = ((val >> 4) & 1) == 0;
+                if self.enabled {
+                    self.volume = 15;
+                    self.period = val & 0xf;
+                    self.counter = 0;
+                } else {
+                    self.volume = val & 0xf;
+                }
+            }
+            1 | 2 => {}
+            3 => {
+                self.length_id = val >> 3;
+
+                // FIXME: Only set length_left if APUSTATUS has enabled this channel.
+                self.length_left = LENGTH_COUNTERS[self.length_id];
+            }
+            _ => fail!(~"can't happen"),
+        }
+    }
 }
 
 //
@@ -208,33 +233,16 @@ impl Apu {
 
     fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
+        pulse.envelope.storeb(addr, val);   // Write to the envelope.
         match addr & 0x3 {
-            0 => {
-                pulse.duty = val >> 6;
-                pulse.envelope.disable_length = ((val >> 5) & 1) != 0;
-                pulse.envelope.enabled = ((val >> 4) & 1) == 0;
-                if pulse.envelope.enabled {
-                    pulse.envelope.volume = 15;
-                    pulse.envelope.period = val & 0xf;
-                    pulse.envelope.counter = 0;
-                } else {
-                    pulse.envelope.volume = val & 0xf;
-                }
-            }
+            0 => pulse.duty = val >> 6,
             1 => {
                 // TODO: Set reload flag.
                 pulse.sweep = ApuPulseSweep(val);
                 pulse.sweep_cycle = 0;
             }
             2 => pulse.timer = (pulse.timer & 0xff00) | (val as u16),
-            3 => {
-                pulse.envelope.length_id = val >> 3;
-
-                // FIXME: Only set length_left if APUSTATUS has enabled this channel.
-                pulse.envelope.length_left = LENGTH_COUNTERS[pulse.envelope.length_id];
-
-                pulse.timer = (pulse.timer & 0x00ff) | ((val as u16 & 0x7) << 8);
-            }
+            3 => pulse.timer = (pulse.timer & 0x00ff) | ((val as u16 & 0x7) << 8),
             _ => fail!(~"can't happen"),
         }
     }
