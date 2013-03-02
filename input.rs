@@ -110,7 +110,7 @@ impl Input {
         }
     }
 
-    fn check_input(&mut self) -> InputResult {
+    pub fn check_input(&mut self) -> InputResult {
         loop {
             match event::poll_event() {
                 NoEvent => break,

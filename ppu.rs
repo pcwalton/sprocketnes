@@ -753,7 +753,7 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     #[inline(never)]
-    fn step(&mut self, run_to_cycle: u64) -> StepResult {
+    pub fn step(&mut self, run_to_cycle: u64) -> StepResult {
         let mut result = StepResult { new_frame: false, vblank_nmi: false };
         loop {
             let next_scanline_cycle: u64 = self.cy + CYCLES_PER_SCANLINE;

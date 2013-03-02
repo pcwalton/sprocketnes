@@ -31,7 +31,63 @@ const LENGTH_COUNTERS: [u8 * 32] = [
 ];
 
 //
+// Volume envelopes
+//
+
+struct ApuEnvelope {
+    enabled: bool,
+    volume: u8,
+
+    period: u8,
+    counter: u8,
+
+    disable_length: bool,
+    length_id: u8,
+    length_left: u8,
+}
+
+save_struct!(ApuEnvelope {
+    enabled, volume, period, counter, disable_length, length_id, length_left
+})
+
+impl ApuEnvelope {
+    static fn new() -> ApuEnvelope {
+        ApuEnvelope {
+            enabled: false,
+            volume: 0,
+
+            period: 0,
+            counter: 0,
+
+            disable_length: false,
+            length_id: 0,
+            length_left: 0,
+        }
+    }
+
+    fn loops(self) -> bool { self.disable_length }
+}
+
+//
 // APUPULSE: [0x4000, 0x4008)
+//
+
+struct ApuPulse {
+    duty: u8,
+    envelope: ApuEnvelope,
+    sweep: ApuPulseSweep,
+    timer: u16,
+
+    sweep_cycle: u8,
+
+    waveform_index: u8,
+    wavelen_count: u64,
+}
+
+save_struct!(ApuPulse { duty, envelope, sweep, timer, sweep_cycle, waveform_index, wavelen_count })
+
+//
+// APU pulse sweep
 //
 
 struct ApuPulseSweep(u8);
@@ -42,51 +98,6 @@ impl ApuPulseSweep {
     fn negate(self) -> bool    { ((*self >> 3) & 0x1) != 0 }
     fn shift_count(self) -> u8 { *self & 0x7               }
 }
-
-struct ApuPulseEnvelope {
-    disable_length: bool,
-    enabled: bool,
-    volume: u8,
-
-    period: u8,
-    counter: u8,
-}
-
-save_struct!(ApuPulseEnvelope { disable_length, enabled, volume, period, counter })
-
-impl ApuPulseEnvelope {
-    static fn new() -> ApuPulseEnvelope {
-        ApuPulseEnvelope {
-            disable_length: false,
-            enabled: false,
-            volume: 0,
-            period: 0,
-            counter: 0
-        }
-    }
-
-    fn loops(self) -> bool { self.disable_length }
-}
-
-struct ApuPulse {
-    duty: u8,
-    envelope: ApuPulseEnvelope,
-    sweep: ApuPulseSweep,
-    timer: u16,
-
-    length_id: u8,
-    length_left: u8,
-    sweep_cycle: u8,
-
-    waveform_index: u8,
-    wavelen_count: u64,
-}
-
-save_struct!(ApuPulse {
-    duty, envelope, sweep, timer,
-    length_id, length_left, sweep_cycle,
-    waveform_index, wavelen_count
-})
 
 struct ApuStatus(u8);
 
@@ -162,12 +173,10 @@ impl Apu {
                 pulses: [
                     ApuPulse {
                         duty: 0,
-                        envelope: ApuPulseEnvelope::new(),
+                        envelope: ApuEnvelope::new(),
                         sweep: ApuPulseSweep(0),
                         timer: 0,
 
-                        length_id: 0,
-                        length_left: 0,
                         sweep_cycle: 0,
 
                         waveform_index: 0,
@@ -192,7 +201,7 @@ impl Apu {
 
         for uint::range(0, 2) |i| {
             if !self.regs.status.pulse_enabled(i as u8) {
-                self.regs.pulses[i].length_left = 0;
+                self.regs.pulses[i].envelope.length_left = 0;
             }
         }
     }
@@ -219,10 +228,10 @@ impl Apu {
             }
             2 => pulse.timer = (pulse.timer & 0xff00) | (val as u16),
             3 => {
-                pulse.length_id = val >> 3;
+                pulse.envelope.length_id = val >> 3;
 
                 // FIXME: Only set length_left if APUSTATUS has enabled this channel.
-                pulse.length_left = LENGTH_COUNTERS[pulse.length_id];
+                pulse.envelope.length_left = LENGTH_COUNTERS[pulse.envelope.length_id];
 
                 pulse.timer = (pulse.timer & 0x00ff) | ((val as u16 & 0x7) << 8);
             }
@@ -234,7 +243,7 @@ impl Apu {
     // Playback
     //
 
-    fn step(&mut self, run_to_cycle: u64) {
+    pub fn step(&mut self, run_to_cycle: u64) {
         loop {
             let mut next_tick_cycle = self.cy;
             if self.ticks % 2 == 0 {
@@ -261,8 +270,8 @@ impl Apu {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
-                if pulse.length_left > 0 && !pulse.envelope.disable_length {
-                    pulse.length_left -= 1;
+                if pulse.envelope.length_left > 0 && !pulse.envelope.disable_length {
+                    pulse.envelope.length_left -= 1;
                 }
 
                 // Sweep.
@@ -296,7 +305,7 @@ impl Apu {
                     } else {
                         pulse.envelope.volume -= 1;
                         if pulse.envelope.volume == 0 && !pulse.envelope.loops() {
-                            pulse.length_left = 0;
+                            pulse.envelope.length_left = 0;
                         }
                     }
                 }
@@ -325,7 +334,7 @@ impl Apu {
         let end_offset = start_offset + NES_SAMPLES_PER_TICK as uint;
 
         // Process sound.
-        if timer > 0 && pulse.envelope.volume > 0 && pulse.length_left > 0 {
+        if timer > 0 && pulse.envelope.volume > 0 && pulse.envelope.length_left > 0 {
             let volume = (pulse.envelope.volume as i16 * 4) << 8;
             let wavelen = (pulse.timer as u64 + 1) * 2;
             let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];

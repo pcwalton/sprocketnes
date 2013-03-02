@@ -701,7 +701,7 @@ impl<M:Mem> Cpu<M> {
     fn nop(&mut self) {}
 
     // The main fetch-and-decode routine
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         self.trace();
 
         let op = self.loadb_bump_pc();
@@ -711,14 +711,15 @@ impl<M:Mem> Cpu<M> {
     }
 
     /// External interfaces
-    fn reset(&mut self) { self.regs.pc = self.loadw(RESET_VECTOR); }
-    fn nmi(&mut self) {
+    pub fn reset(&mut self) { self.regs.pc = self.loadw(RESET_VECTOR); }
+
+    pub fn nmi(&mut self) {
         self.pushw(self.regs.pc);
         self.pushb(self.regs.flags);
         self.regs.pc = self.loadw(NMI_VECTOR);
     }
 
     /// The constructor.
-    static fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
+    static pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
 }
 

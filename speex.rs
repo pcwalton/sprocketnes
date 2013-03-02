@@ -54,7 +54,7 @@ impl Resampler {
         }
     }
 
-    fn process(&self, channel_index: u32, in: &[i16], out: &mut [u8]) -> (u32, u32) {
+    pub fn process(&self, channel_index: u32, in: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
             assert in.len() <= 0xffffffff;
             assert out.len() / 2 <= 0xffffffff;

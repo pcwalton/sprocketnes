@@ -4,8 +4,7 @@
 // Author: Patrick Walton
 //
 
-use cast::transmute;
-
+use core::cast::transmute;
 use core::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, off_t, size_t};
 use core::libc::{ssize_t, time_t};
 use core::libc;

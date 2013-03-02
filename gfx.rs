@@ -70,7 +70,7 @@ macro_rules! scaler(
 )
 
 impl Gfx {
-    static fn new(scale: Scale) -> Gfx {
+    static pub fn new(scale: Scale) -> Gfx {
         sdl::init([ InitVideo, InitAudio, InitTimer ]);
         let screen = video::set_video_mode(SCREEN_WIDTH * scale.factor() as int,
                                            SCREEN_HEIGHT * scale.factor()  as int,
@@ -81,7 +81,7 @@ impl Gfx {
         Gfx { screen: screen.unwrap(), scale: scale }
     }
 
-    fn blit(&self, ppu_screen: &([u8 * 184320])) {
+    pub fn blit(&self, ppu_screen: &([u8 * 184320])) {
         do self.screen.with_lock |pixels| {
             match self.scale {
                 Scale1x => scaler!(1, pixels, ppu_screen),

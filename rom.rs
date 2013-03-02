@@ -57,10 +57,10 @@ struct INesHeader {
 }
 
 impl INesHeader {
-    fn mapper(&self) -> u8 { (self.flags_7 & 0xf0) | (self.flags_6 >> 4) }
-    fn trainer(&self) -> bool { (self.flags_6 & 0x04) != 0 }
+    pub fn mapper(&self) -> u8 { (self.flags_7 & 0xf0) | (self.flags_6 >> 4) }
+    pub fn trainer(&self) -> bool { (self.flags_6 & 0x04) != 0 }
 
-    fn to_str(&self) -> ~str {
+    pub fn to_str(&self) -> ~str {
         fmt!(
             "PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d\nTrainer: %s",
             self.prg_rom_size as int,

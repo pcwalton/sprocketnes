@@ -7,20 +7,22 @@
 extern mod sdl;
 
 // NB: This must be first to pick up the macro definitions. What a botch.
-mod util;
+#[macro_escape]
+pub mod util;
 
-mod apu;
-mod audio;
-mod cpu;
-mod disasm;
-mod gfx;
-mod input;
-mod main;
-mod mapper;
-mod mem;
-mod ppu;
-mod rom;
+pub mod apu;
+pub mod audio;
+#[macro_escape]
+pub mod cpu;
+pub mod disasm;
+pub mod gfx;
+pub mod input;
+pub mod main;
+pub mod mapper;
+pub mod mem;
+pub mod ppu;
+pub mod rom;
 
 // C library support
-mod speex;
+pub mod speex;
 
