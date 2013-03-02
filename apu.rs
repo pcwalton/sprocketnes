@@ -91,6 +91,32 @@ impl ApuEnvelope {
             _ => fail!(~"can't happen"),
         }
     }
+
+    fn decrement_length(&mut self) {
+        if self.length_left > 0 && !self.disable_length {
+            self.length_left -= 1;
+        }
+    }
+
+    // This routine executes at 240 Hz and adjusts the volume and counter appropriately.
+    fn tick(&mut self) {
+        if self.enabled {
+            self.counter += 1;
+            if self.counter >= self.period {
+                self.counter = 0;
+                if self.volume == 0 {
+                    if self.loops() {
+                        self.volume = 15;
+                    }
+                } else {
+                    self.volume -= 1;
+                    if self.volume == 0 && !self.loops() {
+                        self.length_left = 0;
+                    }
+                }
+            }
+        }
+    }
 }
 
 //
@@ -278,9 +304,7 @@ impl Apu {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
-                if pulse.envelope.length_left > 0 && !pulse.envelope.disable_length {
-                    pulse.envelope.length_left -= 1;
-                }
+                pulse.envelope.decrement_length();
 
                 // Sweep.
                 pulse.sweep_cycle += 1;
@@ -300,25 +324,8 @@ impl Apu {
         }
 
         // 240 Hz operations: envelope and linear counter.
-        for uint::range(0, 2) |i| {
-            let pulse = &mut self.regs.pulses[i];
-            if pulse.envelope.enabled {
-                pulse.envelope.counter += 1;
-                if pulse.envelope.counter >= pulse.envelope.period {
-                    pulse.envelope.counter = 0;
-                    if pulse.envelope.volume == 0 {
-                        if pulse.envelope.loops() {
-                            pulse.envelope.volume = 15;
-                        }
-                    } else {
-                        pulse.envelope.volume -= 1;
-                        if pulse.envelope.volume == 0 && !pulse.envelope.loops() {
-                            pulse.envelope.length_left = 0;
-                        }
-                    }
-                }
-            }
-        }
+        self.regs.pulses[0].envelope.tick();
+        self.regs.pulses[1].envelope.tick();
 
         // Fill the sample buffers.
         self.play_pulse(0, 0);
