@@ -7,7 +7,7 @@
 use audio::OutputBuffer;
 use mem::Mem;
 use speex::Resampler;
-use util::{Fd, Save};
+use util::{Fd, Save, Xorshift};
 use util;
 
 use core::cast::{forget, transmute};
@@ -28,6 +28,11 @@ const PULSE_WAVEFORMS: [u8 * 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b100111
 const LENGTH_COUNTERS: [u8 * 32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
+];
+
+// TODO: PAL
+const NOISE_PERIODS: [u16 * 16] = [
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 ];
 
 //
@@ -150,14 +155,42 @@ impl ApuPulseSweep {
     fn shift_count(self) -> u8 { *self & 0x7               }
 }
 
+//
+// APUNOISE: [0x400c, 0x4010)
+//
+
+struct ApuNoise {
+    envelope: ApuEnvelope,
+
+    timer: u16,         // The number of ticks per possible waveform change.
+
+    timer_count: u16,   // The number of ticks since the last timer.
+    rng: Xorshift,      // The xorshift RNG. FIXME: This is inaccurate.
+}
+
+save_struct!(ApuNoise { envelope, timer, timer_count })
+
+impl ApuNoise {
+    static fn new() -> ApuNoise {
+        ApuNoise { envelope: ApuEnvelope::new(), timer: 0, timer_count: 0, rng: Xorshift::new() }
+    }
+}
+
+//
+// APUSTATUS: 0x4015
+//
+
 struct ApuStatus(u8);
 
 impl ApuStatus {
     fn pulse_enabled(self, channel: u8) -> bool { ((*self >> channel) & 1) != 0 }
+    fn triangle_enabled(self) -> bool           { (*self & 0x04) != 0 }
+    fn noise_enabled(self) -> bool              { (*self & 0x08) != 0 }
 }
 
 struct Regs {
     pulses: [ApuPulse * 2],
+    noise: ApuNoise,
     status: ApuStatus,  // $4015: APUSTATUS
 }
 
@@ -165,11 +198,13 @@ impl Save for Regs {
     fn save(&mut self, fd: &Fd) {
         self.pulses[0].save(fd);
         self.pulses[1].save(fd);
+        self.noise.save(fd);
         self.status.save(fd);
     }
     fn load(&mut self, fd: &Fd) {
         self.pulses[0].load(fd);
         self.pulses[1].load(fd);
+        self.noise.load(fd);
         self.status.load(fd);
     }
 }
@@ -211,6 +246,7 @@ impl Mem for Apu {
         match addr {
             0x4000..0x4003 => self.update_pulse(addr, val, 0),
             0x4004..0x4007 => self.update_pulse(addr, val, 1),
+            0x400c..0x400f => self.update_noise(addr, val),
             0x4015 => self.update_status(val),
             _ => {} // TODO
         }
@@ -234,6 +270,7 @@ impl Apu {
                         wavelen_count: 0,
                     }, ..2
                 ],
+                noise: ApuNoise::new(),
                 status: ApuStatus(0),
             },
 
@@ -255,6 +292,9 @@ impl Apu {
                 self.regs.pulses[i].envelope.length_left = 0;
             }
         }
+        if !self.regs.status.noise_enabled() {
+            self.regs.noise.envelope.length_left = 0;
+        }
     }
 
     fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: uint) {
@@ -269,6 +309,18 @@ impl Apu {
             }
             2 => pulse.timer = (pulse.timer & 0xff00) | (val as u16),
             3 => pulse.timer = (pulse.timer & 0x00ff) | ((val as u16 & 0x7) << 8),
+            _ => fail!(~"can't happen"),
+        }
+    }
+
+    fn update_noise(&mut self, addr: u16, val: u8) {
+        self.regs.noise.envelope.storeb(addr, val);
+        match addr & 3 {
+            2 => {
+                // TODO: Mode bit.
+                self.regs.noise.timer = NOISE_PERIODS[val & 0xf];
+            }
+            0 | 1 | 3 => {}
             _ => fail!(~"can't happen"),
         }
     }
@@ -321,15 +373,20 @@ impl Apu {
                     }
                 }
             }
+
+            // Length counter for noise.
+            self.regs.noise.envelope.decrement_length();
         }
 
         // 240 Hz operations: envelope and linear counter.
         self.regs.pulses[0].envelope.tick();
         self.regs.pulses[1].envelope.tick();
+        self.regs.noise.envelope.tick();
 
         // Fill the sample buffers.
         self.play_pulse(0, 0);
         self.play_pulse(1, 1);
+        self.play_noise(3);
         self.sample_buffer_offset += NES_SAMPLES_PER_TICK as uint;
 
         // Now play the channels, flushing the sample buffers, if necessary.
@@ -373,6 +430,44 @@ impl Apu {
 
             pulse.waveform_index = waveform_index;
             pulse.wavelen_count = wavelen_count;
+        } else {
+            for uint::range(start_offset, end_offset) |i| {
+                sample_buffer.samples[i] = 0;
+            }
+        }
+    }
+
+    fn play_noise(&mut self, channel: c_int) {
+        let mut noise = &mut self.regs.noise;
+
+        let mut sample_buffer = &mut self.sample_buffers[channel];
+        let start_offset = self.sample_buffer_offset;
+        let end_offset = start_offset + NES_SAMPLES_PER_TICK as uint;
+
+        // Process sound.
+        if self.regs.noise.envelope.volume > 0 && self.regs.noise.envelope.length_left > 0 {
+            let volume = (noise.envelope.volume as i16 * 4) << 8;
+
+            // Fill the buffer.
+            let mut buffer = vec::mut_slice(sample_buffer.samples, start_offset, end_offset);
+
+            let timer = noise.timer;
+            let mut timer_count = noise.timer_count;
+            let mut rng = noise.rng;
+            let mut on = 1;
+
+            for vec::each_mut(buffer) |dest| {
+                timer_count += 1;
+                if timer_count >= timer {
+                    timer_count = 0;
+                    on = rng.next() & 1;
+                }
+
+                *dest = if on == 0 { 0 } else { volume };
+            }
+
+            noise.timer_count = timer_count;
+            noise.rng = rng;
         } else {
             for uint::range(start_offset, end_offset) |i| {
                 sample_buffer.samples[i] = 0;
