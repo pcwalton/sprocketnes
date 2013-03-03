@@ -30,6 +30,11 @@ const LENGTH_COUNTERS: [u8 * 32] = [
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
+const TRIANGLE_WAVEFORM: [u8 * 32] = [
+    15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+];
+
 // TODO: PAL
 const NOISE_PERIODS: [u16 * 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
@@ -38,6 +43,13 @@ const NOISE_PERIODS: [u16 * 16] = [
 //
 // Channel lengths
 //
+
+// There are two modes in which the disable bit can be set: bit 5 (pulses) or bit 7 (triangle).
+trait DisableBit { fn bit_number(self) -> u8; }
+struct DisableBit5;
+impl DisableBit for DisableBit5 { fn bit_number(self) -> u8 { 5 } }
+struct DisableBit7;
+impl DisableBit for DisableBit7 { fn bit_number(self) -> u8 { 7 } }
 
 struct ApuLength {
     disable: bool,
@@ -50,10 +62,11 @@ save_struct!(ApuLength { disable, id, remaining })
 impl ApuLength {
     static fn new() -> ApuLength { ApuLength { disable: false, id: 0, remaining: 0 } }
 
-    // Channels that support the APU Length follow the same register protocol.
-    fn storeb(&mut self, addr: u16, val: u8) {
+    // Channels that support the APU Length follow the same register protocol, *except* that the
+    // disable bit may be different.
+    fn storeb<DB:DisableBit>(&mut self, addr: u16, val: u8, db: DB) {
         match addr & 0x3 {
-            0 => self.disable = ((val >> 5) & 1) != 0,
+            0 => self.disable = ((val >> db.bit_number()) & 1) != 0,
             1 | 2 => {}
             3 => {
                 // FIXME: Only set `remaining` if APUSTATUS has enabled this channel.
@@ -92,7 +105,7 @@ impl ApuEnvelope {
 
     // Channels that support the APU Envelope follow the same register protocol.
     fn storeb(&mut self, addr: u16, val: u8) {
-        self.length.storeb(addr, val);
+        self.length.storeb(addr, val, DisableBit5);
 
         if (addr & 0x3) == 0 {
             self.enabled = ((val >> 4) & 1) == 0;
@@ -191,8 +204,55 @@ impl ApuPulseSweep {
 // APUTRIANGLE: [0x4008, 0x400c)
 //
 
-// TODO
-struct ApuTriangle;
+struct ApuTriangle {
+    timer: ApuTimer,
+    length: ApuLength,
+    linear_counter: u8,
+    linear_counter_reload: u8,
+    linear_counter_halt: bool,
+    waveform_index: u8,
+}
+
+save_struct!(ApuTriangle { timer, length, linear_counter })
+
+impl ApuTriangle {
+    static fn new() -> ApuTriangle {
+        ApuTriangle {
+            timer: ApuTimer::new(),
+            length: ApuLength::new(),
+            linear_counter: 0,
+            linear_counter_reload: 0,
+            linear_counter_halt: false,
+            waveform_index: 0,
+        }
+    }
+
+    fn storeb(&mut self, addr: u16, val: u8) {
+        self.timer.storeb(addr, val);
+        self.length.storeb(addr, val, DisableBit7);
+
+        if (addr & 3) == 0 {
+            self.linear_counter_reload = (val & 0x7f);
+            //self.linear_counter = self.linear_counter_reload;
+            self.linear_counter_halt = true;
+        }
+    }
+
+    // Updates the linear counter. Runs at 240 Hz.
+    fn tick(&mut self) {
+        if self.linear_counter_halt {
+            self.linear_counter = self.linear_counter_reload;
+        } else if self.linear_counter != 0 {
+            self.linear_counter -= 1;
+        }
+
+        if !self.length.disable {
+            self.linear_counter_halt = false;
+        }
+    }
+
+    fn audible(&self) -> bool { self.length.remaining > 0 && self.linear_counter > 0 }
+}
 
 //
 // APUNOISE: [0x400c, 0x4010)
@@ -231,6 +291,7 @@ impl ApuStatus {
 
 struct Regs {
     pulses: [ApuPulse * 2],
+    triangle: ApuTriangle,
     noise: ApuNoise,
     status: ApuStatus,  // $4015: APUSTATUS
 }
@@ -239,12 +300,14 @@ impl Save for Regs {
     fn save(&mut self, fd: &Fd) {
         self.pulses[0].save(fd);
         self.pulses[1].save(fd);
+        self.triangle.save(fd);
         self.noise.save(fd);
         self.status.save(fd);
     }
     fn load(&mut self, fd: &Fd) {
         self.pulses[0].load(fd);
         self.pulses[1].load(fd);
+        self.triangle.load(fd);
         self.noise.load(fd);
         self.status.load(fd);
     }
@@ -287,6 +350,7 @@ impl Mem for Apu {
         match addr {
             0x4000..0x4003 => self.update_pulse(addr, val, 0),
             0x4004..0x4007 => self.update_pulse(addr, val, 1),
+            0x4008..0x400b => self.regs.triangle.storeb(addr, val),
             0x400c..0x400f => self.update_noise(addr, val),
             0x4015 => self.update_status(val),
             _ => {} // TODO
@@ -308,6 +372,7 @@ impl Apu {
                         waveform_index: 0,
                     }, ..2
                 ],
+                triangle: ApuTriangle::new(),
                 noise: ApuNoise::new(),
                 status: ApuStatus(0),
             },
@@ -330,11 +395,15 @@ impl Apu {
                 self.regs.pulses[i].envelope.length.remaining = 0;
             }
         }
+        if !self.regs.status.triangle_enabled() {
+            self.regs.triangle.length.remaining = 0;
+        }
         if !self.regs.status.noise_enabled() {
             self.regs.noise.envelope.length.remaining = 0;
         }
     }
 
+    // FIXME: Refactor into a method on ApuPulse itself.
     fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
         pulse.envelope.storeb(addr, val);   // Write to the envelope.
@@ -351,15 +420,13 @@ impl Apu {
         }
     }
 
+    // FIXME: Refactor into a method on ApuNoise itself.
     fn update_noise(&mut self, addr: u16, val: u8) {
         self.regs.noise.envelope.storeb(addr, val);
-        match addr & 3 {
-            2 => {
-                // TODO: Mode bit.
-                self.regs.noise.timer = NOISE_PERIODS[val & 0xf];
-            }
-            0 | 1 | 3 => {}
-            _ => fail!(~"can't happen"),
+
+        if (addr & 3) == 2 {
+            // TODO: Mode bit.
+            self.regs.noise.timer = NOISE_PERIODS[val & 0xf];
         }
     }
 
@@ -412,18 +479,21 @@ impl Apu {
                 }
             }
 
-            // Length counter for noise.
+            // Length counter for triangle and noise.
+            self.regs.triangle.length.decrement();
             self.regs.noise.envelope.length.decrement();
         }
 
         // 240 Hz operations: envelope and linear counter.
         self.regs.pulses[0].envelope.tick();
         self.regs.pulses[1].envelope.tick();
+        self.regs.triangle.tick();
         self.regs.noise.envelope.tick();
 
         // Fill the sample buffers.
         self.play_pulse(0, 0);
         self.play_pulse(1, 1);
+        self.play_triangle(2);
         self.play_noise(3);
         self.sample_buffer_offset += NES_SAMPLES_PER_TICK as uint;
 
@@ -479,6 +549,32 @@ impl Apu {
 
             pulse.waveform_index = waveform_index;
             pulse.timer.wavelen_count = wavelen_count;
+        }
+    }
+
+    fn play_triangle(&mut self, channel: c_int) {
+        let mut triangle = &mut self.regs.triangle;
+        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+                                                        self.sample_buffer_offset,
+                                                        triangle.audible());
+        for buffer_opt.each |&buffer| {
+            let wavelen = triangle.timer.wavelen() / 2;
+            let mut waveform_index = triangle.waveform_index;
+            let mut wavelen_count = triangle.timer.wavelen_count;
+
+            for vec::each_mut(buffer) |dest| {
+                wavelen_count += 1;
+                if wavelen_count >= wavelen {
+                    wavelen_count = 0;
+                    waveform_index = (waveform_index + 1) % 32;
+                }
+
+                // FIXME: Factor out this calculation.
+                *dest = (TRIANGLE_WAVEFORM[waveform_index] as i16 * 4) << 8;
+            }
+
+            triangle.waveform_index = waveform_index;
+            triangle.timer.wavelen_count = wavelen_count;
         }
     }
 
