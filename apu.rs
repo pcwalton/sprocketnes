@@ -36,68 +36,73 @@ const NOISE_PERIODS: [u16 * 16] = [
 ];
 
 //
+// Channel lengths
+//
+
+struct ApuLength {
+    disable: bool,
+    id: u8,
+    remaining: u8,
+}
+
+save_struct!(ApuLength { disable, id, remaining })
+
+impl ApuLength {
+    static fn new() -> ApuLength { ApuLength { disable: false, id: 0, remaining: 0 } }
+
+    // Channels that support the APU Length follow the same register protocol.
+    fn storeb(&mut self, addr: u16, val: u8) {
+        match addr & 0x3 {
+            0 => self.disable = ((val >> 5) & 1) != 0,
+            1 | 2 => {}
+            3 => {
+                // FIXME: Only set `remaining` if APUSTATUS has enabled this channel.
+                self.id = val >> 3;
+                self.remaining = LENGTH_COUNTERS[self.id];
+            }
+            _ => fail!(~"can't happen"),
+        }
+    }
+
+    fn decrement(&mut self) {
+        if self.remaining > 0 && !self.disable {
+            self.remaining -= 1;
+        }
+    }
+}
+
+//
 // Volume envelopes
 //
 
 struct ApuEnvelope {
     enabled: bool,
     volume: u8,
-
     period: u8,
     counter: u8,
-
-    disable_length: bool,
-    length_id: u8,
-    length_left: u8,
+    length: ApuLength,
 }
 
-save_struct!(ApuEnvelope {
-    enabled, volume, period, counter, disable_length, length_id, length_left
-})
+save_struct!(ApuEnvelope { enabled, volume, period, counter, length })
 
 impl ApuEnvelope {
     static fn new() -> ApuEnvelope {
-        ApuEnvelope {
-            enabled: false,
-            volume: 0,
-
-            period: 0,
-            counter: 0,
-
-            disable_length: false,
-            length_id: 0,
-            length_left: 0,
-        }
+        ApuEnvelope { enabled: false, volume: 0, period: 0, counter: 0, length: ApuLength::new() }
     }
 
-    // Channels that support the APU Envelope support writing to the registers in the same way.
+    // Channels that support the APU Envelope follow the same register protocol.
     fn storeb(&mut self, addr: u16, val: u8) {
-        match addr & 0x3 {
-            0 => {
-                self.disable_length = ((val >> 5) & 1) != 0;
-                self.enabled = ((val >> 4) & 1) == 0;
-                if self.enabled {
-                    self.volume = 15;
-                    self.period = val & 0xf;
-                    self.counter = 0;
-                } else {
-                    self.volume = val & 0xf;
-                }
-            }
-            1 | 2 => {}
-            3 => {
-                self.length_id = val >> 3;
+        self.length.storeb(addr, val);
 
-                // FIXME: Only set length_left if APUSTATUS has enabled this channel.
-                self.length_left = LENGTH_COUNTERS[self.length_id];
+        if (addr & 0x3) == 0 {
+            self.enabled = ((val >> 4) & 1) == 0;
+            if self.enabled {
+                self.volume = 15;
+                self.period = val & 0xf;
+                self.counter = 0;
+            } else {
+                self.volume = val & 0xf;
             }
-            _ => fail!(~"can't happen"),
-        }
-    }
-
-    fn decrement_length(&mut self) {
-        if self.length_left > 0 && !self.disable_length {
-            self.length_left -= 1;
         }
     }
 
@@ -114,15 +119,15 @@ impl ApuEnvelope {
                 } else {
                     self.volume -= 1;
                     if self.volume == 0 && !self.loops() {
-                        self.length_left = 0;
+                        self.length.remaining = 0;
                     }
                 }
             }
         }
     }
 
-    fn loops(self) -> bool { self.disable_length }
-    fn audible(&self) -> bool { self.volume > 0 && self.length_left > 0 }
+    fn loops(self) -> bool { self.length.disable }
+    fn audible(&self) -> bool { self.volume > 0 && self.length.remaining > 0 }
     fn sample_volume(&self) -> i16 { (self.volume as i16 * 4) << 8 }
 }
 
@@ -158,6 +163,13 @@ impl ApuPulseSweep {
 }
 
 //
+// APUTRIANGLE: [0x4008, 0x400c)
+//
+
+// TODO
+struct ApuTriangle;
+
+//
 // APUNOISE: [0x400c, 0x4010)
 //
 
@@ -189,6 +201,10 @@ impl ApuStatus {
     fn triangle_enabled(self) -> bool           { (*self & 0x04) != 0 }
     fn noise_enabled(self) -> bool              { (*self & 0x08) != 0 }
 }
+
+//
+// Audio registers
+//
 
 struct Regs {
     pulses: [ApuPulse * 2],
@@ -291,11 +307,11 @@ impl Apu {
 
         for uint::range(0, 2) |i| {
             if !self.regs.status.pulse_enabled(i as u8) {
-                self.regs.pulses[i].envelope.length_left = 0;
+                self.regs.pulses[i].envelope.length.remaining = 0;
             }
         }
         if !self.regs.status.noise_enabled() {
-            self.regs.noise.envelope.length_left = 0;
+            self.regs.noise.envelope.length.remaining = 0;
         }
     }
 
@@ -358,7 +374,7 @@ impl Apu {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
-                pulse.envelope.decrement_length();
+                pulse.envelope.length.decrement();
 
                 // Sweep.
                 pulse.sweep_cycle += 1;
@@ -377,7 +393,7 @@ impl Apu {
             }
 
             // Length counter for noise.
-            self.regs.noise.envelope.decrement_length();
+            self.regs.noise.envelope.length.decrement();
         }
 
         // 240 Hz operations: envelope and linear counter.
