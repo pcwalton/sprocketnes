@@ -70,8 +70,6 @@ impl ApuEnvelope {
         }
     }
 
-    fn loops(self) -> bool { self.disable_length }
-
     // Channels that support the APU Envelope support writing to the registers in the same way.
     fn storeb(&mut self, addr: u16, val: u8) {
         match addr & 0x3 {
@@ -122,6 +120,10 @@ impl ApuEnvelope {
             }
         }
     }
+
+    fn loops(self) -> bool { self.disable_length }
+    fn audible(&self) -> bool { self.volume > 0 && self.length_left > 0 }
+    fn sample_volume(&self) -> i16 { (self.volume as i16 * 4) << 8 }
 }
 
 //
@@ -397,22 +399,34 @@ impl Apu {
         self.ticks += 1;
     }
 
+    //
+    // Channel playback
+    //
+
+    static fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [i16], offset: uint, audible: bool)
+                                         -> Option<&'a mut [i16]> {
+        let mut buffer = vec::mut_slice(buffer, offset, offset + NES_SAMPLES_PER_TICK as uint);
+        if audible {
+            return Some(buffer);
+        }
+
+        for vec::each_mut(buffer) |dest| {
+            *dest = 0;
+        }
+        None
+    }
+
     fn play_pulse(&mut self, pulse_number: uint, channel: c_int) {
         let pulse = &mut self.regs.pulses[pulse_number];
-        let timer = pulse.timer as uint;
-
-        let mut sample_buffer = &mut self.sample_buffers[channel];
-        let start_offset = self.sample_buffer_offset;
-        let end_offset = start_offset + NES_SAMPLES_PER_TICK as uint;
-
-        // Process sound.
-        if timer > 0 && pulse.envelope.volume > 0 && pulse.envelope.length_left > 0 {
-            let volume = (pulse.envelope.volume as i16 * 4) << 8;
+        let audible = pulse.envelope.audible() && pulse.timer > 0;
+        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+                                                        self.sample_buffer_offset,
+                                                        audible);
+        for buffer_opt.each |&buffer| {
+            // Process sound.
+            let volume = pulse.envelope.sample_volume();
             let wavelen = (pulse.timer as u64 + 1) * 2;
             let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];
-
-            // Fill the buffer.
-            let mut buffer = vec::mut_slice(sample_buffer.samples, start_offset, end_offset);
 
             // TODO: Vectorize this for speed.
             let mut waveform_index = pulse.waveform_index;
@@ -430,27 +444,16 @@ impl Apu {
 
             pulse.waveform_index = waveform_index;
             pulse.wavelen_count = wavelen_count;
-        } else {
-            for uint::range(start_offset, end_offset) |i| {
-                sample_buffer.samples[i] = 0;
-            }
         }
     }
 
     fn play_noise(&mut self, channel: c_int) {
         let mut noise = &mut self.regs.noise;
-
-        let mut sample_buffer = &mut self.sample_buffers[channel];
-        let start_offset = self.sample_buffer_offset;
-        let end_offset = start_offset + NES_SAMPLES_PER_TICK as uint;
-
-        // Process sound.
-        if self.regs.noise.envelope.volume > 0 && self.regs.noise.envelope.length_left > 0 {
-            let volume = (noise.envelope.volume as i16 * 4) << 8;
-
-            // Fill the buffer.
-            let mut buffer = vec::mut_slice(sample_buffer.samples, start_offset, end_offset);
-
+        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+                                                        self.sample_buffer_offset,
+                                                        noise.envelope.audible());
+        for buffer_opt.each |&buffer| {
+            let volume = noise.envelope.sample_volume();
             let timer = noise.timer;
             let mut timer_count = noise.timer_count;
             let mut rng = noise.rng;
@@ -468,10 +471,6 @@ impl Apu {
 
             noise.timer_count = timer_count;
             noise.rng = rng;
-        } else {
-            for uint::range(start_offset, end_offset) |i| {
-                sample_buffer.samples[i] = 0;
-            }
         }
     }
 
