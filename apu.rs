@@ -132,22 +132,47 @@ impl ApuEnvelope {
 }
 
 //
+// Audio frequencies, shared by the pulses and the triangle
+//
+
+struct ApuTimer {
+    value: u16,             // The raw timer value as written to the register.
+    wavelen_count: u64,     // How many clock ticks have passed since the last period.
+}
+
+save_struct!(ApuTimer { value, wavelen_count })
+
+impl ApuTimer {
+    static fn new() -> ApuTimer { ApuTimer { value: 0, wavelen_count: 0 } }
+
+    // Channels that support the APU Envelope follow the same register protocol.
+    fn storeb(&mut self, addr: u16, val: u8) {
+        match addr & 0x3 {
+            0 | 1 => {}
+            2 => self.value = (self.value & 0xff00) | (val as u16),
+            3 => self.value = (self.value & 0x00ff) | ((val as u16 & 0x7) << 8),
+            _ => fail!(~"can't happen"),
+        }
+    }
+
+    fn audible(&self) -> bool { self.value > 0 }
+    fn wavelen(&self) -> u64 { (self.value as u64 + 1) * 2 }
+}
+
+//
 // APUPULSE: [0x4000, 0x4008)
 //
 
 struct ApuPulse {
-    duty: u8,
     envelope: ApuEnvelope,
     sweep: ApuPulseSweep,
-    timer: u16,
-
+    timer: ApuTimer,
+    duty: u8,
     sweep_cycle: u8,
-
     waveform_index: u8,
-    wavelen_count: u64,
 }
 
-save_struct!(ApuPulse { duty, envelope, sweep, timer, sweep_cycle, waveform_index, wavelen_count })
+save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_index })
 
 //
 // APU pulse sweep
@@ -175,9 +200,7 @@ struct ApuTriangle;
 
 struct ApuNoise {
     envelope: ApuEnvelope,
-
     timer: u16,         // The number of ticks per possible waveform change.
-
     timer_count: u16,   // The number of ticks since the last timer.
     rng: Xorshift,      // The xorshift RNG. FIXME: This is inaccurate.
 }
@@ -277,15 +300,12 @@ impl Apu {
             regs: Regs {
                 pulses: [
                     ApuPulse {
-                        duty: 0,
                         envelope: ApuEnvelope::new(),
                         sweep: ApuPulseSweep(0),
-                        timer: 0,
-
+                        timer: ApuTimer::new(),
+                        duty: 0,
                         sweep_cycle: 0,
-
                         waveform_index: 0,
-                        wavelen_count: 0,
                     }, ..2
                 ],
                 noise: ApuNoise::new(),
@@ -318,6 +338,7 @@ impl Apu {
     fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
         pulse.envelope.storeb(addr, val);   // Write to the envelope.
+        pulse.timer.storeb(addr, val);      // Write to the timer.
         match addr & 0x3 {
             0 => pulse.duty = val >> 6,
             1 => {
@@ -325,8 +346,7 @@ impl Apu {
                 pulse.sweep = ApuPulseSweep(val);
                 pulse.sweep_cycle = 0;
             }
-            2 => pulse.timer = (pulse.timer & 0xff00) | (val as u16),
-            3 => pulse.timer = (pulse.timer & 0x00ff) | ((val as u16 & 0x7) << 8),
+            2 | 3 => {}
             _ => fail!(~"can't happen"),
         }
     }
@@ -382,11 +402,11 @@ impl Apu {
                     pulse.sweep_cycle = 0;
 
                     if pulse.sweep.enabled() {
-                        let delta = pulse.timer >> pulse.sweep.shift_count();
+                        let delta = pulse.timer.value >> pulse.sweep.shift_count();
                         if !pulse.sweep.negate() {
-                            pulse.timer += delta;
+                            pulse.timer.value += delta;
                         } else {
-                            pulse.timer -= delta;
+                            pulse.timer.value -= delta;
                         }
                     }
                 }
@@ -434,19 +454,18 @@ impl Apu {
 
     fn play_pulse(&mut self, pulse_number: uint, channel: c_int) {
         let pulse = &mut self.regs.pulses[pulse_number];
-        let audible = pulse.envelope.audible() && pulse.timer > 0;
+        let audible = pulse.envelope.audible() && pulse.timer.audible();
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         audible);
         for buffer_opt.each |&buffer| {
             // Process sound.
-            let volume = pulse.envelope.sample_volume();
-            let wavelen = (pulse.timer as u64 + 1) * 2;
-            let waveform: u8 = PULSE_WAVEFORMS[pulse.duty];
-
             // TODO: Vectorize this for speed.
+            let volume = pulse.envelope.sample_volume();
+            let wavelen = pulse.timer.wavelen();
+            let waveform = PULSE_WAVEFORMS[pulse.duty];
             let mut waveform_index = pulse.waveform_index;
-            let mut wavelen_count = pulse.wavelen_count;
+            let mut wavelen_count = pulse.timer.wavelen_count;
 
             for vec::each_mut(buffer) |dest| {
                 wavelen_count += 1;
@@ -459,7 +478,7 @@ impl Apu {
             }
 
             pulse.waveform_index = waveform_index;
-            pulse.wavelen_count = wavelen_count;
+            pulse.timer.wavelen_count = wavelen_count;
         }
     }
 
