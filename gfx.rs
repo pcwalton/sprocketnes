@@ -5,6 +5,7 @@
 //
 
 use core::cast::transmute;
+use core::int;
 use core::uint::range;
 use sdl::sdl::{InitAudio, InitTimer, InitVideo};
 use sdl::sdl;
@@ -13,6 +14,13 @@ use sdl::video;
 
 const SCREEN_WIDTH: uint = 256;
 const SCREEN_HEIGHT: uint = 240;
+
+const FONT_HEIGHT: uint = 10;
+
+const STATUS_LINE_PADDING: uint = 6;
+const STATUS_LINE_X: uint = STATUS_LINE_PADDING;
+const STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
+const STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
 
 //
 // PT Ronda Seven
@@ -134,6 +142,105 @@ const FONT_ADVANCES: [u8 * 95] = [
 ];
 
 //
+// Text output
+//
+
+enum GlyphColor {
+    White,
+    Black,
+}
+
+fn draw_glyph(pixels: &mut [u8],
+              surface_width: uint,
+              x: int,
+              y: int,
+              color: GlyphColor,
+              glyph_index: uint) {
+    let mut color_byte = match color { White => 0xff, Black => 0x00 };
+    for int::range(0, 10) |y_index| {
+        let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
+        for int::range(0, 8) |x_index| {
+            if ((row >> (7 - x_index)) & 1) != 0 {
+                for int::range(0, 3) |channel| {
+                    let mut index = (y + y_index) * (surface_width as int) * 3 + (x + x_index) * 3;
+                    index += channel;
+
+                    if index < pixels.len() as int {
+                        pixels[index] = color_byte;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn draw_text(pixels: &mut [u8], surface_width: uint, mut x: int, y: int, string: &str) {
+    for uint::range(0, string.len()) |i| {
+        let glyph_index = (string[i] - 32) as uint;
+        if glyph_index < FONT_ADVANCES.len() {
+            draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
+            draw_glyph(pixels, surface_width, x, y, White, glyph_index);        // Main
+            x += FONT_ADVANCES[glyph_index] as int;
+        }
+    }
+}
+
+#[deriving_eq]
+enum StatusLineAnimation {
+    Idle,
+    Pausing(uint),
+    SlidingOut(uint),
+}
+
+struct StatusLineText {
+    string: ~str,
+    animation: StatusLineAnimation,
+}
+
+impl StatusLineText {
+    static fn new() -> StatusLineText {
+        StatusLineText { string: ~"", animation: Idle }
+    }
+
+    fn set(&mut self, string: ~str) {
+        self.string = string;
+        self.animation = Pausing(STATUS_LINE_PAUSE_DURATION);
+    }
+
+    fn tick(&mut self) {
+        self.animation = match self.animation {
+            Idle                      => Idle,
+            Pausing(0)                => SlidingOut(STATUS_LINE_Y),
+            Pausing(time)             => Pausing(time - 1),
+            SlidingOut(SCREEN_HEIGHT) => Idle,
+            SlidingOut(y)             => SlidingOut(y + 1),
+        }
+    }
+
+    fn render(&self, pixels: &mut [u8]) {
+        if self.animation == Idle {
+            return;
+        }
+        let y = match self.animation {
+            Idle => fail!(),
+            SlidingOut(y) => y as int,
+            Pausing(_) => STATUS_LINE_Y as int,
+        };
+        draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as int, y, self.string);
+    }
+}
+
+pub struct StatusLine {
+    text: StatusLineText,
+}
+
+impl StatusLine {
+    static pub fn new() -> StatusLine       { StatusLine { text: StatusLineText::new() } }
+    pub fn set(&mut self, new_text: ~str)   { self.text.set(new_text);                   }
+    pub fn render(&self, pixels: &mut [u8]) { self.text.render(pixels);                  }
+}
+
+//
 // Screen scaling
 //
 
@@ -150,6 +257,7 @@ impl Scale {
 pub struct Gfx {
     screen: ~Surface,
     scale: Scale,
+    status_line: StatusLine,
 }
 
 macro_rules! scaler(
@@ -205,10 +313,19 @@ impl Gfx {
                                            [ SWSurface ],
                                            []);
 
-        Gfx { screen: screen.unwrap(), scale: scale }
+        Gfx { screen: screen.unwrap(), scale: scale, status_line: StatusLine::new() }
     }
 
-    pub fn blit(&self, ppu_screen: &([u8 * 184320])) {
+    pub fn tick(&mut self) {
+        self.status_line.text.tick();
+    }
+
+    pub fn composite(&self, ppu_screen: &mut ([u8 * 184320])) {
+        self.status_line.render(*ppu_screen);
+        self.blit(ppu_screen);
+    }
+
+    fn blit(&self, ppu_screen: &([u8 * 184320])) {
         do self.screen.with_lock |pixels| {
             match self.scale {
                 Scale1x => scaler!(1, pixels, ppu_screen),

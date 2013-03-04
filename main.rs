@@ -97,7 +97,7 @@ fn start() {
     println("Loaded ROM:");
     println(rom.header.to_str());
 
-    let gfx = Gfx::new(options.scale);
+    let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
     do Mapper::with_mapper(rom) |mapper| {
@@ -122,14 +122,22 @@ fn start() {
             }
 
             if ppu_result.new_frame {
-                gfx.blit(cpu.mem.ppu.screen);
+                gfx.tick();
+                gfx.composite(cpu.mem.ppu.screen);
                 gfx.screen.flip();
                 record_fps(&mut last_time, &mut frames);
+
                 match cpu.mem.input.check_input() {
                     input::Continue => {}
                     input::Quit => break,
-                    input::SaveState => cpu.save(&Fd::open("state.sav", ForWriting)),
-                    input::LoadState => cpu.load(&Fd::open("state.sav", ForReading)),
+                    input::SaveState => {
+                        cpu.save(&Fd::open("state.sav", ForWriting));
+                        gfx.status_line.set(~"Saved state");
+                    }
+                    input::LoadState => {
+                        cpu.load(&Fd::open("state.sav", ForReading));
+                        gfx.status_line.set(~"Loaded state");
+                    }
                 }
             }
 
