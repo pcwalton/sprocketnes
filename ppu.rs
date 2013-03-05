@@ -650,7 +650,8 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
                     let pattern_color;
                     match sprite.tiles(self) {
-                        SpriteTiles8x8(tile) => {
+                        // TODO: 8x16 rendering
+                        SpriteTiles8x8(tile) | SpriteTiles8x16(tile, _) => {
                             let mut x = x - sprite.x;
                             if sprite.flip_horizontal() { x = 7 - x; }
 
@@ -661,9 +662,6 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
                             debug_assert(y < 8, "sprite Y miscalculation");
 
                             pattern_color = self.get_pattern_pixel(Sprite, tile, x, y);
-                        }
-                        SpriteTiles8x16(*) => {
-                            fail!(~"8x16 sprite rendering unimplemented");
                         }
                     }
 

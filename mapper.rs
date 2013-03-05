@@ -33,6 +33,13 @@ impl Mapper {
                     f(sxrom_ptr as &Mapper)
                 }
             }
+            4 => {
+                unsafe {
+                    let mut txrom = TxRom::new(rom);
+                    let txrom_ptr: &'static TxRom = transmute(&mut txrom);   // FIXME: Wat?
+                    f(txrom_ptr as &Mapper)
+                }
+            }
             _ => fail!(~"unsupported mapper")
         }
     }
@@ -210,5 +217,122 @@ impl Mapper for SxRom {
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
     fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr]       }
     fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr] = val }
+}
+
+//
+// Mapper 4 (TxROM/MMC3)
+//
+// See http://wiki.nesdev.com/w/index.php/MMC3
+//
+
+struct TxBankSelect(u8);
+
+enum TxPrgBankMode {
+    Swappable8000,
+    SwappableC000,
+}
+
+impl TxBankSelect {
+    fn bank_update_select(self) -> u8 { *self & 0x7 }
+    fn prg_bank_mode(self) -> TxPrgBankMode {
+        if (*self & 0x40) == 0 { Swappable8000 } else { SwappableC000 }
+    }
+}
+
+struct TxRegs {
+    bank_select: TxBankSelect,  // Bank select (0x8000-0x9ffe even)
+}
+
+struct TxRom {
+    rom: ~Rom,
+    regs: TxRegs,
+    prg_ram: ~([u8 * 8192]),
+
+    chr_banks_2k: [u8 * 2],     // 2KB CHR-ROM banks
+    chr_banks_1k: [u8 * 4],     // 1KB CHR-ROM banks
+    prg_banks:    [u8 * 2],     // 8KB PRG-ROM banks
+}
+
+impl TxRom {
+    static fn new(rom: ~Rom) -> TxRom {
+        TxRom {
+            rom: rom,
+            regs: TxRegs { bank_select: TxBankSelect(0) },
+            prg_ram: ~([ 0, ..8192 ]),
+
+            chr_banks_2k: [ 0, 0 ],
+            chr_banks_1k: [ 0, 0, 0, 0 ],
+            prg_banks: [ 0, 0 ],
+        }
+    }
+
+    fn prg_bank_count(&self) -> u8 { self.rom.header.prg_rom_size * 2 }
+}
+
+impl Mapper for TxRom {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
+        unsafe {
+            if addr < 0x6000 {
+                0
+            } else if addr < 0x8000 {
+                self.prg_ram[addr & 0x1fff]
+            } else if addr < 0xa000 {
+                // $8000-$9FFF might be switchable or fixed to the second to last bank.
+                let bank = match self.regs.bank_select.prg_bank_mode() {
+                    Swappable8000 => self.prg_banks[0],
+                    SwappableC000 => self.prg_bank_count() - 2,
+                };
+                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            } else if addr < 0xc000 {
+                // $A000-$BFFF is switchable.
+                self.rom.prg[(self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff)]
+            } else if addr < 0xe000 {
+                // $C000-$DFFF might be switchable or fixed to the second to last bank.
+                let bank = match self.regs.bank_select.prg_bank_mode() {
+                    Swappable8000 => self.prg_bank_count() - 2,
+                    SwappableC000 => self.prg_banks[0],
+                };
+                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            } else {
+                // $E000-$FFFF is fixed to the last bank.
+                let bank = self.prg_bank_count() - 1;
+                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            }
+        }
+    }
+
+    fn prg_storeb(&mut self, addr: u16, val: u8) {
+        if addr < 0x6000 {
+            return;
+        }
+
+        if addr < 0x8000 {
+            self.prg_ram[addr & 0x1fff] = val;
+        } else if addr < 0xa000 {
+            if (addr & 1) == 0 {
+                // Bank select.
+                self.regs.bank_select = TxBankSelect(val);
+            } else {
+                // Bank data.
+                let bank_update_select = self.regs.bank_select.bank_update_select();
+                match bank_update_select {
+                    0..1 => self.chr_banks_2k[bank_update_select] = val,
+                    2..5 => self.chr_banks_1k[bank_update_select - 2] = val,
+                    6..7 => self.prg_banks[bank_update_select - 6] = val,
+                    _ => fail!()
+                }
+            }
+        } else {
+            // TODO: IRQ
+        }
+    }
+
+    fn chr_loadb(&mut self, addr: u16) -> u8 {
+        // TODO: Banking
+        self.rom.chr[addr]
+    }
+    fn chr_storeb(&mut self, _: u16, _: u8) {
+        // TODO: CHR-RAM
+    }
 }
 
