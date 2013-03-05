@@ -248,6 +248,7 @@ impl TxBankSelect {
     fn prg_bank_mode(self) -> TxPrgBankMode {
         if (*self & 0x40) == 0 { Swappable8000 } else { SwappableC000 }
     }
+    fn chr_a12_inversion(self) -> bool { (*self & 0x80) != 0 }
 }
 
 struct TxRegs {
@@ -358,9 +359,22 @@ impl Mapper for TxRom {
     }
 
     fn chr_loadb(&mut self, addr: u16) -> u8 {
-        // TODO: Banking
-        self.rom.chr[addr]
+        let (bank, two_kb) = match (addr, self.regs.bank_select.chr_a12_inversion()) {
+            (0x0000..0x07ff, false) | (0x1000..0x17ff, true) => (self.chr_banks_2k[0], true),
+            (0x0800..0x0fff, false) | (0x1800..0x1fff, true) => (self.chr_banks_2k[1], true),
+            (0x1000..0x13ff, false) | (0x0000..0x03ff, true) => (self.chr_banks_1k[0], false),
+            (0x1400..0x17ff, false) | (0x0400..0x07ff, true) => (self.chr_banks_1k[1], false),
+            (0x1800..0x1bff, false) | (0x0800..0x0bff, true) => (self.chr_banks_1k[2], false),
+            (0x1c00..0x1fff, false) | (0x0c00..0x0fff, true) => (self.chr_banks_1k[3], false),
+            _ => return 0,
+        };
+        if two_kb {
+            self.rom.chr[(bank as uint * 1024) + (addr as uint & 0x7ff)]
+        } else {
+            self.rom.chr[(bank as uint * 1024) | (addr as uint & 0x3ff)]
+        }
     }
+
     fn chr_storeb(&mut self, _: u16, _: u8) {
         // TODO: CHR-RAM
     }
