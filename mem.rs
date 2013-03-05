@@ -65,14 +65,14 @@ impl Save for Ram {
 
 pub struct MemMap {
     ram: Ram,
-    ppu: Ppu<Vram,Oam>,
+    ppu: Ppu,
     input: Input,
     mapper: (*c_void, *c_void),
     apu: Apu,
 }
 
 impl MemMap {
-    static fn new(ppu: Ppu<Vram,Oam>, input: Input, mapper: &Mapper, apu: Apu) -> MemMap {
+    static fn new(ppu: Ppu, input: Input, mapper: &Mapper, apu: Apu) -> MemMap {
         // FIXME: Need the &mut self notational change to get rid of the unsafe pointer here.
         unsafe {
             MemMap {
@@ -96,7 +96,7 @@ impl Mem for MemMap {
             self.input.loadb(addr)
         } else if addr <= 0x4018 {
             self.apu.loadb(addr)
-        } else if addr < 0x8000 {
+        } else if addr < 0x6000 {
             0   // FIXME: I think some mappers use regs in this area?
         } else {
             unsafe {
@@ -114,7 +114,7 @@ impl Mem for MemMap {
             self.input.storeb(addr, val)
         } else if addr <= 0x4018 {
             self.apu.storeb(addr, val)
-        } else if addr < 0x8000 {
+        } else if addr < 0x6000 {
             // Nothing. FIXME: I think some mappers use regs in this area?
         } else {
             unsafe {

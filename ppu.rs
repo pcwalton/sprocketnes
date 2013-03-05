@@ -4,7 +4,7 @@
 // Author: Patrick Walton
 //
 
-use mapper::Mapper;
+use mapper::{Irq, Mapper};
 use mem::Mem;
 use util::{Fd, Save, debug_assert, println};
 
@@ -257,7 +257,7 @@ enum SpriteTiles {
 }
 
 impl Sprite {
-    fn tiles<VM,OM>(&self, ppu: &Ppu<VM,OM>) -> SpriteTiles {
+    fn tiles(&self, ppu: &Ppu) -> SpriteTiles {
         let base = ppu.regs.ctrl.sprite_pattern_table_addr();
         match ppu.regs.ctrl.sprite_size() {
             SpriteSize8x8 => SpriteTiles8x8(self.tile_index_byte as u16 | base),
@@ -281,7 +281,7 @@ impl Sprite {
     }
 
     // Quick test to see whether this sprite is on the given scanline.
-    fn on_scanline<VM,OM>(&self, ppu: &Ppu<VM,OM>, y: u8) -> bool {
+    fn on_scanline(&self, ppu: &Ppu, y: u8) -> bool {
         if y < self.y { return false; }
         match ppu.regs.ctrl.sprite_size() {
             SpriteSize8x8 => y < self.y + 8,
@@ -290,17 +290,17 @@ impl Sprite {
     }
 
     // Quick test to see whether the given point is in the bounding box of this sprite.
-    fn in_bounding_box<VM,OM>(&self, ppu: &Ppu<VM,OM>, x: u8, y: u8) -> bool {
+    fn in_bounding_box(&self, ppu: &Ppu, x: u8, y: u8) -> bool {
         x >= self.x && x < self.x + 8 && self.on_scanline(ppu, y)
     }
 }
 
 // The main PPU structure. This structure is separate from the PPU memory just as the CPU is.
 
-pub struct Ppu<VM,OM> {
+pub struct Ppu {
     regs: Regs,
-    vram: VM,
-    oam: OM,
+    vram: Vram,
+    oam: Oam,
 
     screen: ~([u8 * 184320]),  // 256 * 240 * 3
     scanline: u16,
@@ -314,7 +314,7 @@ pub struct Ppu<VM,OM> {
     cy: u64
 }
 
-impl<VM:Mem,OM:Mem> Mem for Ppu<VM,OM> {
+impl Mem for Ppu {
     // Performs a load of the PPU register at the given CPU address.
     fn loadb(&mut self, addr: u16) -> u8 {
         debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
@@ -352,6 +352,7 @@ impl<VM:Mem,OM:Mem> Mem for Ppu<VM,OM> {
 pub struct StepResult {
     new_frame: bool,    // We wrapped around to the next scanline.
     vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
+    scanline_irq: bool, // The mapper wants to execute a scanline IRQ.
 }
 
 struct Rgb {
@@ -381,7 +382,7 @@ enum SpritePriority {
     BelowBg,
 }
 
-impl<VM:Mem + Save,OM:Mem + Save> Save for Ppu<VM,OM> {
+impl Save for Ppu {
     fn save(&mut self, fd: &Fd) {
         self.regs.save(fd);
         self.vram.save(fd);
@@ -404,8 +405,8 @@ impl<VM:Mem + Save,OM:Mem + Save> Save for Ppu<VM,OM> {
     }
 }
 
-impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
-    static fn new(vram: VM, oam: OM) -> Ppu<VM,OM> {
+impl Ppu {
+    static fn new(vram: Vram, oam: Oam) -> Ppu {
         Ppu {
             regs: Regs {
                 ctrl: PpuCtrl(0),
@@ -557,7 +558,7 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&mut Ppu<VM,OM>, &Sprite, u8) -> bool) {
+    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) {
         for range(0, 64) |i| {
             let sprite = self.make_sprite_info(i as u16);
             if !f(self, &sprite, i as u8) {
@@ -752,7 +753,7 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
 
     #[inline(never)]
     pub fn step(&mut self, run_to_cycle: u64) -> StepResult {
-        let mut result = StepResult { new_frame: false, vblank_nmi: false };
+        let mut result = StepResult { new_frame: false, vblank_nmi: false, scanline_irq: false };
         loop {
             let next_scanline_cycle: u64 = self.cy + CYCLES_PER_SCANLINE;
             if next_scanline_cycle > run_to_cycle {
@@ -764,6 +765,14 @@ impl<VM:Mem,OM:Mem> Ppu<VM,OM> {
             }
 
             self.scanline += 1;
+
+            unsafe {
+                let mut mapper: &Mapper = transmute(self.vram.mapper);
+                if mapper.next_scanline() == Irq {
+                    result.scanline_irq = true;
+                }
+            }
+
             if self.scanline == (VBLANK_SCANLINE as u16) {
                 self.start_vblank(&mut result);
             } else if self.scanline == (LAST_SCANLINE as u16) { 

@@ -11,6 +11,7 @@ use gfx::{Gfx, Scale, Scale1x, Scale2x, Scale3x};
 use input::Input;
 use input;
 use mapper::Mapper;
+use mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
@@ -119,6 +120,8 @@ fn start() {
             let ppu_result = cpu.mem.ppu.step(cpu.cy);
             if ppu_result.vblank_nmi {
                 cpu.nmi();
+            } else if ppu_result.scanline_irq {
+                cpu.irq();
             }
 
             if ppu_result.new_frame {

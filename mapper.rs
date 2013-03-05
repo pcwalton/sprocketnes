@@ -6,14 +6,22 @@
 
 use mem::Mem;
 use rom::Rom;
+use util;
 
 use core::cast::transmute;
+
+#[deriving_eq]
+pub enum MapperResult {
+    Continue,
+    Irq,
+}
 
 pub trait Mapper {
     fn prg_loadb(&mut self, addr: u16) -> u8;
     fn prg_storeb(&mut self, addr: u16, val: u8);
     fn chr_loadb(&mut self, addr: u16) -> u8;
     fn chr_storeb(&mut self, addr: u16, val: u8);
+    fn next_scanline(&mut self) -> MapperResult;
 }
 
 impl Mapper {
@@ -69,6 +77,7 @@ impl Mapper for Nrom {
     fn prg_storeb(&mut self, _: u16, _: u8) {}  // Can't store to PRG-ROM.
     fn chr_loadb(&mut self, addr: u16) -> u8 { self.rom.chr[addr] }
     fn chr_storeb(&mut self, _: u16, _: u8) {}  // Can't store to CHR-ROM.
+    fn next_scanline(&mut self) -> MapperResult { Continue }
 }
 
 //
@@ -217,6 +226,8 @@ impl Mapper for SxRom {
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
     fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr]       }
     fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr] = val }
+
+    fn next_scanline(&mut self) -> MapperResult { Continue }
 }
 
 //
@@ -251,6 +262,10 @@ struct TxRom {
     chr_banks_2k: [u8 * 2],     // 2KB CHR-ROM banks
     chr_banks_1k: [u8 * 4],     // 1KB CHR-ROM banks
     prg_banks:    [u8 * 2],     // 8KB PRG-ROM banks
+
+    scanline_counter: u8,
+    irq_reload: u8,             // Copied into the scanline counter when it hits zero.
+    irq_enabled: bool,
 }
 
 impl TxRom {
@@ -263,6 +278,10 @@ impl TxRom {
             chr_banks_2k: [ 0, 0 ],
             chr_banks_1k: [ 0, 0, 0, 0 ],
             prg_banks: [ 0, 0 ],
+
+            scanline_counter: 0,
+            irq_reload: 0,
+            irq_enabled: false,
         }
     }
 
@@ -322,8 +341,19 @@ impl Mapper for TxRom {
                     _ => fail!()
                 }
             }
+        } else if addr < 0xc000 {
+            // TODO: Mirroring and PRG-RAM protect
+        } else if addr < 0xe000 {
+            if (addr & 1) == 0 {
+                // IRQ latch.
+                self.irq_reload = val;
+            } else {
+                // IRQ reload.
+                self.scanline_counter = self.irq_reload;
+            }
         } else {
-            // TODO: IRQ
+            // IRQ enable.
+            self.irq_enabled = (addr & 1) == 1;
         }
     }
 
@@ -333,6 +363,21 @@ impl Mapper for TxRom {
     }
     fn chr_storeb(&mut self, _: u16, _: u8) {
         // TODO: CHR-RAM
+    }
+
+    fn next_scanline(&mut self) -> MapperResult {
+        if self.scanline_counter != 0 {
+            self.scanline_counter -= 1;
+            if self.scanline_counter == 0 {
+                self.scanline_counter = self.irq_reload;
+
+                if self.irq_enabled {
+                    util::debug_print("*** Generated IRQ! ***");
+                    return Irq;
+                }
+            }
+        }
+        Continue
     }
 }
 

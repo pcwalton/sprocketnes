@@ -719,6 +719,16 @@ impl<M:Mem> Cpu<M> {
         self.regs.pc = self.loadw(NMI_VECTOR);
     }
 
+    pub fn irq(&mut self) {
+        if self.get_flag(IRQ_FLAG) {
+            return;
+        }
+
+        self.pushw(self.regs.pc);
+        self.pushb(self.regs.flags);
+        self.regs.pc = self.loadw(BRK_VECTOR);
+    }
+
     /// The constructor.
     static pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
 }
