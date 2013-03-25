@@ -37,8 +37,8 @@ pub struct Resampler {
 }
 
 impl Resampler {
-    static pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
-                   -> Result<Resampler,c_int> {
+    pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
+            -> Result<Resampler,c_int> {
         unsafe {
             let mut err = 0;
             let speex_resampler = speex_resampler_init(channels,
@@ -56,8 +56,8 @@ impl Resampler {
 
     pub fn process(&self, channel_index: u32, in: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
-            assert in.len() <= 0xffffffff;
-            assert out.len() / 2 <= 0xffffffff;
+            fail_unless!(in.len() <= 0xffffffff);
+            fail_unless!(out.len() / 2 <= 0xffffffff);
             let mut (in_len, out_len) = (in.len() as u32, out.len() as u32 / 2);
             let err = speex_resampler_process_int(self.speex_resampler,
                                                   channel_index,
@@ -65,7 +65,7 @@ impl Resampler {
                                                   &mut in_len,
                                                   transmute(&out[0]),
                                                   &mut out_len);
-            assert err == 0;
+            fail_unless!(err == 0);
             (in_len, out_len)
         }
     }

@@ -6,21 +6,20 @@
 
 use core::cast::transmute;
 use core::int;
-use core::uint::range;
 use sdl::sdl::{InitAudio, InitTimer, InitVideo};
 use sdl::sdl;
 use sdl::video::{AsyncBlit, SWSurface, Surface};
 use sdl::video;
 
-const SCREEN_WIDTH: uint = 256;
-const SCREEN_HEIGHT: uint = 240;
+static SCREEN_WIDTH: uint = 256;
+static SCREEN_HEIGHT: uint = 240;
 
-const FONT_HEIGHT: uint = 10;
+static FONT_HEIGHT: uint = 10;
 
-const STATUS_LINE_PADDING: uint = 6;
-const STATUS_LINE_X: uint = STATUS_LINE_PADDING;
-const STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
-const STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
+static STATUS_LINE_PADDING: uint = 6;
+static STATUS_LINE_X: uint = STATUS_LINE_PADDING;
+static STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
+static STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
 
 //
 // PT Ronda Seven
@@ -28,7 +27,7 @@ const STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a 
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-const FONT_GLYPHS: [u8 * 950] = [
+static FONT_GLYPHS: [u8, ..95 * 10] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -126,7 +125,7 @@ const FONT_GLYPHS: [u8 * 950] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-const FONT_ADVANCES: [u8 * 95] = [
+static FONT_ADVANCES: [u8, ..95] = [
     3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */, 
     4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */, 
     6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */, 
@@ -185,7 +184,7 @@ pub fn draw_text(pixels: &mut [u8], surface_width: uint, mut x: int, y: int, str
     }
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 enum StatusLineAnimation {
     Idle,
     Pausing(uint),
@@ -198,7 +197,7 @@ struct StatusLineText {
 }
 
 impl StatusLineText {
-    static fn new() -> StatusLineText {
+    fn new() -> StatusLineText {
         StatusLineText { string: ~"", animation: Idle }
     }
 
@@ -235,7 +234,7 @@ pub struct StatusLine {
 }
 
 impl StatusLine {
-    static pub fn new() -> StatusLine       { StatusLine { text: StatusLineText::new() } }
+    pub fn new() -> StatusLine       { StatusLine { text: StatusLineText::new() } }
     pub fn set(&mut self, new_text: ~str)   { self.text.set(new_text);                   }
     pub fn render(&self, pixels: &mut [u8]) { self.text.render(pixels);                  }
 }
@@ -305,7 +304,7 @@ macro_rules! scaler(
 //
 
 impl Gfx {
-    static pub fn new(scale: Scale) -> Gfx {
+    pub fn new(scale: Scale) -> Gfx {
         sdl::init([ InitVideo, InitAudio, InitTimer ]);
         let screen = video::set_video_mode(SCREEN_WIDTH * scale.factor() as int,
                                            SCREEN_HEIGHT * scale.factor()  as int,
@@ -320,12 +319,12 @@ impl Gfx {
         self.status_line.text.tick();
     }
 
-    pub fn composite(&self, ppu_screen: &mut ([u8 * 184320])) {
+    pub fn composite(&self, ppu_screen: &mut ([u8, ..184320])) {
         self.status_line.render(*ppu_screen);
         self.blit(ppu_screen);
     }
 
-    fn blit(&self, ppu_screen: &([u8 * 184320])) {
+    fn blit(&self, ppu_screen: &([u8, ..184320])) {
         do self.screen.with_lock |pixels| {
             match self.scale {
                 Scale1x => scaler!(1, pixels, ppu_screen),

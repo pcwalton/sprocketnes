@@ -16,13 +16,13 @@ use core::uint::range;
 // Constants
 //
 
-pub const SCREEN_WIDTH: uint = 256;
-pub const SCREEN_HEIGHT: uint = 240;
-pub const CYCLES_PER_SCANLINE: u64 = 114;   // 29781 cycles per frame, 261 scanlines
-pub const VBLANK_SCANLINE: uint = 241;
-pub const LAST_SCANLINE: uint = 261;
+pub static SCREEN_WIDTH: uint = 256;
+pub static SCREEN_HEIGHT: uint = 240;
+pub static CYCLES_PER_SCANLINE: u64 = 114;   // 29781 cycles per frame, 261 scanlines
+pub static VBLANK_SCANLINE: uint = 241;
+pub static LAST_SCANLINE: uint = 261;
 
-const PALETTE: [u8 * 192] = [
+static PALETTE: [u8, ..192] = [
     124,124,124,    0,0,252,        0,0,188,        68,40,188,
     148,0,132,      168,0,32,       168,16,0,       136,20,0,
     80,48,0,        0,120,0,        0,104,0,        0,88,0,
@@ -156,12 +156,12 @@ save_enum!(PpuAddrByte { Hi, Lo })
 
 pub struct Vram {
     mapper: (*c_void, *c_void),
-    nametables: [u8 * 0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
-    palette: [u8 * 0x20],
+    nametables: [u8, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
+    palette: [u8, ..0x20],
 }
 
 impl Vram {
-    static fn new(mapper: &Mapper) -> Vram {
+    pub fn new(mapper: &Mapper) -> Vram {
         // FIXME: Need to fix &mut self notational problem to eliminate this unsafeness.
         unsafe {
             Vram {
@@ -224,11 +224,11 @@ impl Save for Vram {
 //
 
 pub struct Oam {
-    oam: [u8 * 0x100]
+    oam: [u8, ..0x100]
 }
 
 impl Oam {
-    static fn new() -> Oam {
+    pub fn new() -> Oam {
         Oam { oam: [ 0, ..0x100 ] }
     }
 }
@@ -302,7 +302,7 @@ pub struct Ppu {
     vram: Vram,
     oam: Oam,
 
-    screen: ~([u8 * 184320]),  // 256 * 240 * 3
+    screen: ~([u8, ..184320]),  // 256 * 240 * 3
     scanline: u16,
     ppudata_buffer: u8,
 
@@ -348,7 +348,7 @@ impl Mem for Ppu {
     }
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub struct StepResult {
     new_frame: bool,    // We wrapped around to the next scanline.
     vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
@@ -406,7 +406,7 @@ impl Save for Ppu {
 }
 
 impl Ppu {
-    static fn new(vram: Vram, oam: Oam) -> Ppu {
+    pub fn new(vram: Vram, oam: Oam) -> Ppu {
         Ppu {
             regs: Regs {
                 ctrl: PpuCtrl(0),
@@ -634,7 +634,7 @@ impl Ppu {
     }
 
     fn get_sprite_pixel(&mut self,
-                        visible_sprites: &[Option<u8> * 8],
+                        visible_sprites: &[Option<u8>, ..8],
                         x: u8,
                         background_opaque: bool)
                      -> Option<SpriteColor> {
@@ -689,7 +689,7 @@ impl Ppu {
         return None;
     }
 
-    fn compute_visible_sprites(&mut self) -> [Option<u8> * 8] {
+    fn compute_visible_sprites(&mut self) -> [Option<u8>, ..8] {
         let mut count = 0;
         let mut result = [None, ..8];
         for self.each_sprite |this, sprite, index| {

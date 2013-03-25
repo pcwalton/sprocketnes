@@ -15,7 +15,7 @@ pub struct Rom {
 }
 
 impl Rom {
-    static fn from_fd(fd: Fd) -> Rom {
+    fn from_fd(fd: Fd) -> Rom {
         let mut buffer = [ 0, ..16 ];
         fd.read(buffer);
 
@@ -31,7 +31,7 @@ impl Rom {
             zero: [ 0, ..5 ]
         };
 
-        assert header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ];
+        fail_unless!(header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ]);
 
         let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0);
         fd.read(prg_rom);
@@ -41,11 +41,11 @@ impl Rom {
         Rom { header: header, prg: prg_rom, chr: chr_rom }
     }
 
-    static fn from_path(path: &str) -> Rom { Rom::from_fd(Fd::open(path, ForReading)) }
+    pub fn from_path(path: &str) -> Rom { Rom::from_fd(Fd::open(path, ForReading)) }
 }
 
 struct INesHeader {
-    magic: [u8 * 4],    // 'N' 'E' 'S' '\x1a'
+    magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
     prg_rom_size: u8,   // number of 16K units of PRG-ROM
     chr_rom_size: u8,   // number of 8K units of CHR-ROM
     flags_6: u8,
@@ -53,19 +53,21 @@ struct INesHeader {
     prg_ram_size: u8,   // number of 8K units of PRG-RAM
     flags_9: u8,
     flags_10: u8,
-    zero: [u8 * 5],     // always zero
+    zero: [u8, ..5],    // always zero
 }
 
 impl INesHeader {
     pub fn mapper(&self) -> u8 { (self.flags_7 & 0xf0) | (self.flags_6 >> 4) }
+    pub fn ines_mapper(&self) -> u8 { self.flags_6 >> 4 }
     pub fn trainer(&self) -> bool { (self.flags_6 & 0x04) != 0 }
 
     pub fn to_str(&self) -> ~str {
         fmt!(
-            "PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d\nTrainer: %s",
+            "PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d/%d\nTrainer: %s",
             self.prg_rom_size as int,
             self.chr_rom_size as int,
             self.mapper() as int,
+            self.ines_mapper() as int,
             if self.trainer() { "Yes" } else { "No" }
         )
     }

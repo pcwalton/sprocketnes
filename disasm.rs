@@ -6,8 +6,6 @@
 
 use mem::Mem;
 
-use core::uint;
-
 pub struct Disassembler<M> {
     pc: u16,
     mem: *mut M

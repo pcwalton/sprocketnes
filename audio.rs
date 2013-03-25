@@ -16,7 +16,7 @@ use sdl::audio;
 //
 
 pub struct OutputBuffer {
-    samples: [u8 * 8820], // 4410 * 10 * 2
+    samples: [u8, ..4410 * 2],
     play_offset: uint,
 }
 
@@ -49,7 +49,7 @@ pub fn open() -> *mut OutputBuffer {
         samples: 4410,
         callback: |samples| unsafe { audio_callback(samples, transmute(output_buffer_ptr)) },
     };
-    assert audio::open(spec).is_ok();
+    fail_unless!(audio::open(spec).is_ok());
     audio::pause(false);
 
     unsafe {

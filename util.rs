@@ -29,7 +29,7 @@ impl Drop for Fd {
 }
 
 impl Fd {
-    static pub fn open(path: &str, mode: OpenMode) -> Fd {
+    pub fn open(path: &str, mode: OpenMode) -> Fd {
         unsafe {
             let fd_mode = match mode {
                 ForReading => O_RDONLY,
@@ -123,7 +123,7 @@ impl Save for u64 {
     }
 }
 
-impl Save for &mut [u8] {
+impl<'self> Save for &'self mut [u8] {
     fn save(&mut self, fd: &Fd) {
         // FIXME: Unsafe due to stupid borrow check bug.
         unsafe {
@@ -137,7 +137,7 @@ impl Save for &mut [u8] {
 impl Save for bool {
     fn save(&mut self, fd: &Fd) { fd.write([ if *self { 0 } else { 1 } ]) }
     fn load(&mut self, fd: &Fd) {
-        let mut val: [u8 * 1] = [ 0 ];
+        let mut val: [u8, ..1] = [ 0 ];
         fd.read(val);
         *self = val[0] != 0
     }
@@ -185,7 +185,7 @@ pub struct Xorshift {
 }
 
 impl Xorshift {
-    static pub fn new() -> Xorshift {
+    pub fn new() -> Xorshift {
         Xorshift { x: 123456789, y: 362436069, z: 521288629, w: 88675123 }
     }
 

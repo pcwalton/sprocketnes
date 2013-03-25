@@ -8,35 +8,33 @@ use audio::OutputBuffer;
 use mem::Mem;
 use speex::Resampler;
 use util::{Fd, Save, Xorshift};
-use util;
 
 use core::cast::{forget, transmute};
 use core::libc::c_int;
-use core::vec::each_mut;
 use sdl::audio;
 
-const CYCLES_PER_EVEN_TICK: u64 = 7438;
-const CYCLES_PER_ODD_TICK: u64 = 7439;
+static CYCLES_PER_EVEN_TICK: u64 = 7438;
+static CYCLES_PER_ODD_TICK: u64 = 7439;
 
-const NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
-const OUTPUT_SAMPLE_RATE: u32 = 44100;
-const TICK_FREQUENCY: u32 = 240;
-const NES_SAMPLES_PER_TICK: u32 = NES_SAMPLE_RATE / TICK_FREQUENCY;
+static NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
+static OUTPUT_SAMPLE_RATE: u32 = 44100;
+static TICK_FREQUENCY: u32 = 240;
+static NES_SAMPLES_PER_TICK: u32 = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
-const PULSE_WAVEFORMS: [u8 * 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
+static PULSE_WAVEFORMS: [u8, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
-const LENGTH_COUNTERS: [u8 * 32] = [
+static LENGTH_COUNTERS: [u8, ..32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-const TRIANGLE_WAVEFORM: [u8 * 32] = [
+static TRIANGLE_WAVEFORM: [u8, ..32] = [
     15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 ];
 
 // TODO: PAL
-const NOISE_PERIODS: [u16 * 16] = [
+static NOISE_PERIODS: [u16, ..16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 ];
 
@@ -60,7 +58,7 @@ struct ApuLength {
 save_struct!(ApuLength { disable, id, remaining })
 
 impl ApuLength {
-    static fn new() -> ApuLength { ApuLength { disable: false, id: 0, remaining: 0 } }
+    fn new() -> ApuLength { ApuLength { disable: false, id: 0, remaining: 0 } }
 
     // Channels that support the APU Length follow the same register protocol, *except* that the
     // disable bit may be different.
@@ -99,7 +97,7 @@ struct ApuEnvelope {
 save_struct!(ApuEnvelope { enabled, volume, period, counter, length })
 
 impl ApuEnvelope {
-    static fn new() -> ApuEnvelope {
+    fn new() -> ApuEnvelope {
         ApuEnvelope { enabled: false, volume: 0, period: 0, counter: 0, length: ApuLength::new() }
     }
 
@@ -156,7 +154,7 @@ struct ApuTimer {
 save_struct!(ApuTimer { value, wavelen_count })
 
 impl ApuTimer {
-    static fn new() -> ApuTimer { ApuTimer { value: 0, wavelen_count: 0 } }
+    fn new() -> ApuTimer { ApuTimer { value: 0, wavelen_count: 0 } }
 
     // Channels that support the APU Envelope follow the same register protocol.
     fn storeb(&mut self, addr: u16, val: u8) {
@@ -216,7 +214,7 @@ struct ApuTriangle {
 save_struct!(ApuTriangle { timer, length, linear_counter })
 
 impl ApuTriangle {
-    static fn new() -> ApuTriangle {
+    fn new() -> ApuTriangle {
         ApuTriangle {
             timer: ApuTimer::new(),
             length: ApuLength::new(),
@@ -268,7 +266,7 @@ struct ApuNoise {
 save_struct!(ApuNoise { envelope, timer, timer_count })
 
 impl ApuNoise {
-    static fn new() -> ApuNoise {
+    fn new() -> ApuNoise {
         ApuNoise { envelope: ApuEnvelope::new(), timer: 0, timer_count: 0, rng: Xorshift::new() }
     }
 }
@@ -290,7 +288,7 @@ impl ApuStatus {
 //
 
 struct Regs {
-    pulses: [ApuPulse * 2],
+    pulses: [ApuPulse, ..2],
     triangle: ApuTriangle,
     noise: ApuNoise,
     status: ApuStatus,  // $4015: APUSTATUS
@@ -318,7 +316,7 @@ impl Save for Regs {
 //
 
 struct SampleBuffer {
-    samples: [i16 * 178992],
+    samples: [i16, ..178992],
 }
 
 //
@@ -328,7 +326,7 @@ struct SampleBuffer {
 pub struct Apu {
     regs: Regs,
 
-    sample_buffers: ~([SampleBuffer * 5]),
+    sample_buffers: ~([SampleBuffer, ..5]),
     sample_buffer_offset: uint,
     output_buffer: *mut OutputBuffer,
     resampler: Resampler,
@@ -359,7 +357,7 @@ impl Mem for Apu {
 }
 
 impl Apu {
-    static pub fn new(output_buffer: *mut OutputBuffer) -> Apu {
+    pub fn new(output_buffer: *mut OutputBuffer) -> Apu {
         Apu {
             regs: Regs {
                 pulses: [
@@ -509,8 +507,8 @@ impl Apu {
     // Channel playback
     //
 
-    static fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [i16], offset: uint, audible: bool)
-                                         -> Option<&'a mut [i16]> {
+    fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [i16], offset: uint, audible: bool)
+                                  -> Option<&'a mut [i16]> {
         let mut buffer = vec::mut_slice(buffer, offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);

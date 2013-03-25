@@ -4,13 +4,12 @@
 // Author: Patrick Walton
 //
 
-use mem::Mem;
 use rom::Rom;
 use util;
 
 use core::cast::transmute;
 
-#[deriving_eq]
+#[deriving(Eq)]
 pub enum MapperResult {
     Continue,
     Irq,
@@ -25,19 +24,19 @@ pub trait Mapper {
 }
 
 impl Mapper {
-    static fn with_mapper<R>(rom: ~Rom, f: &fn(&Mapper) -> R) -> R {
-        match rom.header.mapper() {
+    pub fn with_mapper<R>(rom: ~Rom, f: &fn(&Mapper) -> R) -> R {
+        match rom.header.ines_mapper() {
             0 => {
                 unsafe {
                     let mut nrom = Nrom { rom: rom };
-                    let mut nrom_ptr: &static/Nrom = transmute(&mut nrom);  // FIXME: Wat?
+                    let mut nrom_ptr: &'static Nrom = transmute(&mut nrom);  // FIXME: Wat?
                     f(nrom_ptr as &Mapper)
                 }
             },
             1 => {
                 unsafe {
                     let mut sxrom = SxRom::new(rom);
-                    let sxrom_ptr: &static/SxRom = transmute(&mut sxrom);   // FIXME: Wat?
+                    let sxrom_ptr: &'static SxRom = transmute(&mut sxrom);   // FIXME: Wat?
                     f(sxrom_ptr as &Mapper)
                 }
             }
@@ -143,12 +142,12 @@ pub struct SxRom {
     accum: u8,
     // The write count. At the 5th write, we update the register.
     write_count: u8,
-    prg_ram: ~([u8 * 8192]),
-    chr_ram: ~([u8 * 8192]),
+    prg_ram: ~([u8, ..8192]),
+    chr_ram: ~([u8, ..8192]),
 }
 
 impl SxRom {
-    static fn new(rom: ~Rom) -> SxRom {
+    fn new(rom: ~Rom) -> SxRom {
         SxRom {
             rom: rom,
             regs: SxRegs {
@@ -258,11 +257,11 @@ struct TxRegs {
 struct TxRom {
     rom: ~Rom,
     regs: TxRegs,
-    prg_ram: ~([u8 * 8192]),
+    prg_ram: ~([u8, ..8192]),
 
-    chr_banks_2k: [u8 * 2],     // 2KB CHR-ROM banks
-    chr_banks_1k: [u8 * 4],     // 1KB CHR-ROM banks
-    prg_banks:    [u8 * 2],     // 8KB PRG-ROM banks
+    chr_banks_2k: [u8, ..2],    // 2KB CHR-ROM banks
+    chr_banks_1k: [u8, ..4],    // 1KB CHR-ROM banks
+    prg_banks:    [u8, ..2],    // 8KB PRG-ROM banks
 
     scanline_counter: u8,
     irq_reload: u8,             // Copied into the scanline counter when it hits zero.
@@ -270,7 +269,7 @@ struct TxRom {
 }
 
 impl TxRom {
-    static fn new(rom: ~Rom) -> TxRom {
+    fn new(rom: ~Rom) -> TxRom {
         TxRom {
             rom: rom,
             regs: TxRegs { bank_select: TxBankSelect(0) },

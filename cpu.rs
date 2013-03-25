@@ -4,7 +4,6 @@
 // Author: Patrick Walton
 //
 
-use disasm::Disassembler;
 use mem::{Mem, MemUtil};
 use util::{Fd, Save, println};
 
@@ -14,23 +13,23 @@ use core::uint::range;
 // Constants
 //
 
-const CARRY_FLAG:    u8 = 1 << 0;
-const ZERO_FLAG:     u8 = 1 << 1;
-const IRQ_FLAG:      u8 = 1 << 2;
-const DECIMAL_FLAG:  u8 = 1 << 3;
-const BREAK_FLAG:    u8 = 1 << 4;
-const OVERFLOW_FLAG: u8 = 1 << 6;
-const NEGATIVE_FLAG: u8 = 1 << 7;
+static CARRY_FLAG:    u8 = 1 << 0;
+static ZERO_FLAG:     u8 = 1 << 1;
+static IRQ_FLAG:      u8 = 1 << 2;
+static DECIMAL_FLAG:  u8 = 1 << 3;
+static BREAK_FLAG:    u8 = 1 << 4;
+static OVERFLOW_FLAG: u8 = 1 << 6;
+static NEGATIVE_FLAG: u8 = 1 << 7;
 
-const NMI_VECTOR:   u16 = 0xfffa; 
-const RESET_VECTOR: u16 = 0xfffc; 
-const BRK_VECTOR:   u16 = 0xfffe;
+static NMI_VECTOR:   u16 = 0xfffa; 
+static RESET_VECTOR: u16 = 0xfffc; 
+static BRK_VECTOR:   u16 = 0xfffe;
 
 /// The number of cycles that each machine operation takes. Indexed by opcode number.
 ///
 /// FIXME: This is copied from FCEU.
 
-const CYCLE_TABLE: [u8 * 256] = [
+static CYCLE_TABLE: [u8, ..256] = [
     /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
     /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
     /*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
@@ -65,7 +64,7 @@ struct Regs {
 save_struct!(Regs { a, x, y, s, flags, pc })
 
 impl Regs {
-    static fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
+    fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
 }
 
 //
@@ -730,6 +729,6 @@ impl<M:Mem> Cpu<M> {
     }
 
     /// The constructor.
-    static pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
+    pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
 }
 

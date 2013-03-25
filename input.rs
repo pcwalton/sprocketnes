@@ -14,14 +14,14 @@ use sdl::event;
 // The "strobe state": the order in which the NES reads the buttons.
 //
 
-const STROBE_STATE_A: u8        = 0;
-const STROBE_STATE_B: u8        = 1;
-const STROBE_STATE_SELECT: u8   = 2;
-const STROBE_STATE_START: u8    = 3;
-const STROBE_STATE_UP: u8       = 4;
-const STROBE_STATE_DOWN: u8     = 5;
-const STROBE_STATE_LEFT: u8     = 6;
-const STROBE_STATE_RIGHT: u8    = 7;
+static STROBE_STATE_A: u8        = 0;
+static STROBE_STATE_B: u8        = 1;
+static STROBE_STATE_SELECT: u8   = 2;
+static STROBE_STATE_START: u8    = 3;
+static STROBE_STATE_UP: u8       = 4;
+static STROBE_STATE_DOWN: u8     = 5;
+static STROBE_STATE_LEFT: u8     = 6;
+static STROBE_STATE_RIGHT: u8    = 7;
 
 struct StrobeState(u8);
 
@@ -79,7 +79,7 @@ pub enum InputResult {
 }
 
 impl Input {
-    static fn new() -> Input {
+    pub fn new() -> Input {
         Input {
             gamepad_0: GamePadState {
                 left: false,

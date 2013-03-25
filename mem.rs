@@ -47,7 +47,7 @@ impl<M:Mem> MemUtil for M {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram([u8 * 0x800]);
+pub struct Ram([u8, ..0x800]);
 
 impl Mem for Ram {
     fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
@@ -72,7 +72,7 @@ pub struct MemMap {
 }
 
 impl MemMap {
-    static fn new(ppu: Ppu, input: Input, mapper: &Mapper, apu: Apu) -> MemMap {
+    pub fn new(ppu: Ppu, input: Input, mapper: &Mapper, apu: Apu) -> MemMap {
         // FIXME: Need the &mut self notational change to get rid of the unsafe pointer here.
         unsafe {
             MemMap {
