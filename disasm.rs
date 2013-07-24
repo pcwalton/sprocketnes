@@ -130,13 +130,13 @@ impl<M:Mem> Disassembler<M> {
     fn immediate(&mut self) -> ~str          { ~"#" + self.disb_bump_pc()          }
     fn accumulator(&mut self) -> ~str        { ~""                                 }
     fn zero_page(&mut self) -> ~str          { self.disb_bump_pc()                 }
-    fn zero_page_x(&mut self) -> ~str        { self.disb_bump_pc() + ~",X"         }
-    fn zero_page_y(&mut self) -> ~str        { self.disb_bump_pc() + ~",Y"         }
+    fn zero_page_x(&mut self) -> ~str        { self.disb_bump_pc() + ",X"          }
+    fn zero_page_y(&mut self) -> ~str        { self.disb_bump_pc() + ",Y"          }
     fn absolute(&mut self) -> ~str           { self.disw_bump_pc()                 }
-    fn absolute_x(&mut self) -> ~str         { self.disw_bump_pc() + ~",X"         }
-    fn absolute_y(&mut self) -> ~str         { self.disw_bump_pc() + ~",Y"         }
-    fn indexed_indirect_x(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~",X)" }
-    fn indirect_indexed_y(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ~"),Y" }
+    fn absolute_x(&mut self) -> ~str         { self.disw_bump_pc() + ",X"          }
+    fn absolute_y(&mut self) -> ~str         { self.disw_bump_pc() + ",Y"          }
+    fn indexed_indirect_x(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + ",X)"  }
+    fn indirect_indexed_y(&mut self) -> ~str { ~"(" + self.disb_bump_pc() + "),Y"  }
 
     // The main disassembly routine.
     #[inline(never)]

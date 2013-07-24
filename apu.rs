@@ -9,9 +9,9 @@ use mem::Mem;
 use speex::Resampler;
 use util::{Fd, Save, Xorshift};
 
-use core::cast::{forget, transmute};
-use core::libc::c_int;
 use sdl::audio;
+use std::libc::c_int;
+use std::uint;
 
 static CYCLES_PER_EVEN_TICK: u64 = 7438;
 static CYCLES_PER_ODD_TICK: u64 = 7439;
@@ -375,7 +375,13 @@ impl Apu {
                 status: ApuStatus(0),
             },
 
-            sample_buffers: ~[ SampleBuffer { samples: [ 0, ..178992 ] }, ..5 ],
+            sample_buffers: ~([
+                SampleBuffer {
+                    samples: [ 0, ..178992 ]
+                },
+                ..5
+            ]),
+
             sample_buffer_offset: 0,
             output_buffer: output_buffer,
             resampler: Resampler::new(1, NES_SAMPLE_RATE, OUTPUT_SAMPLE_RATE, 0).unwrap(),
@@ -508,13 +514,13 @@ impl Apu {
     //
 
     fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [i16], offset: uint, audible: bool)
-                                  -> Option<&'a mut [i16]> {
-        let mut buffer = vec::mut_slice(buffer, offset, offset + NES_SAMPLES_PER_TICK as uint);
+                                     -> Option<&'a mut [i16]> {
+        let buffer = buffer.mut_slice(offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);
         }
 
-        for vec::each_mut(buffer) |dest| {
+        for buffer.mut_iter().advance |dest| {
             *dest = 0;
         }
         None
@@ -526,80 +532,89 @@ impl Apu {
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         audible);
-        for buffer_opt.each |&buffer| {
-            // Process sound.
-            // TODO: Vectorize this for speed.
-            let volume = pulse.envelope.sample_volume();
-            let wavelen = pulse.timer.wavelen();
-            let waveform = PULSE_WAVEFORMS[pulse.duty];
-            let mut waveform_index = pulse.waveform_index;
-            let mut wavelen_count = pulse.timer.wavelen_count;
+        match buffer_opt {
+            None => {}
+            Some(buffer) => {
+                // Process sound.
+                // TODO: Vectorize this for speed.
+                let volume = pulse.envelope.sample_volume();
+                let wavelen = pulse.timer.wavelen();
+                let waveform = PULSE_WAVEFORMS[pulse.duty];
+                let mut waveform_index = pulse.waveform_index;
+                let mut wavelen_count = pulse.timer.wavelen_count;
 
-            for vec::each_mut(buffer) |dest| {
-                wavelen_count += 1;
-                if wavelen_count >= wavelen {
-                    wavelen_count = 0;
-                    waveform_index = (waveform_index + 1) % 8;
+                for buffer.mut_iter().advance |dest| {
+                    wavelen_count += 1;
+                    if wavelen_count >= wavelen {
+                        wavelen_count = 0;
+                        waveform_index = (waveform_index + 1) % 8;
+                    }
+
+                    *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
                 }
 
-                *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
+                pulse.waveform_index = waveform_index;
+                pulse.timer.wavelen_count = wavelen_count;
             }
-
-            pulse.waveform_index = waveform_index;
-            pulse.timer.wavelen_count = wavelen_count;
         }
     }
 
     fn play_triangle(&mut self, channel: c_int) {
-        let mut triangle = &mut self.regs.triangle;
+        let triangle = &mut self.regs.triangle;
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         triangle.audible());
-        for buffer_opt.each |&buffer| {
-            let wavelen = triangle.timer.wavelen() / 2;
-            let mut waveform_index = triangle.waveform_index;
-            let mut wavelen_count = triangle.timer.wavelen_count;
+        match buffer_opt {
+            None => {}
+            Some(buffer) => {
+                let wavelen = triangle.timer.wavelen() / 2;
+                let mut waveform_index = triangle.waveform_index;
+                let mut wavelen_count = triangle.timer.wavelen_count;
 
-            for vec::each_mut(buffer) |dest| {
-                wavelen_count += 1;
-                if wavelen_count >= wavelen {
-                    wavelen_count = 0;
-                    waveform_index = (waveform_index + 1) % 32;
+                for buffer.mut_iter().advance |dest| {
+                    wavelen_count += 1;
+                    if wavelen_count >= wavelen {
+                        wavelen_count = 0;
+                        waveform_index = (waveform_index + 1) % 32;
+                    }
+
+                    // FIXME: Factor out this calculation.
+                    *dest = (TRIANGLE_WAVEFORM[waveform_index] as i16 * 4) << 8;
                 }
 
-                // FIXME: Factor out this calculation.
-                *dest = (TRIANGLE_WAVEFORM[waveform_index] as i16 * 4) << 8;
+                triangle.waveform_index = waveform_index;
+                triangle.timer.wavelen_count = wavelen_count;
             }
-
-            triangle.waveform_index = waveform_index;
-            triangle.timer.wavelen_count = wavelen_count;
         }
     }
 
     fn play_noise(&mut self, channel: c_int) {
-        let mut noise = &mut self.regs.noise;
+        let noise = &mut self.regs.noise;
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         noise.envelope.audible());
-        for buffer_opt.each |&buffer| {
-            let volume = noise.envelope.sample_volume();
-            let timer = noise.timer;
-            let mut timer_count = noise.timer_count;
-            let mut rng = noise.rng;
-            let mut on = 1;
+        match buffer_opt {
+            None => {}
+            Some(buffer) => {
+                let volume = noise.envelope.sample_volume();
+                let timer = noise.timer;
+                let mut timer_count = noise.timer_count;
+                let mut rng = noise.rng;
+                let mut on = 1;
 
-            for vec::each_mut(buffer) |dest| {
-                timer_count += 1;
-                if timer_count >= timer {
-                    timer_count = 0;
-                    on = rng.next() & 1;
+                for buffer.mut_iter().advance |dest| {
+                    timer_count += 1;
+                    if timer_count >= timer {
+                        timer_count = 0;
+                        on = rng.next() & 1;
+                    }
+
+                    *dest = if on == 0 { 0 } else { volume };
                 }
 
-                *dest = if on == 0 { 0 } else { volume };
+                noise.timer_count = timer_count;
+                noise.rng = rng;
             }
-
-            noise.timer_count = timer_count;
-            noise.rng = rng;
         }
     }
 

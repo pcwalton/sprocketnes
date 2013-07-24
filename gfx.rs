@@ -4,17 +4,20 @@
 // Author: Patrick Walton
 //
 
-use core::cast::transmute;
-use core::int;
 use sdl::sdl::{InitAudio, InitTimer, InitVideo};
 use sdl::sdl;
-use sdl::video::{AsyncBlit, SWSurface, Surface};
+use sdl::video::{SWSurface, Surface};
 use sdl::video;
+use std::cast::transmute;
+use std::int;
+use std::uint;
 
 static SCREEN_WIDTH: uint = 256;
 static SCREEN_HEIGHT: uint = 240;
 
 static FONT_HEIGHT: uint = 10;
+static FONT_GLYPH_COUNT: uint = 95;
+static FONT_GLYPH_LENGTH: uint = FONT_GLYPH_COUNT * FONT_HEIGHT;
 
 static STATUS_LINE_PADDING: uint = 6;
 static STATUS_LINE_X: uint = STATUS_LINE_PADDING;
@@ -27,7 +30,7 @@ static STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-static FONT_GLYPHS: [u8, ..95 * 10] = [
+static FONT_GLYPHS: [u8, ..FONT_GLYPH_LENGTH] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -125,7 +128,7 @@ static FONT_GLYPHS: [u8, ..95 * 10] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-static FONT_ADVANCES: [u8, ..95] = [
+static FONT_ADVANCES: [u8, ..FONT_GLYPH_COUNT] = [
     3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */, 
     4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */, 
     6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */, 
@@ -155,7 +158,10 @@ fn draw_glyph(pixels: &mut [u8],
               y: int,
               color: GlyphColor,
               glyph_index: uint) {
-    let mut color_byte = match color { White => 0xff, Black => 0x00 };
+    let color_byte = match color {
+        White => 0xff,
+        Black => 0x00,
+    };
     for int::range(0, 10) |y_index| {
         let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
         for int::range(0, 8) |x_index| {
@@ -266,7 +272,7 @@ macro_rules! scaler(
 
         unsafe {
             let mut dest: *mut u32 = transmute(&$pixels[0]);
-            let mut src_start: *u8 = transmute(&$ppu_screen[0]);
+            let src_start: *u8 = transmute(&$ppu_screen[0]);
 
             let mut src_y = 0;
             while src_y < SCREEN_HEIGHT {

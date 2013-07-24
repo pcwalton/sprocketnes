@@ -10,7 +10,6 @@ use cpu::Cpu;
 use gfx::{Gfx, Scale, Scale1x, Scale2x, Scale3x};
 use input::Input;
 use input;
-use mapper::Mapper;
 use mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
@@ -18,8 +17,8 @@ use rom::Rom;
 use util::{Fd, ForReading, ForWriting, Save, println};
 use util;
 
-use core::os;
-use sdl;
+use std::os;
+use std::str;
 
 #[cfg(debug)]
 fn record_fps(last_time: &mut u64, frames: &mut uint) {
@@ -33,7 +32,7 @@ fn record_fps(last_time: &mut u64, frames: &mut uint) {
     }
 }
 
-#[cfg(ndebug)]
+#[cfg(not(debug))]
 fn record_fps(_: &mut u64, _: &mut uint) {}
 
 //
@@ -57,7 +56,7 @@ fn parse_args() -> Option<Options> {
     let mut options = Options { rom_path: ~"", scale: Scale1x };
 
     let args = os::args();
-    for args.eachi |i, arg| {
+    for args.iter().enumerate().advance |(i, arg)| {
         if i == 0 {
             loop;
         }
@@ -72,7 +71,7 @@ fn parse_args() -> Option<Options> {
             usage();
             return None;
         } else {
-            options.rom_path = copy *arg;
+            options.rom_path = arg.to_str();
         }
     }
 
@@ -88,10 +87,10 @@ fn parse_args() -> Option<Options> {
 // Entry point and main loop
 //
 
-fn start() {
+pub fn start() {
     let options = match parse_args() {
         Some(options) => options,
-        None => return
+        None => return,
     };
 
     let rom = ~Rom::from_path(options.rom_path);
@@ -101,11 +100,11 @@ fn start() {
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
-    do Mapper::with_mapper(rom) |mapper| {
-        let mut ppu = Ppu::new(Vram::new(mapper), Oam::new());
-        let mut input = Input::new();
-        let mut apu = Apu::new(audio_buffer);
-        let mut memmap = MemMap::new(ppu, input, mapper, apu);
+    do mapper::with_mapper(rom) |mapper| {
+        let ppu = Ppu::new(Vram::new(mapper), Oam::new());
+        let input = Input::new();
+        let apu = Apu::new(audio_buffer);
+        let memmap = MemMap::new(ppu, input, mapper, apu);
         let mut cpu = Cpu::new(memmap);
 
         // TODO: Add a flag to not reset for nestest.log
@@ -149,9 +148,5 @@ fn start() {
     }
 
     audio::close();
-}
-
-fn main() {
-    sdl::start::start(start);
 }
 

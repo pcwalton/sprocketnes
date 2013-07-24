@@ -7,7 +7,7 @@
 use rom::Rom;
 use util;
 
-use core::cast::transmute;
+use std::cast::transmute;
 
 #[deriving(Eq)]
 pub enum MapperResult {
@@ -23,32 +23,30 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-impl Mapper {
-    pub fn with_mapper<R>(rom: ~Rom, f: &fn(&Mapper) -> R) -> R {
-        match rom.header.ines_mapper() {
-            0 => {
-                unsafe {
-                    let mut nrom = Nrom { rom: rom };
-                    let mut nrom_ptr: &'static Nrom = transmute(&mut nrom);  // FIXME: Wat?
-                    f(nrom_ptr as &Mapper)
-                }
-            },
-            1 => {
-                unsafe {
-                    let mut sxrom = SxRom::new(rom);
-                    let sxrom_ptr: &'static SxRom = transmute(&mut sxrom);   // FIXME: Wat?
-                    f(sxrom_ptr as &Mapper)
-                }
+pub fn with_mapper<R>(rom: ~Rom, f: &fn(&Mapper) -> R) -> R {
+    match rom.header.ines_mapper() {
+        0 => {
+            unsafe {
+                let mut nrom = Nrom { rom: rom };
+                let nrom_ptr: &'static Nrom = transmute(&mut nrom);  // FIXME: Wat?
+                f(nrom_ptr as &Mapper)
             }
-            4 => {
-                unsafe {
-                    let mut txrom = TxRom::new(rom);
-                    let txrom_ptr: &'static TxRom = transmute(&mut txrom);   // FIXME: Wat?
-                    f(txrom_ptr as &Mapper)
-                }
+        },
+        1 => {
+            unsafe {
+                let mut sxrom = SxRom::new(rom);
+                let sxrom_ptr: &'static SxRom = transmute(&mut sxrom);   // FIXME: Wat?
+                f(sxrom_ptr as &Mapper)
             }
-            _ => fail!(~"unsupported mapper")
         }
+        4 => {
+            unsafe {
+                let mut txrom = TxRom::new(rom);
+                let txrom_ptr: &'static TxRom = transmute(&mut txrom);   // FIXME: Wat?
+                f(txrom_ptr as &Mapper)
+            }
+        }
+        _ => fail!(~"unsupported mapper")
     }
 }
 
@@ -166,24 +164,22 @@ impl SxRom {
 
 impl Mapper for SxRom {
     fn prg_loadb(&mut self, addr: u16) -> u8 {
-        unsafe {
-            if addr < 0x8000 {
-                0
-            } else if addr < 0xc000 {
-                let bank = match self.regs.ctrl.prg_rom_mode() {
-                    Switch32K => self.regs.prg_bank & 0xfe,
-                    FixFirstBank => 0,
-                    FixLastBank => self.regs.prg_bank,
-                };
-                self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
-            } else {
-                let bank = match self.regs.ctrl.prg_rom_mode() {
-                    Switch32K => (self.regs.prg_bank & 0xfe) | 1,
-                    FixFirstBank => self.regs.prg_bank,
-                    FixLastBank => (*self.rom).header.prg_rom_size - 1,
-                };
-                self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
-            }
+        if addr < 0x8000 {
+            0
+        } else if addr < 0xc000 {
+            let bank = match self.regs.ctrl.prg_rom_mode() {
+                Switch32K => self.regs.prg_bank & 0xfe,
+                FixFirstBank => 0,
+                FixLastBank => self.regs.prg_bank,
+            };
+            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
+        } else {
+            let bank = match self.regs.ctrl.prg_rom_mode() {
+                Switch32K => (self.regs.prg_bank & 0xfe) | 1,
+                FixFirstBank => self.regs.prg_bank,
+                FixLastBank => (*self.rom).header.prg_rom_size - 1,
+            };
+            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
         }
     }
 
@@ -290,33 +286,31 @@ impl TxRom {
 
 impl Mapper for TxRom {
     fn prg_loadb(&mut self, addr: u16) -> u8 {
-        unsafe {
-            if addr < 0x6000 {
-                0
-            } else if addr < 0x8000 {
-                self.prg_ram[addr & 0x1fff]
-            } else if addr < 0xa000 {
-                // $8000-$9FFF might be switchable or fixed to the second to last bank.
-                let bank = match self.regs.bank_select.prg_bank_mode() {
-                    Swappable8000 => self.prg_banks[0],
-                    SwappableC000 => self.prg_bank_count() - 2,
-                };
-                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
-            } else if addr < 0xc000 {
-                // $A000-$BFFF is switchable.
-                self.rom.prg[(self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff)]
-            } else if addr < 0xe000 {
-                // $C000-$DFFF might be switchable or fixed to the second to last bank.
-                let bank = match self.regs.bank_select.prg_bank_mode() {
-                    Swappable8000 => self.prg_bank_count() - 2,
-                    SwappableC000 => self.prg_banks[0],
-                };
-                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
-            } else {
-                // $E000-$FFFF is fixed to the last bank.
-                let bank = self.prg_bank_count() - 1;
-                self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
-            }
+        if addr < 0x6000 {
+            0
+        } else if addr < 0x8000 {
+            self.prg_ram[addr & 0x1fff]
+        } else if addr < 0xa000 {
+            // $8000-$9FFF might be switchable or fixed to the second to last bank.
+            let bank = match self.regs.bank_select.prg_bank_mode() {
+                Swappable8000 => self.prg_banks[0],
+                SwappableC000 => self.prg_bank_count() - 2,
+            };
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+        } else if addr < 0xc000 {
+            // $A000-$BFFF is switchable.
+            self.rom.prg[(self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff)]
+        } else if addr < 0xe000 {
+            // $C000-$DFFF might be switchable or fixed to the second to last bank.
+            let bank = match self.regs.bank_select.prg_bank_mode() {
+                Swappable8000 => self.prg_bank_count() - 2,
+                SwappableC000 => self.prg_banks[0],
+            };
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+        } else {
+            // $E000-$FFFF is fixed to the last bank.
+            let bank = self.prg_bank_count() - 1;
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         }
     }
 

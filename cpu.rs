@@ -5,9 +5,11 @@
 //
 
 use mem::{Mem, MemUtil};
-use util::{Fd, Save, println};
+use util::{Fd, Save};
+#[cfg(cpuspew)]
+use util::println;
 
-use core::uint::range;
+use std::uint::range;
 
 //
 // Constants
@@ -356,7 +358,7 @@ impl<M:Mem> Cpu<M> {
             self.cy as uint
         ));
     }
-    #[cfg(ncpuspew)]
+    #[cfg(not(cpuspew))]
     fn trace(&mut self) {}
 
     // Performs DMA to the OAMDATA ($2004) register.
@@ -518,7 +520,7 @@ impl<M:Mem> Cpu<M> {
     // Comparisons
     fn cmp_base<AM:AddressingMode<M>>(&mut self, x: u8, am: AM) {
         let y = am.load(self);
-        let mut result = x as u32 - y as u32;
+        let result = x as u32 - y as u32;
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
         let _ = self.set_zn(result as u8);
     }

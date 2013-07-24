@@ -6,7 +6,7 @@
 
 use util::{Fd, ForReading};
 
-use core::vec;
+use std::vec;
 
 pub struct Rom {
     header: INesHeader,
@@ -20,7 +20,12 @@ impl Rom {
         fd.read(buffer);
 
         let header = INesHeader {
-            magic: [ buffer[0], buffer[1], buffer[2], buffer[3] ],
+            magic: [
+                buffer[0],
+                buffer[1],
+                buffer[2],
+                buffer[3],
+            ],
             prg_rom_size: buffer[4],
             chr_rom_size: buffer[5],
             flags_6: buffer[6],
@@ -31,11 +36,16 @@ impl Rom {
             zero: [ 0, ..5 ]
         };
 
-        fail_unless!(header.magic == [ 'N' as u8, 'E' as u8, 'S' as u8, 0x1a ]);
+        assert!(header.magic == [
+            'N' as u8,
+            'E' as u8,
+            'S' as u8,
+            0x1a,
+        ]);
 
-        let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0);
+        let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
         fd.read(prg_rom);
-        let mut chr_rom = vec::from_elem(header.chr_rom_size as uint * 8192, 0);
+        let mut chr_rom = vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
         fd.read(chr_rom);
 
         Rom { header: header, prg: prg_rom, chr: chr_rom }
@@ -57,19 +67,27 @@ struct INesHeader {
 }
 
 impl INesHeader {
-    pub fn mapper(&self) -> u8 { (self.flags_7 & 0xf0) | (self.flags_6 >> 4) }
-    pub fn ines_mapper(&self) -> u8 { self.flags_6 >> 4 }
-    pub fn trainer(&self) -> bool { (self.flags_6 & 0x04) != 0 }
+    pub fn mapper(&self) -> u8 {
+        (self.flags_7 & 0xf0) | (self.flags_6 >> 4)
+    }
+    pub fn ines_mapper(&self) -> u8 {
+        self.flags_6 >> 4
+    }
+    pub fn trainer(&self) -> bool {
+        (self.flags_6 & 0x04) != 0
+    }
 
     pub fn to_str(&self) -> ~str {
-        fmt!(
-            "PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d/%d\nTrainer: %s",
-            self.prg_rom_size as int,
-            self.chr_rom_size as int,
-            self.mapper() as int,
-            self.ines_mapper() as int,
-            if self.trainer() { "Yes" } else { "No" }
-        )
+        fmt!("PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d/%d\nTrainer: %s",
+             self.prg_rom_size as int,
+             self.chr_rom_size as int,
+             self.mapper() as int,
+             self.ines_mapper() as int,
+             if self.trainer() {
+                "Yes"
+             } else {
+                "No"
+             })
     }
 }
 

@@ -4,12 +4,13 @@
 // Author: Patrick Walton
 //
 
-use core::cast::transmute;
-use core::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, off_t, size_t};
-use core::libc::{ssize_t, time_t};
-use core::libc;
-use core::ptr::null;
-use core::str;
+use std::cast::transmute;
+use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, off_t, size_t};
+use std::libc::time_t;
+use std::libc;
+use std::ptr::null;
+use std::str;
+use std::uint;
 
 //
 // Standard library I/O replacements
@@ -18,12 +19,14 @@ use core::str;
 //
 
 // Blech! This really should go in the standard library!
-pub struct Fd(c_int);
+pub struct Fd {
+    contents: c_int,
+}
 
 impl Drop for Fd {
-    fn finalize(&self) {
+    fn drop(&self) {
         unsafe {
-            libc::close(**self);
+            libc::close(self.contents);
         }
     }
 }
@@ -36,7 +39,9 @@ impl Fd {
                 ForWriting => O_WRONLY | O_CREAT | O_TRUNC
             } as c_int;
             do str::as_c_str(path) |c_path| {
-                Fd(libc::open(c_path, fd_mode, 493))
+                Fd {
+                    contents: libc::open(c_path, fd_mode, 493),
+                }
             }
         }
     }
@@ -45,7 +50,7 @@ impl Fd {
         unsafe {
             let mut offset = 0;
             while offset < buf.len() {
-                let nread = libc::read(**self,
+                let nread = libc::read(self.contents,
                                        transmute(&mut buf[offset]),
                                        (buf.len() - offset) as size_t);
                 if nread <= 0 {
@@ -60,7 +65,7 @@ impl Fd {
         unsafe {
             let mut offset = 0;
             while offset < buf.len() {
-                let nwritten = libc::write(**self,
+                let nwritten = libc::write(self.contents,
                                            transmute(&buf[offset]),
                                            (buf.len() - offset) as size_t);
                 if nwritten <= 0 {
@@ -71,7 +76,11 @@ impl Fd {
         }
     }
 
-    pub fn tell(&self) -> off_t { unsafe { libc::lseek(**self, 0, SEEK_CUR as c_int) } }
+    pub fn tell(&self) -> off_t {
+        unsafe {
+            libc::lseek(self.contents, 0, SEEK_CUR as c_int)
+        }
+    }
 }
 
 pub enum OpenMode {
@@ -217,7 +226,7 @@ pub fn debug_assert(cond: bool, msg: &str) {
     }
 }
 
-#[cfg(ndebug)]
+#[cfg(not(debug))]
 pub fn debug_assert(_: bool, _: &str) {}
 
 #[cfg(debug)]
@@ -225,7 +234,7 @@ pub fn debug_print(msg: &str) {
     println(msg);
 }
 
-#[cfg(ndebug)]
+#[cfg(not(debug))]
 pub fn debug_print(_: &str) {}
 
 //

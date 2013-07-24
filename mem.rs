@@ -7,11 +7,11 @@
 use apu::Apu;
 use input::Input;
 use mapper::Mapper;
-use ppu::{Oam, Ppu, Vram};
-use util::{Fd, Save, debug_print};
+use ppu::Ppu;
+use util::{Fd, Save};
 
-use core::cast::transmute;
-use core::libc::c_void;
+use std::cast::transmute;
+use std::libc::c_void;
 
 //
 // The memory interface

@@ -6,11 +6,11 @@
 
 use mapper::{Irq, Mapper};
 use mem::Mem;
-use util::{Fd, Save, debug_assert, println};
+use util::{Fd, Save, debug_assert};
 
-use core::cast::transmute;
-use core::libc::c_void;
-use core::uint::range;
+use std::cast::transmute;
+use std::libc::c_void;
+use std::uint::range;
 
 //
 // Constants
@@ -512,7 +512,7 @@ impl Ppu {
 
     fn read_ppudata(&mut self) -> u8 {
         let addr = self.regs.addr.val;
-        let mut val = self.vram.loadb(addr);
+        let val = self.vram.loadb(addr);
         self.regs.addr.val += self.regs.ctrl.vram_addr_increment();
 
         // Emulate the PPU buffering quirk.
@@ -558,13 +558,14 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) {
+    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) -> bool {
         for range(0, 64) |i| {
             let sprite = self.make_sprite_info(i as u16);
             if !f(self, &sprite, i as u8) {
-                break;
+                break
             }
         }
+        true
     }
 
     //
@@ -638,7 +639,7 @@ impl Ppu {
                         x: u8,
                         background_opaque: bool)
                      -> Option<SpriteColor> {
-        for visible_sprites.each |&visible_sprite_opt| {
+        for visible_sprites.iter().advance |&visible_sprite_opt| {
             match visible_sprite_opt {
                 None => return None,
                 Some(index) => {

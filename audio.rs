@@ -7,16 +7,19 @@
 // TODO: This module is very unsafe. Adding a reader-writer audio lock to SDL would help make it
 // safe.
 
-use core::cast::{forget, transmute};
 use sdl::audio::{DesiredAudioSpec, Mono, S16LsbAudioFormat};
 use sdl::audio;
+use std::cast::{forget, transmute};
+use std::uint;
 
 //
 // The audio callback
 //
 
+static SAMPLE_COUNT: uint = 4410 * 2;
+
 pub struct OutputBuffer {
-    samples: [u8, ..4410 * 2],
+    samples: [u8, ..SAMPLE_COUNT],
     play_offset: uint,
 }
 
@@ -47,9 +50,13 @@ pub fn open() -> *mut OutputBuffer {
         format: S16LsbAudioFormat,
         channels: Mono,
         samples: 4410,
-        callback: |samples| unsafe { audio_callback(samples, transmute(output_buffer_ptr)) },
+        callback: |samples| {
+            unsafe {
+                audio_callback(samples, transmute(output_buffer_ptr))
+            }
+        },
     };
-    fail_unless!(audio::open(spec).is_ok());
+    assert!(audio::open(spec).is_ok());
     audio::pause(false);
 
     unsafe {

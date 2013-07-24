@@ -26,3 +26,7 @@ pub mod rom;
 // C library support
 pub mod speex;
 
+fn main() {
+    sdl::start::start(main::start);
+}
+
