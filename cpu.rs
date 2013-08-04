@@ -363,7 +363,7 @@ impl<M:Mem> Cpu<M> {
 
     // Performs DMA to the OAMDATA ($2004) register.
     fn dma(&mut self, hi_addr: u8) {
-        for range(hi_addr as uint << 8, (hi_addr + 1) as uint << 8) |addr| {
+        for addr in range(hi_addr as uint << 8, (hi_addr + 1) as uint << 8) {
             let val = self.loadb(addr as u16);
             self.storeb(0x2004, val);
 

@@ -162,11 +162,11 @@ fn draw_glyph(pixels: &mut [u8],
         White => 0xff,
         Black => 0x00,
     };
-    for int::range(0, 10) |y_index| {
+    for y_index in range(0, 10) {
         let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
-        for int::range(0, 8) |x_index| {
+        for x_index in range(0, 8) {
             if ((row >> (7 - x_index)) & 1) != 0 {
-                for int::range(0, 3) |channel| {
+                for channel in range(0, 3) {
                     let mut index = (y + y_index) * (surface_width as int) * 3 + (x + x_index) * 3;
                     index += channel;
 
@@ -180,7 +180,7 @@ fn draw_glyph(pixels: &mut [u8],
 }
 
 pub fn draw_text(pixels: &mut [u8], surface_width: uint, mut x: int, y: int, string: &str) {
-    for uint::range(0, string.len()) |i| {
+    for i in range(0, string.len()) {
         let glyph_index = (string[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
             draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
@@ -276,8 +276,8 @@ macro_rules! scaler(
 
             let mut src_y = 0;
             while src_y < SCREEN_HEIGHT {
-                let src_scanline_start = src_start.offset(src_y * SCREEN_WIDTH * 3);
-                let src_scanline_end = src_scanline_start.offset(SCREEN_WIDTH * 3);
+                let src_scanline_start = src_start.offset((src_y * SCREEN_WIDTH * 3) as int);
+                let src_scanline_end = src_scanline_start.offset((SCREEN_WIDTH * 3) as int);
 
                 // Ugh, LLVM isn't inlining properly.
                 //
@@ -312,8 +312,8 @@ macro_rules! scaler(
 impl Gfx {
     pub fn new(scale: Scale) -> Gfx {
         sdl::init([ InitVideo, InitAudio, InitTimer ]);
-        let screen = video::set_video_mode(SCREEN_WIDTH * scale.factor() as int,
-                                           SCREEN_HEIGHT * scale.factor()  as int,
+        let screen = video::set_video_mode((SCREEN_WIDTH * scale.factor()) as int,
+                                           (SCREEN_HEIGHT * scale.factor()) as int,
                                            32,
                                            [ SWSurface ],
                                            []);

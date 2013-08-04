@@ -21,7 +21,7 @@ extern {
     fn speex_resampler_destroy(st: *SpeexResamplerState);
     fn speex_resampler_process_int(st: *SpeexResamplerState,
                                    channel_index: u32,
-                                   in: *i16,
+                                   input: *i16,
                                    in_len: *mut u32,
                                    out: *i16,
                                    out_len: *mut u32)
@@ -56,16 +56,16 @@ impl Resampler {
         }
     }
 
-    pub fn process(&self, channel_index: u32, in: &[i16], out: &mut [u8]) -> (u32, u32) {
+    pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
-            assert!(in.len() <= 0xffffffff);
+            assert!(input.len() <= 0xffffffff);
             assert!(out.len() / 2 <= 0xffffffff);
-            let (in_len, out_len) = (in.len() as u32, out.len() as u32 / 2);
+            let (in_len, out_len) = (input.len() as u32, out.len() as u32 / 2);
             let mut in_len = in_len;
             let mut out_len = out_len;
             let err = speex_resampler_process_int(self.speex_resampler,
                                                   channel_index,
-                                                  &in[0],
+                                                  &input[0],
                                                   &mut in_len,
                                                   transmute(&out[0]),
                                                   &mut out_len);

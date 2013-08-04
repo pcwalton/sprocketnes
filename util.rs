@@ -9,7 +9,6 @@ use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, o
 use std::libc::time_t;
 use std::libc;
 use std::ptr::null;
-use std::str;
 use std::uint;
 
 //
@@ -38,7 +37,7 @@ impl Fd {
                 ForReading => O_RDONLY,
                 ForWriting => O_WRONLY | O_CREAT | O_TRUNC
             } as c_int;
-            do str::as_c_str(path) |c_path| {
+            do path.as_c_str |c_path| {
                 Fd {
                     contents: libc::open(c_path, fd_mode, 493),
                 }
@@ -117,7 +116,7 @@ impl Save for u16 {
 impl Save for u64 {
     fn save(&mut self, fd: &Fd) {
         let mut buf = [ 0, ..8 ];
-        for uint::range(0, 8) |i| {
+        for i in range(0, 8) {
             buf[i] = ((*self) >> (i * 8)) as u8;
         }
         fd.write(buf);
@@ -126,7 +125,7 @@ impl Save for u64 {
         let mut buf = [ 0, ..8 ];
         fd.read(buf);
         *self = 0;
-        for uint::range(0, 8) |i| {
+        for i in range(0, 8) {
             *self = *self | (buf[i] as u64 << (i * 8));
         }
     }

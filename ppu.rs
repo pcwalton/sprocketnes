@@ -10,7 +10,6 @@ use util::{Fd, Save, debug_assert};
 
 use std::cast::transmute;
 use std::libc::c_void;
-use std::uint::range;
 
 //
 // Constants
@@ -558,14 +557,13 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) -> bool {
-        for range(0, 64) |i| {
+    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) {
+        for i in range(0, 64) {
             let sprite = self.make_sprite_info(i as u16);
             if !f(self, &sprite, i as u8) {
-                break
+                return
             }
         }
-        true
     }
 
     //
@@ -639,7 +637,7 @@ impl Ppu {
                         x: u8,
                         background_opaque: bool)
                      -> Option<SpriteColor> {
-        for visible_sprites.iter().advance |&visible_sprite_opt| {
+        for &visible_sprite_opt in visible_sprites.iter() {
             match visible_sprite_opt {
                 None => return None,
                 Some(index) => {
@@ -693,15 +691,18 @@ impl Ppu {
     fn compute_visible_sprites(&mut self) -> [Option<u8>, ..8] {
         let mut count = 0;
         let mut result = [None, ..8];
-        for self.each_sprite |this, sprite, index| {
+        do self.each_sprite |this, sprite, index| {
             if sprite.on_scanline(this, this.scanline as u8) {
                 if count < 8 {
                     result[count] = Some(index);
                     count += 1;
+                    true
                 } else {
                     this.regs.status.set_sprite_overflow(true);
-                    return result;
+                    false
                 }
+            } else {
+                true
             }
         }
         result
@@ -714,7 +715,7 @@ impl Ppu {
         let backdrop_color_index = self.vram.loadb(0x3f00) & 0x3f;
         let backdrop_color = self.get_color(backdrop_color_index);
 
-        for range(0, SCREEN_WIDTH) |x| {
+        for x in range(0, SCREEN_WIDTH) {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut background_color = None;
             if self.regs.mask.show_background() {

@@ -17,6 +17,7 @@ use rom::Rom;
 use util::{Fd, ForReading, ForWriting, Save, println};
 use util;
 
+use std::libc::c_char;
 use std::os;
 use std::str;
 
@@ -52,26 +53,25 @@ fn usage() {
     println("    -3 scale by 3x");
 }
 
-fn parse_args() -> Option<Options> {
+fn parse_args(argc: u32, argv: **c_char) -> Option<Options> {
     let mut options = Options { rom_path: ~"", scale: Scale1x };
 
-    let args = os::args();
-    for args.iter().enumerate().advance |(i, arg)| {
-        if i == 0 {
-            loop;
-        }
+    for i in range(1, argc as int) {
+        let arg = unsafe {
+            str::raw::from_c_str(*argv.offset(i))
+        };
 
-        if str::eq_slice(*arg, "-1") {
+        if "-1" == arg {
             options.scale = Scale1x;
-        } else if str::eq_slice(*arg, "-2") {
+        } else if "-2" == arg {
             options.scale = Scale2x;
-        } else if str::eq_slice(*arg, "-3") {
+        } else if "-3" == arg {
             options.scale = Scale3x;
         } else if arg[0] == ('-' as u8) {
             usage();
             return None;
         } else {
-            options.rom_path = arg.to_str();
+            options.rom_path = arg;
         }
     }
 
@@ -87,8 +87,8 @@ fn parse_args() -> Option<Options> {
 // Entry point and main loop
 //
 
-pub fn start() {
-    let options = match parse_args() {
+pub fn start(argc: u32, argv: **c_char) {
+    let options = match parse_args(argc, argv) {
         Some(options) => options,
         None => return,
     };

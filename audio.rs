@@ -27,7 +27,7 @@ fn audio_callback(samples: &mut [u8], output_buffer: &mut OutputBuffer) {
     let play_offset = output_buffer.play_offset;
     let output_buffer_len = output_buffer.samples.len();
 
-    for uint::range(0, samples.len()) |i| {
+    for i in range(0, samples.len()) {
         if i + play_offset >= output_buffer_len {
             break;
         }

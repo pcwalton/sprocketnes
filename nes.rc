@@ -4,7 +4,11 @@
 // Author: Patrick Walton
 //
 
+#[no_main];
+
 extern mod sdl;
+
+use std::libc::c_char;
 
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_escape]
@@ -26,7 +30,8 @@ pub mod rom;
 // C library support
 pub mod speex;
 
-fn main() {
-    sdl::start::start(main::start);
+#[no_mangle]
+pub extern fn SDL_main(argc: u32, argv: **c_char) {
+    main::start(argc, argv);
 }
 

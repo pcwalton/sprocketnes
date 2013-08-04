@@ -394,7 +394,7 @@ impl Apu {
     fn update_status(&mut self, val: u8) {
         self.regs.status = ApuStatus(val);
 
-        for uint::range(0, 2) |i| {
+        for i in range(0, 2) {
             if !self.regs.status.pulse_enabled(i as u8) {
                 self.regs.pulses[i].envelope.length.remaining = 0;
             }
@@ -461,7 +461,7 @@ impl Apu {
         // 120 Hz operations: length counter and sweep.
         if self.ticks % 2 == 0 {
             // TODO: Remember that triangle wave has a different length disable bit.
-            for uint::range(0, 2) |i| {
+            for i in range(0, 2) {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
@@ -520,7 +520,7 @@ impl Apu {
             return Some(buffer);
         }
 
-        for buffer.mut_iter().advance |dest| {
+        for dest in buffer.mut_iter() {
             *dest = 0;
         }
         None
@@ -543,7 +543,7 @@ impl Apu {
                 let mut waveform_index = pulse.waveform_index;
                 let mut wavelen_count = pulse.timer.wavelen_count;
 
-                for buffer.mut_iter().advance |dest| {
+                for dest in buffer.mut_iter() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -571,7 +571,7 @@ impl Apu {
                 let mut waveform_index = triangle.waveform_index;
                 let mut wavelen_count = triangle.timer.wavelen_count;
 
-                for buffer.mut_iter().advance |dest| {
+                for dest in buffer.mut_iter() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -602,7 +602,7 @@ impl Apu {
                 let mut rng = noise.rng;
                 let mut on = 1;
 
-                for buffer.mut_iter().advance |dest| {
+                for dest in buffer.mut_iter() {
                     timer_count += 1;
                     if timer_count >= timer {
                         timer_count = 0;
@@ -629,9 +629,9 @@ impl Apu {
         // First, mix all sample buffers into the first one.
         //
         // FIXME: This should not be a linear mix, for accuracy.
-        for uint::range(0, self.sample_buffers[0].samples.len()) |i| {
+        for i in range(0, self.sample_buffers[0].samples.len()) {
             let mut val = 0;
-            for uint::range(0, 5) |j| {
+            for j in range(0, 5) {
                 val += self.sample_buffers[j].samples[i] as i32;
             }
 
