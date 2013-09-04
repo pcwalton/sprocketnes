@@ -5,8 +5,8 @@
 //
 
 use std::cast::transmute;
-use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_int, c_void, off_t, size_t};
-use std::libc::time_t;
+use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_char, c_int, c_void, off_t};
+use std::libc::{size_t, time_t};
 use std::libc;
 use std::ptr::null;
 use std::uint;
@@ -23,11 +23,17 @@ pub struct Fd {
 }
 
 impl Drop for Fd {
+    #[fixed_stack_segment]
     fn drop(&self) {
         unsafe {
             libc::close(self.contents);
         }
     }
+}
+
+#[fixed_stack_segment]
+unsafe fn open(path: *c_char, fd_mode: c_int, mode: c_int) -> c_int {
+    libc::open(path, fd_mode, mode)
 }
 
 impl Fd {
@@ -37,14 +43,15 @@ impl Fd {
                 ForReading => O_RDONLY,
                 ForWriting => O_WRONLY | O_CREAT | O_TRUNC
             } as c_int;
-            do path.as_c_str |c_path| {
+            do path.with_c_str |c_path| {
                 Fd {
-                    contents: libc::open(c_path, fd_mode, 493),
+                    contents: open(c_path, fd_mode, 493),
                 }
             }
         }
     }
 
+    #[fixed_stack_segment]
     pub fn read(&self, buf: &mut [u8]) {
         unsafe {
             let mut offset = 0;
@@ -60,6 +67,7 @@ impl Fd {
         }
     }
 
+    #[fixed_stack_segment]
     pub fn write(&self, buf: &[u8]) {
         unsafe {
             let mut offset = 0;
@@ -75,6 +83,7 @@ impl Fd {
         }
     }
 
+    #[fixed_stack_segment]
     pub fn tell(&self) -> off_t {
         unsafe {
             libc::lseek(self.contents, 0, SEEK_CUR as c_int)
@@ -211,6 +220,7 @@ impl Xorshift {
 // This is reimplemented because the core Rust I/O library currently uses the garbage collector.
 //
 
+#[fixed_stack_segment]
 pub fn println(s: &str) {
     unsafe {
         libc::write(2, transmute(&s[0]), s.len() as size_t); 
@@ -249,6 +259,7 @@ extern {
     fn gettimeofday(tp: *mut timeval, tzp: *c_void) -> c_int;
 }
 
+#[fixed_stack_segment]
 pub fn current_time_millis() -> u64 {
     unsafe {
         let mut tv = timeval { tv_sec: 0, tv_usec: 0 };

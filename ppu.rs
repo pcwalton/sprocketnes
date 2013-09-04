@@ -177,7 +177,7 @@ impl Mem for Vram {
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
             unsafe {
-                let mut mapper: &Mapper = transmute(self.mapper);
+                let mut mapper: &mut Mapper = transmute(self.mapper);
                 mapper.chr_loadb(addr)
             }
         } else if addr < 0x3f00 {   // Name table area
@@ -191,7 +191,7 @@ impl Mem for Vram {
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
             unsafe {
-                let mut mapper: &Mapper = transmute(self.mapper);
+                let mut mapper: &mut Mapper = transmute(self.mapper);
                 mapper.chr_storeb(addr, val)
             }
         } else if addr < 0x3f00 {           // Name table area
@@ -769,7 +769,7 @@ impl Ppu {
             self.scanline += 1;
 
             unsafe {
-                let mut mapper: &Mapper = transmute(self.vram.mapper);
+                let mut mapper: &mut Mapper = transmute(self.vram.mapper);
                 if mapper.next_scanline() == Irq {
                     result.scanline_irq = true;
                 }

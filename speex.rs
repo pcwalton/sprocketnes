@@ -37,6 +37,7 @@ pub struct Resampler {
 }
 
 impl Resampler {
+    #[fixed_stack_segment]
     pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
                -> Result<Resampler,c_int> {
         unsafe {
@@ -56,6 +57,7 @@ impl Resampler {
         }
     }
 
+    #[fixed_stack_segment]
     pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
             assert!(input.len() <= 0xffffffff);
@@ -76,6 +78,7 @@ impl Resampler {
 }
 
 impl Drop for Resampler {
+    #[fixed_stack_segment]
     fn drop(&self) {
         unsafe {
             speex_resampler_destroy(self.speex_resampler)

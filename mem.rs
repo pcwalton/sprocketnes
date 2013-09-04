@@ -100,7 +100,7 @@ impl Mem for MemMap {
             0   // FIXME: I think some mappers use regs in this area?
         } else {
             unsafe {
-                let mut mapper: &Mapper = transmute(self.mapper);
+                let mut mapper: &mut Mapper = transmute(self.mapper);
                 mapper.prg_loadb(addr)
             }
         }
@@ -118,7 +118,7 @@ impl Mem for MemMap {
             // Nothing. FIXME: I think some mappers use regs in this area?
         } else {
             unsafe {
-                let mut mapper: &Mapper = transmute(self.mapper);
+                let mut mapper: &mut Mapper = transmute(self.mapper);
                 mapper.prg_storeb(addr, val)
             }
         }
