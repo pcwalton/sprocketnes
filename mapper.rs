@@ -23,7 +23,7 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn with_mapper<R>(rom: ~Rom, f: &fn(&Mapper) -> R) -> R {
+pub fn with_mapper<R>(rom: ~Rom, f: |&Mapper| -> R) -> R {
     match rom.header.ines_mapper() {
         0 => {
             unsafe {

@@ -557,7 +557,7 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: &fn(&mut Ppu, &Sprite, u8) -> bool) {
+    fn each_sprite(&mut self, f: |&mut Ppu, &Sprite, u8| -> bool) {
         for i in range(0, 64) {
             let sprite = self.make_sprite_info(i as u16);
             if !f(self, &sprite, i as u8) {
@@ -645,7 +645,7 @@ impl Ppu {
 
                     // Don't need to consider this sprite if we aren't in its bounding box.
                     if !sprite.in_bounding_box(self, x as u8, self.scanline as u8) {
-                        loop;
+                        continue
                     }
 
                     let pattern_color;
@@ -667,7 +667,7 @@ impl Ppu {
 
                     // If the pattern color was zero, this part of the sprite is transparent.
                     if pattern_color == 0 {
-                        loop;
+                        continue
                     }
 
                     // OK, so we know this pixel is opaque. Now if this is the first sprite and the
@@ -691,7 +691,7 @@ impl Ppu {
     fn compute_visible_sprites(&mut self) -> [Option<u8>, ..8] {
         let mut count = 0;
         let mut result = [None, ..8];
-        do self.each_sprite |this, sprite, index| {
+        self.each_sprite(|this, sprite, index| {
             if sprite.on_scanline(this, this.scanline as u8) {
                 if count < 8 {
                     result[count] = Some(index);
@@ -704,7 +704,7 @@ impl Ppu {
             } else {
                 true
             }
-        }
+        });
         result
     }
 

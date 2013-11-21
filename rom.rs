@@ -78,16 +78,16 @@ impl INesHeader {
     }
 
     pub fn to_str(&self) -> ~str {
-        fmt!("PRG-ROM size: %d\nCHR-ROM size: %d\nMapper: %d/%d\nTrainer: %s",
-             self.prg_rom_size as int,
-             self.chr_rom_size as int,
-             self.mapper() as int,
-             self.ines_mapper() as int,
-             if self.trainer() {
-                "Yes"
-             } else {
-                "No"
-             })
+        format!("PRG-ROM size: {}\nCHR-ROM size: {}\nMapper: {}/{}\nTrainer: {}",
+                self.prg_rom_size as int,
+                self.chr_rom_size as int,
+                self.mapper() as int,
+                self.ines_mapper() as int,
+                if self.trainer() {
+                    "Yes"
+                } else {
+                    "No"
+                })
     }
 }
 

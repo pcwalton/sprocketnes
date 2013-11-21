@@ -9,7 +9,6 @@ use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_char, c_int, c
 use std::libc::{size_t, time_t};
 use std::libc;
 use std::ptr::null;
-use std::uint;
 
 //
 // Standard library I/O replacements
@@ -24,7 +23,7 @@ pub struct Fd {
 
 impl Drop for Fd {
     #[fixed_stack_segment]
-    fn drop(&self) {
+    fn drop(&mut self) {
         unsafe {
             libc::close(self.contents);
         }
@@ -43,11 +42,11 @@ impl Fd {
                 ForReading => O_RDONLY,
                 ForWriting => O_WRONLY | O_CREAT | O_TRUNC
             } as c_int;
-            do path.with_c_str |c_path| {
+            path.with_c_str(|c_path| {
                 Fd {
                     contents: open(c_path, fd_mode, 493),
                 }
-            }
+            })
         }
     }
 

@@ -18,8 +18,16 @@ use util::{Fd, ForReading, ForWriting, Save, println};
 use util;
 
 use std::libc::c_char;
-use std::os;
 use std::str;
+
+#[link_args="-lSDL -lSDLmain"]
+extern "C" {
+}
+
+#[cfg(target_os="macos")]
+#[link_args="-lobjc -framework Cocoa"]
+extern "C" {
+}
 
 #[cfg(debug)]
 fn record_fps(last_time: &mut u64, frames: &mut uint) {
@@ -53,7 +61,7 @@ fn usage() {
     println("    -3 scale by 3x");
 }
 
-fn parse_args(argc: u32, argv: **c_char) -> Option<Options> {
+fn parse_args(argc: i32, argv: **c_char) -> Option<Options> {
     let mut options = Options { rom_path: ~"", scale: Scale1x };
 
     for i in range(1, argc as int) {
@@ -87,7 +95,7 @@ fn parse_args(argc: u32, argv: **c_char) -> Option<Options> {
 // Entry point and main loop
 //
 
-pub fn start(argc: u32, argv: **c_char) {
+pub fn start(argc: i32, argv: **c_char) {
     let options = match parse_args(argc, argv) {
         Some(options) => options,
         None => return,
@@ -100,7 +108,7 @@ pub fn start(argc: u32, argv: **c_char) {
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
-    do mapper::with_mapper(rom) |mapper| {
+    mapper::with_mapper(rom, |mapper| {
         let ppu = Ppu::new(Vram::new(mapper), Oam::new());
         let input = Input::new();
         let apu = Apu::new(audio_buffer);
@@ -145,7 +153,7 @@ pub fn start(argc: u32, argv: **c_char) {
 
             cpu.mem.apu.step(cpu.cy);
         }
-    }
+    });
 
     audio::close();
 }

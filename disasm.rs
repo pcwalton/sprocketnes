@@ -29,8 +29,8 @@ impl<M:Mem> Disassembler<M> {
         bottom | top
     }
 
-    fn disb_bump_pc(&mut self) -> ~str { fmt!("$%02X", self.loadb_bump_pc() as uint) }
-    fn disw_bump_pc(&mut self) -> ~str { fmt!("$%04X", self.loadw_bump_pc() as uint) }
+    fn disb_bump_pc(&mut self) -> ~str { format!("${:02X}", self.loadb_bump_pc() as uint) }
+    fn disw_bump_pc(&mut self) -> ~str { format!("${:04X}", self.loadw_bump_pc() as uint) }
 
     //
     // Mnemonics
@@ -142,7 +142,7 @@ impl<M:Mem> Disassembler<M> {
     #[inline(never)]
     pub fn disassemble(&mut self) -> ~str {
         let op = self.loadb_bump_pc();
-        decode_op!(op: op, this: self)
+        decode_op!(op, self)
     }
 }
 

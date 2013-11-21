@@ -9,8 +9,6 @@ use sdl::sdl;
 use sdl::video::{SWSurface, Surface};
 use sdl::video;
 use std::cast::transmute;
-use std::int;
-use std::uint;
 
 static SCREEN_WIDTH: uint = 256;
 static SCREEN_HEIGHT: uint = 240;
@@ -331,13 +329,13 @@ impl Gfx {
     }
 
     fn blit(&self, ppu_screen: &([u8, ..184320])) {
-        do self.screen.with_lock |pixels| {
+        self.screen.with_lock(|pixels| {
             match self.scale {
                 Scale1x => scaler!(1, pixels, ppu_screen),
                 Scale2x => scaler!(2, pixels, ppu_screen),
                 Scale3x => scaler!(3, pixels, ppu_screen),
             }
-        }
+        })
     }
 }
 

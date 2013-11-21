@@ -9,8 +9,6 @@ use util::{Fd, Save};
 #[cfg(cpuspew)]
 use util::println;
 
-use std::uint::range;
-
 //
 // Constants
 //
@@ -106,7 +104,7 @@ impl<M:Mem> AddressingMode<M> for MemoryAddressingMode {
 //
 
 macro_rules! decode_op {
-    (op: $op:expr, this: $this:ident) => {
+    ($op:expr, $this:ident) => {
         // We try to keep this in the same order as the implementations above.
         // TODO: Use arm macros to fix some of this duplication.
         match $op {
@@ -706,7 +704,7 @@ impl<M:Mem> Cpu<M> {
         self.trace();
 
         let op = self.loadb_bump_pc();
-        decode_op!(op: op, this: self);
+        decode_op!(op, self);
 
         self.cy += CYCLE_TABLE[op] as Cycles;
     }

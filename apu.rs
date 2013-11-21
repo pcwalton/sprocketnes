@@ -11,7 +11,6 @@ use util::{Fd, Save, Xorshift};
 
 use sdl::audio;
 use std::libc::c_int;
-use std::uint;
 
 static CYCLES_PER_EVEN_TICK: u64 = 7438;
 static CYCLES_PER_ODD_TICK: u64 = 7439;
@@ -647,25 +646,25 @@ impl Apu {
         // Wait for the audio callback to catch up if necessary.
         // FIXME: This is a racy spinlock; use condvars instead.
         loop {
-            let played = do audio::with_lock {
+            let played = audio::with_lock(|| {
                 unsafe {
                     (*self.output_buffer).play_offset == (*self.output_buffer).samples.len()
                 }
-            };
+            });
             if played {
                 break;
             }
         }
 
         // Resample and output the audio.
-        do audio::with_lock {
+        audio::with_lock(|| {
             unsafe {
                 let _ = self.resampler.process(0,
                                                self.sample_buffers[0].samples,
                                                (*self.output_buffer).samples);
                 (*self.output_buffer).play_offset = 0;
             }
-        }
+        })
     }
 }
 

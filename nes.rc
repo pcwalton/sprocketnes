@@ -4,6 +4,7 @@
 // Author: Patrick Walton
 //
 
+#[feature(macro_rules)];
 #[no_main];
 
 extern mod sdl;
@@ -31,7 +32,9 @@ pub mod rom;
 pub mod speex;
 
 #[no_mangle]
-pub extern fn SDL_main(argc: u32, argv: **c_char) {
+#[used]
+pub extern "C" fn SDL_main(argc: i32, argv: **c_char) -> i32 {
     main::start(argc, argv);
+    0
 }
 

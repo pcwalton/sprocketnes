@@ -79,7 +79,7 @@ impl Resampler {
 
 impl Drop for Resampler {
     #[fixed_stack_segment]
-    fn drop(&self) {
+    fn drop(&mut self) {
         unsafe {
             speex_resampler_destroy(self.speex_resampler)
         }

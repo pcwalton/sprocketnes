@@ -7,7 +7,7 @@
 // TODO: This module is very unsafe. Adding a reader-writer audio lock to SDL would help make it
 // safe.
 
-use sdl::audio::{DesiredAudioSpec, Mono, S16LsbAudioFormat};
+use sdl::audio::{AudioCallback, DesiredAudioSpec, Mono, S16LsbAudioFormat};
 use sdl::audio;
 use std::cast::{forget, transmute};
 use std::uint;
@@ -23,18 +23,27 @@ pub struct OutputBuffer {
     play_offset: uint,
 }
 
-fn audio_callback(samples: &mut [u8], output_buffer: &mut OutputBuffer) {
-    let play_offset = output_buffer.play_offset;
-    let output_buffer_len = output_buffer.samples.len();
+struct NesAudioCallback {
+    output_buffer: *mut OutputBuffer,
+}
 
-    for i in range(0, samples.len()) {
-        if i + play_offset >= output_buffer_len {
-            break;
+impl AudioCallback for NesAudioCallback {
+    fn fill(&mut self, samples: &mut [u8]) {
+        unsafe {
+            let output_buffer: &mut OutputBuffer = transmute(self.output_buffer);
+            let play_offset = output_buffer.play_offset;
+            let output_buffer_len = output_buffer.samples.len();
+
+            for i in range(0, samples.len()) {
+                if i + play_offset >= output_buffer_len {
+                    break;
+                }
+                samples[i] = output_buffer.samples[i + play_offset];
+            }
+
+            output_buffer.play_offset = uint::min(play_offset + samples.len(), output_buffer_len);
         }
-        samples[i] = output_buffer.samples[i + play_offset];
     }
-
-    output_buffer.play_offset = uint::min(play_offset + samples.len(), output_buffer_len);
 }
 
 //
@@ -50,11 +59,9 @@ pub fn open() -> *mut OutputBuffer {
         format: S16LsbAudioFormat,
         channels: Mono,
         samples: 4410,
-        callback: |samples| {
-            unsafe {
-                audio_callback(samples, transmute(output_buffer_ptr))
-            }
-        },
+        callback: ~NesAudioCallback {
+            output_buffer: output_buffer_ptr,
+        } as ~AudioCallback,
     };
     assert!(audio::open(spec).is_ok());
     audio::pause(false);
