@@ -8,9 +8,9 @@ use mapper::{Irq, Mapper};
 use mem::Mem;
 use util::{Save, debug_assert};
 
-use std::cast::transmute;
+use std::cell::RefCell;
 use std::io::File;
-use std::libc::c_void;
+use std::rc::Rc;
 
 //
 // Constants
@@ -155,20 +155,17 @@ save_enum!(PpuAddrByte { Hi, Lo })
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
-    mapper: (*c_void, *c_void),
+    mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
     nametables: [u8, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
     palette: [u8, ..0x20],
 }
 
 impl Vram {
-    pub fn new(mapper: &Mapper) -> Vram {
-        // FIXME: Need to fix &mut self notational problem to eliminate this unsafeness.
-        unsafe {
-            Vram {
-                mapper: transmute(mapper),
-                nametables: [ 0, ..0x800 ],
-                palette: [ 0, ..0x20 ]
-            }
+    pub fn new(mapper: Rc<RefCell<~Mapper:Send+Freeze>>) -> Vram {
+        Vram {
+            mapper: mapper,
+            nametables: [ 0, ..0x800 ],
+            palette: [ 0, ..0x20 ]
         }
     }
 }
@@ -177,10 +174,8 @@ impl Mem for Vram {
     #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
-            unsafe {
-                let mapper: &mut Mapper = transmute(self.mapper);
-                mapper.chr_loadb(addr)
-            }
+            let mut mapper = self.mapper.borrow().borrow_mut();
+            mapper.get().chr_loadb(addr)
         } else if addr < 0x3f00 {   // Name table area
             self.nametables[addr & 0x07ff]
         } else if addr < 0x4000 {   // Palette area
@@ -191,10 +186,8 @@ impl Mem for Vram {
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
-            unsafe {
-                let mapper: &mut Mapper = transmute(self.mapper);
-                mapper.chr_storeb(addr, val)
-            }
+            let mut mapper = self.mapper.borrow().borrow_mut();
+            mapper.get().chr_storeb(addr, val)
         } else if addr < 0x3f00 {           // Name table area
             let addr = addr & 0x07ff;
             self.nametables[addr] = val;
@@ -779,10 +772,10 @@ impl Ppu {
 
             self.scanline += 1;
 
-            unsafe {
-                let mapper: &mut Mapper = transmute(self.vram.mapper);
-                if mapper.next_scanline() == Irq {
-                    result.scanline_irq = true;
+            {
+                let mut mapper = self.vram.mapper.borrow().borrow_mut();
+                if mapper.get().next_scanline() == Irq {
+                    result.scanline_irq = true
                 }
             }
 

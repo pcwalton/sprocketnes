@@ -10,9 +10,9 @@ use mapper::Mapper;
 use ppu::Ppu;
 use util::Save;
 
-use std::cast::transmute;
+use std::cell::RefCell;
 use std::io::File;
-use std::libc::c_void;
+use std::rc::Rc;
 
 //
 // The memory interface
@@ -74,21 +74,22 @@ pub struct MemMap {
     ram: Ram,
     ppu: Ppu,
     input: Input,
-    mapper: (*c_void, *c_void),
+    mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
     apu: Apu,
 }
 
 impl MemMap {
-    pub fn new(ppu: Ppu, input: Input, mapper: &Mapper, apu: Apu) -> MemMap {
-        // FIXME: Need the &mut self notational change to get rid of the unsafe pointer here.
-        unsafe {
-            MemMap {
-                ram: Ram([ 0, ..0x800 ]),
-                ppu: ppu,
-                input: input,
-                mapper: transmute(mapper),
-                apu: apu,
-            }
+    pub fn new(ppu: Ppu,
+               input: Input,
+               mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
+               apu: Apu)
+               -> MemMap {
+        MemMap {
+            ram: Ram([ 0, ..0x800 ]),
+            ppu: ppu,
+            input: input,
+            mapper: mapper,
+            apu: apu,
         }
     }
 }
@@ -106,10 +107,8 @@ impl Mem for MemMap {
         } else if addr < 0x6000 {
             0   // FIXME: I think some mappers use regs in this area?
         } else {
-            unsafe {
-                let mapper: &mut Mapper = transmute(self.mapper);
-                mapper.prg_loadb(addr)
-            }
+            let mut mapper = self.mapper.borrow().borrow_mut();
+            mapper.get().prg_loadb(addr)
         }
     }
     fn storeb(&mut self, addr: u16, val: u8) {
@@ -124,10 +123,8 @@ impl Mem for MemMap {
         } else if addr < 0x6000 {
             // Nothing. FIXME: I think some mappers use regs in this area?
         } else {
-            unsafe {
-                let mapper: &mut Mapper = transmute(self.mapper);
-                mapper.prg_storeb(addr, val)
-            }
+            let mut mapper = self.mapper.borrow().borrow_mut();
+            mapper.get().prg_storeb(addr, val)
         }
     }
 }

@@ -21,15 +21,15 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn create_mapper(rom: ~Rom) -> ~Mapper {
+pub fn create_mapper(rom: ~Rom) -> ~Mapper:Send+Freeze {
     match rom.header.ines_mapper() {
         0 => {
             box Nrom {
                 rom: rom,
-            } as ~Mapper
+            } as ~Mapper:Freeze+Send
         },
-        1 => box SxRom::new(rom) as ~Mapper,
-        4 => box TxRom::new(rom) as ~Mapper,
+        1 => box SxRom::new(rom) as ~Mapper:Freeze+Send,
+        4 => box TxRom::new(rom) as ~Mapper:Freeze+Send,
         _ => fail!("unsupported mapper")
     }
 }

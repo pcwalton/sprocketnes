@@ -10,6 +10,7 @@ use cpu::Cpu;
 use gfx::{Gfx, Scale, Scale1x, Scale2x, Scale3x};
 use input::Input;
 use input;
+use mapper::Mapper;
 use mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
@@ -18,7 +19,9 @@ use util::Save;
 use util;
 
 use std::cast;
+use std::cell::RefCell;
 use std::io::File;
+use std::rc::Rc;
 use std::str;
 
 #[link(name="SDL")]
@@ -115,8 +118,9 @@ pub fn start(argc: i32, argv: **u8) {
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
-    let mapper = mapper::create_mapper(rom);
-    let ppu = Ppu::new(Vram::new(mapper), Oam::new());
+    let mapper: ~Mapper:Freeze+Send = mapper::create_mapper(rom);
+    let mapper = Rc::from_mut(RefCell::new(mapper));
+    let ppu = Ppu::new(Vram::new(mapper.clone()), Oam::new());
     let input = Input::new();
     let apu = Apu::new(audio_buffer);
     let memmap = MemMap::new(ppu, input, mapper, apu);
