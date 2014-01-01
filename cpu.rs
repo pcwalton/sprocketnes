@@ -351,7 +351,10 @@ impl<M:Mem> Cpu<M> {
     // Debugging
     #[cfg(cpuspew)]
     fn trace(&mut self) {
-        let mut disassembler = Disassembler { pc: self.regs.pc, mem: &mut self.mem };
+        let mut disassembler = Disassembler {
+            pc: self.regs.pc,
+            mem: &mut self.mem
+        };
         println!(
             "%04X %-20s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
             self.regs.pc as uint,

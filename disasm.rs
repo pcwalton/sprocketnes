@@ -6,22 +6,20 @@
 
 use mem::Mem;
 
-pub struct Disassembler<M> {
+pub struct Disassembler<'a,M> {
     pc: u16,
-    mem: *mut M
+    mem: &'a mut M
 }
 
-impl<M:Mem> Disassembler<M> {
+impl<'a,M:Mem> Disassembler<'a,M> {
     //
     // Loads and byte-to-string conversion
     //
 
     fn loadb_bump_pc(&mut self) -> u8 {
-        unsafe {
-            let val = (&mut *self.mem).loadb(self.pc);
-            self.pc += 1;
-            val
-        }
+        let val = (&mut *self.mem).loadb(self.pc);
+        self.pc += 1;
+        val
     }
     fn loadw_bump_pc(&mut self) -> u16 {
         let bottom = self.loadb_bump_pc() as u16;
