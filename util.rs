@@ -4,7 +4,6 @@
 // Author: Patrick Walton
 //
 
-use std::cast::transmute;
 use std::io::File;
 use std::libc::{c_int, c_void, time_t};
 use std::ptr::null;
@@ -55,11 +54,7 @@ impl Save for u64 {
 
 impl<'a> Save for &'a mut [u8] {
     fn save(&mut self, fd: &mut File) {
-        // FIXME: Unsafe due to stupid borrow check bug.
-        unsafe {
-            let x: &(&[u8]) = transmute(self);
-            fd.write(*x);
-        }
+        fd.write(*self);
     }
     fn load(&mut self, fd: &mut File) {
         fd.read(*self);
