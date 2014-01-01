@@ -105,7 +105,7 @@ pub fn start(argc: i32, argv: **u8) {
     };
 
     let rom_path: &str = options.rom_path;
-    let rom = ~Rom::from_path(&Path::new(rom_path));
+    let rom = box Rom::from_path(&Path::new(rom_path));
     println("Loaded ROM:");
     println(rom.header.to_str());
 
@@ -146,11 +146,11 @@ pub fn start(argc: i32, argv: **u8) {
                 input::Quit => break,
                 input::SaveState => {
                     cpu.save(&mut File::create(&Path::new("state.sav")).unwrap());
-                    gfx.status_line.set(~"Saved state");
+                    gfx.status_line.set("Saved state".to_str());
                 }
                 input::LoadState => {
                     cpu.load(&mut File::open(&Path::new("state.sav")).unwrap());
-                    gfx.status_line.set(~"Loaded state");
+                    gfx.status_line.set("Loaded state".to_str());
                 }
             }
         }

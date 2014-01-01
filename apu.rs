@@ -71,7 +71,7 @@ impl ApuLength {
                 self.id = val >> 3;
                 self.remaining = LENGTH_COUNTERS[self.id];
             }
-            _ => fail!(~"can't happen"),
+            _ => fail!("can't happen"),
         }
     }
 
@@ -162,7 +162,7 @@ impl ApuTimer {
             0 | 1 => {}
             2 => self.value = (self.value & 0xff00) | (val as u16),
             3 => self.value = (self.value & 0x00ff) | ((val as u16 & 0x7) << 8),
-            _ => fail!(~"can't happen"),
+            _ => fail!("can't happen"),
         }
     }
 
@@ -375,7 +375,7 @@ impl Apu {
                 status: ApuStatus(0),
             },
 
-            sample_buffers: ~([
+            sample_buffers: box ([
                 SampleBuffer {
                     samples: [ 0, ..178992 ]
                 },
@@ -420,7 +420,7 @@ impl Apu {
                 pulse.sweep_cycle = 0;
             }
             2 | 3 => {}
-            _ => fail!(~"can't happen"),
+            _ => fail!("can't happen"),
         }
     }
 

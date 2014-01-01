@@ -47,7 +47,7 @@ fn nes_audio_callback(samples: &mut [u8]) {
 //
 
 pub fn open() -> *mut OutputBuffer {
-    let output_buffer = ~OutputBuffer { samples: [ 0, ..8820 ], play_offset: 0 };
+    let output_buffer = box OutputBuffer { samples: [ 0, ..8820 ], play_offset: 0 };
     let output_buffer_ptr: *mut OutputBuffer = unsafe { transmute(&*output_buffer) };
 
     unsafe {

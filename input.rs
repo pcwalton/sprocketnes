@@ -37,7 +37,7 @@ impl StrobeState {
             STROBE_STATE_DOWN   => state.down,
             STROBE_STATE_LEFT   => state.left,
             STROBE_STATE_RIGHT  => state.right,
-            _                   => fail!(~"shouldn't happen")
+            _                   => fail!("shouldn't happen")
         }
     }
 

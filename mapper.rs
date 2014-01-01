@@ -24,13 +24,13 @@ pub trait Mapper {
 pub fn create_mapper(rom: ~Rom) -> ~Mapper {
     match rom.header.ines_mapper() {
         0 => {
-            ~Nrom {
+            box Nrom {
                 rom: rom,
             } as ~Mapper
         },
-        1 => ~SxRom::new(rom) as ~Mapper,
-        4 => ~TxRom::new(rom) as ~Mapper,
-        _ => fail!(~"unsupported mapper")
+        1 => box SxRom::new(rom) as ~Mapper,
+        4 => box TxRom::new(rom) as ~Mapper,
+        _ => fail!("unsupported mapper")
     }
 }
 
@@ -88,7 +88,7 @@ impl SxCtrl {
             0 | 1 => Switch32K,
             2 => FixFirstBank,
             3 => FixLastBank,
-            _ => fail!(~"can't happen")
+            _ => fail!("can't happen")
         }
     }
 }
@@ -123,8 +123,8 @@ impl SxRom {
             },
             accum: 0,
             write_count: 0,
-            prg_ram: ~([ 0, ..8192 ]),
-            chr_ram: ~([ 0, ..8192 ]),
+            prg_ram: box ([ 0, ..8192 ]),
+            chr_ram: box ([ 0, ..8192 ]),
         }
     }
 }
