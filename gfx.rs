@@ -202,7 +202,10 @@ struct StatusLineText {
 
 impl StatusLineText {
     fn new() -> StatusLineText {
-        StatusLineText { string: ~"", animation: Idle }
+        StatusLineText {
+            string: "".to_str(),
+            animation: Idle,
+        }
     }
 
     fn set(&mut self, string: ~str) {

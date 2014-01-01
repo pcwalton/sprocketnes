@@ -65,7 +65,10 @@ fn usage() {
 }
 
 fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
-    let mut options = Options { rom_path: ~"", scale: Scale1x };
+    let mut options = Options {
+        rom_path: "".to_str(),
+        scale: Scale1x,
+    };
 
     for i in range(1, argc as int) {
         let arg = unsafe {
