@@ -22,7 +22,6 @@ pub struct Fd {
 }
 
 impl Drop for Fd {
-    #[fixed_stack_segment]
     fn drop(&mut self) {
         unsafe {
             libc::close(self.contents);
@@ -30,7 +29,6 @@ impl Drop for Fd {
     }
 }
 
-#[fixed_stack_segment]
 unsafe fn open(path: *c_char, fd_mode: c_int, mode: c_int) -> c_int {
     libc::open(path, fd_mode, mode)
 }
@@ -50,7 +48,6 @@ impl Fd {
         }
     }
 
-    #[fixed_stack_segment]
     pub fn read(&self, buf: &mut [u8]) {
         unsafe {
             let mut offset = 0;
@@ -66,7 +63,6 @@ impl Fd {
         }
     }
 
-    #[fixed_stack_segment]
     pub fn write(&self, buf: &[u8]) {
         unsafe {
             let mut offset = 0;
@@ -82,7 +78,6 @@ impl Fd {
         }
     }
 
-    #[fixed_stack_segment]
     pub fn tell(&self) -> off_t {
         unsafe {
             libc::lseek(self.contents, 0, SEEK_CUR as c_int)
@@ -139,7 +134,7 @@ impl Save for u64 {
     }
 }
 
-impl<'self> Save for &'self mut [u8] {
+impl<'a> Save for &'a mut [u8] {
     fn save(&mut self, fd: &Fd) {
         // FIXME: Unsafe due to stupid borrow check bug.
         unsafe {
@@ -219,7 +214,6 @@ impl Xorshift {
 // This is reimplemented because the core Rust I/O library currently uses the garbage collector.
 //
 
-#[fixed_stack_segment]
 pub fn println(s: &str) {
     unsafe {
         libc::write(2, transmute(&s[0]), s.len() as size_t); 
@@ -258,7 +252,6 @@ extern {
     fn gettimeofday(tp: *mut timeval, tzp: *c_void) -> c_int;
 }
 
-#[fixed_stack_segment]
 pub fn current_time_millis() -> u64 {
     unsafe {
         let mut tv = timeval { tv_sec: 0, tv_usec: 0 };

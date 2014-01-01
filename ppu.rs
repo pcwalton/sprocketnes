@@ -85,14 +85,14 @@ impl PpuCtrl {
 struct PpuMask(u8);
 
 impl PpuMask {
-    fn grayscale(self) -> bool               { (*self & 0x01) != 0 }
-    fn show_background_on_left(self) -> bool { (*self & 0x02) != 0 }
-    fn show_sprites_on_left(self) -> bool    { (*self & 0x04) != 0 }
+    // 0x01: grayscale
+    // 0x02: show background on left
+    // 0x04: show sprites on left
     fn show_background(self) -> bool         { (*self & 0x08) != 0 }
     fn show_sprites(self) -> bool            { (*self & 0x10) != 0 }
-    fn intensify_reds(self) -> bool          { (*self & 0x20) != 0 }
-    fn intensify_greens(self) -> bool        { (*self & 0x40) != 0 }
-    fn intensity_blues(self) -> bool         { (*self & 0x80) != 0 }
+    // 0x20: intensify reds
+    // 0x40: intensify greens
+    // 0x80: intensify blues
 }
 
 //
@@ -177,7 +177,7 @@ impl Mem for Vram {
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
             unsafe {
-                let mut mapper: &mut Mapper = transmute(self.mapper);
+                let mapper: &mut Mapper = transmute(self.mapper);
                 mapper.chr_loadb(addr)
             }
         } else if addr < 0x3f00 {   // Name table area
@@ -191,7 +191,7 @@ impl Mem for Vram {
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
             unsafe {
-                let mut mapper: &mut Mapper = transmute(self.mapper);
+                let mapper: &mut Mapper = transmute(self.mapper);
                 mapper.chr_storeb(addr, val)
             }
         } else if addr < 0x3f00 {           // Name table area
@@ -733,7 +733,7 @@ impl Ppu {
             let color = match (background_color, sprite_color) {
                 (None, None) => backdrop_color,
                 (Some(color), None) => color,
-                (Some(color), Some(SpriteColor { priority: BelowBg, _ })) => color,
+                (Some(color), Some(SpriteColor { priority: BelowBg, .. })) => color,
                 (None, Some(SpriteColor { priority: BelowBg, color: color })) => color,
                 (_, Some(SpriteColor { priority: AboveBg, color: color })) => color,
             };
@@ -769,7 +769,7 @@ impl Ppu {
             self.scanline += 1;
 
             unsafe {
-                let mut mapper: &mut Mapper = transmute(self.vram.mapper);
+                let mapper: &mut Mapper = transmute(self.vram.mapper);
                 if mapper.next_scanline() == Irq {
                     result.scanline_irq = true;
                 }

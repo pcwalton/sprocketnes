@@ -7,8 +7,6 @@
 use rom::Rom;
 use util;
 
-use std::cast::transmute;
-
 #[deriving(Eq)]
 pub enum MapperResult {
     Continue,
@@ -23,29 +21,15 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn with_mapper<R>(rom: ~Rom, f: |&Mapper| -> R) -> R {
+pub fn create_mapper(rom: ~Rom) -> ~Mapper {
     match rom.header.ines_mapper() {
         0 => {
-            unsafe {
-                let mut nrom = Nrom { rom: rom };
-                let nrom_ptr: &'static Nrom = transmute(&mut nrom);  // FIXME: Wat?
-                f(nrom_ptr as &Mapper)
-            }
+            ~Nrom {
+                rom: rom,
+            } as ~Mapper
         },
-        1 => {
-            unsafe {
-                let mut sxrom = SxRom::new(rom);
-                let sxrom_ptr: &'static SxRom = transmute(&mut sxrom);   // FIXME: Wat?
-                f(sxrom_ptr as &Mapper)
-            }
-        }
-        4 => {
-            unsafe {
-                let mut txrom = TxRom::new(rom);
-                let txrom_ptr: &'static TxRom = transmute(&mut txrom);   // FIXME: Wat?
-                f(txrom_ptr as &Mapper)
-            }
-        }
+        1 => ~SxRom::new(rom) as ~Mapper,
+        4 => ~TxRom::new(rom) as ~Mapper,
         _ => fail!(~"unsupported mapper")
     }
 }
@@ -98,21 +82,7 @@ enum SxPrgBankMode {
     FixLastBank,    // Fix last bank at $C000, switch 16K bank at $8000
 }
 
-enum SxChrBankMode {
-    Switch8K,       // Switch 8K at a time
-    SwitchTwo4K,    // Switch two separate 4K banks
-}
-
 impl SxCtrl {
-    fn mirroring(self) -> Mirroring {
-        match *self & 3 {
-            0 => OneScreenLower,
-            1 => OneScreenUpper,
-            2 => Vertical,
-            3 => Horizontal,
-            _ => fail!(~"can't happen")
-        }
-    }
     fn prg_rom_mode(self) -> SxPrgBankMode {
         match (*self >> 2) & 3 {
             0 | 1 => Switch32K,
@@ -120,9 +90,6 @@ impl SxCtrl {
             3 => FixLastBank,
             _ => fail!(~"can't happen")
         }
-    }
-    fn chr_rom_mode(self) -> SxChrBankMode {
-        if ((*self >> 4) & 1) == 0 { Switch8K } else { SwitchTwo4K }
     }
 }
 

@@ -20,12 +20,14 @@ use util;
 use std::libc::c_char;
 use std::str;
 
-#[link_args="-lSDL -lSDLmain"]
+#[link(name="SDL")]
+#[link(name="SDLmain")]
 extern "C" {
 }
 
 #[cfg(target_os="macos")]
-#[link_args="-lobjc -framework Cocoa"]
+#[link(name="objc")]
+#[link_args="-framework Cocoa"]
 extern "C" {
 }
 
@@ -108,52 +110,51 @@ pub fn start(argc: i32, argv: **c_char) {
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
-    mapper::with_mapper(rom, |mapper| {
-        let ppu = Ppu::new(Vram::new(mapper), Oam::new());
-        let input = Input::new();
-        let apu = Apu::new(audio_buffer);
-        let memmap = MemMap::new(ppu, input, mapper, apu);
-        let mut cpu = Cpu::new(memmap);
+    let mapper = mapper::create_mapper(rom);
+    let ppu = Ppu::new(Vram::new(mapper), Oam::new());
+    let input = Input::new();
+    let apu = Apu::new(audio_buffer);
+    let memmap = MemMap::new(ppu, input, mapper, apu);
+    let mut cpu = Cpu::new(memmap);
 
-        // TODO: Add a flag to not reset for nestest.log
-        cpu.reset();
+    // TODO: Add a flag to not reset for nestest.log
+    cpu.reset();
 
-        let mut last_time = util::current_time_millis();
-        let mut frames = 0;
+    let mut last_time = util::current_time_millis();
+    let mut frames = 0;
 
-        loop {
-            cpu.step();
+    loop {
+        cpu.step();
 
-            let ppu_result = cpu.mem.ppu.step(cpu.cy);
-            if ppu_result.vblank_nmi {
-                cpu.nmi();
-            } else if ppu_result.scanline_irq {
-                cpu.irq();
-            }
+        let ppu_result = cpu.mem.ppu.step(cpu.cy);
+        if ppu_result.vblank_nmi {
+            cpu.nmi();
+        } else if ppu_result.scanline_irq {
+            cpu.irq();
+        }
 
-            if ppu_result.new_frame {
-                gfx.tick();
-                gfx.composite(cpu.mem.ppu.screen);
-                gfx.screen.flip();
-                record_fps(&mut last_time, &mut frames);
+        if ppu_result.new_frame {
+            gfx.tick();
+            gfx.composite(cpu.mem.ppu.screen);
+            gfx.screen.flip();
+            record_fps(&mut last_time, &mut frames);
 
-                match cpu.mem.input.check_input() {
-                    input::Continue => {}
-                    input::Quit => break,
-                    input::SaveState => {
-                        cpu.save(&Fd::open("state.sav", ForWriting));
-                        gfx.status_line.set(~"Saved state");
-                    }
-                    input::LoadState => {
-                        cpu.load(&Fd::open("state.sav", ForReading));
-                        gfx.status_line.set(~"Loaded state");
-                    }
+            match cpu.mem.input.check_input() {
+                input::Continue => {}
+                input::Quit => break,
+                input::SaveState => {
+                    cpu.save(&Fd::open("state.sav", ForWriting));
+                    gfx.status_line.set(~"Saved state");
+                }
+                input::LoadState => {
+                    cpu.load(&Fd::open("state.sav", ForReading));
+                    gfx.status_line.set(~"Loaded state");
                 }
             }
-
-            cpu.mem.apu.step(cpu.cy);
         }
-    });
+
+        cpu.mem.apu.step(cpu.cy);
+    }
 
     audio::close();
 }
