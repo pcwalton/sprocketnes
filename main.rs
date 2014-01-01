@@ -14,10 +14,11 @@ use mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
-use util::{Fd, ForReading, ForWriting, Save, println};
+use util::Save;
 use util;
 
-use std::libc::c_char;
+use std::cast;
+use std::io::File;
 use std::str;
 
 #[link(name="SDL")]
@@ -35,7 +36,7 @@ extern "C" {
 fn record_fps(last_time: &mut u64, frames: &mut uint) {
     let now = util::current_time_millis();
     if now >= *last_time + 1000 {
-        println(fmt!("%u FPS", *frames));
+        println!("{} FPS", *frames);
         *frames = 0;
         *last_time = now;
     } else {
@@ -63,12 +64,12 @@ fn usage() {
     println("    -3 scale by 3x");
 }
 
-fn parse_args(argc: i32, argv: **c_char) -> Option<Options> {
+fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
     let mut options = Options { rom_path: ~"", scale: Scale1x };
 
     for i in range(1, argc as int) {
         let arg = unsafe {
-            str::raw::from_c_str(*argv.offset(i))
+            str::raw::from_c_str(cast::transmute(*argv.offset(i)))
         };
 
         if "-1" == arg {
@@ -97,13 +98,14 @@ fn parse_args(argc: i32, argv: **c_char) -> Option<Options> {
 // Entry point and main loop
 //
 
-pub fn start(argc: i32, argv: **c_char) {
+pub fn start(argc: i32, argv: **u8) {
     let options = match parse_args(argc, argv) {
         Some(options) => options,
         None => return,
     };
 
-    let rom = ~Rom::from_path(options.rom_path);
+    let rom_path: &str = options.rom_path;
+    let rom = ~Rom::from_path(&Path::new(rom_path));
     println("Loaded ROM:");
     println(rom.header.to_str());
 
@@ -143,11 +145,11 @@ pub fn start(argc: i32, argv: **c_char) {
                 input::Continue => {}
                 input::Quit => break,
                 input::SaveState => {
-                    cpu.save(&Fd::open("state.sav", ForWriting));
+                    cpu.save(&mut File::create(&Path::new("state.sav")).unwrap());
                     gfx.status_line.set(~"Saved state");
                 }
                 input::LoadState => {
-                    cpu.load(&Fd::open("state.sav", ForReading));
+                    cpu.load(&mut File::open(&Path::new("state.sav")).unwrap());
                     gfx.status_line.set(~"Loaded state");
                 }
             }

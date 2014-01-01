@@ -4,8 +4,7 @@
 // Author: Patrick Walton
 //
 
-use util::{Fd, ForReading};
-
+use std::io::File;
 use std::vec;
 
 pub struct Rom {
@@ -15,9 +14,9 @@ pub struct Rom {
 }
 
 impl Rom {
-    fn from_fd(fd: Fd) -> Rom {
+    fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        fd.read(buffer);
+        file.read(buffer);
 
         let header = INesHeader {
             magic: [
@@ -44,14 +43,20 @@ impl Rom {
         ]);
 
         let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        fd.read(prg_rom);
+        file.read(prg_rom);
         let mut chr_rom = vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        fd.read(chr_rom);
+        file.read(chr_rom);
 
-        Rom { header: header, prg: prg_rom, chr: chr_rom }
+        Rom {
+            header: header,
+            prg: prg_rom,
+            chr: chr_rom,
+        }
     }
 
-    pub fn from_path(path: &str) -> Rom { Rom::from_fd(Fd::open(path, ForReading)) }
+    pub fn from_path(path: &Path) -> Rom {
+        Rom::from_file(&mut File::open(path).unwrap())
+    }
 }
 
 struct INesHeader {

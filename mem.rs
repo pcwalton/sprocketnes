@@ -8,9 +8,10 @@ use apu::Apu;
 use input::Input;
 use mapper::Mapper;
 use ppu::Ppu;
-use util::{Fd, Save};
+use util::Save;
 
 use std::cast::transmute;
+use std::io::File;
 use std::libc::c_void;
 
 //
@@ -55,8 +56,14 @@ impl Mem for Ram {
 }
 
 impl Save for Ram {
-    fn save(&mut self, fd: &Fd) { let mut array: &mut [u8] = **self; array.save(fd) }
-    fn load(&mut self, fd: &Fd) { let mut array: &mut [u8] = **self; array.load(fd) }
+    fn save(&mut self, fd: &mut File) {
+        let mut array: &mut [u8] = **self;
+        array.save(fd)
+    }
+    fn load(&mut self, fd: &mut File) {
+        let mut array: &mut [u8] = **self;
+        array.load(fd)
+    }
 }
 
 //

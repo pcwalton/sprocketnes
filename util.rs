@@ -5,90 +5,9 @@
 //
 
 use std::cast::transmute;
-use std::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, SEEK_CUR, c_char, c_int, c_void, off_t};
-use std::libc::{size_t, time_t};
-use std::libc;
+use std::io::File;
+use std::libc::{c_int, c_void, time_t};
 use std::ptr::null;
-
-//
-// Standard library I/O replacements
-//
-// The standard library I/O currently uses the garbage collector, which I do not want to use.
-//
-
-// Blech! This really should go in the standard library!
-pub struct Fd {
-    contents: c_int,
-}
-
-impl Drop for Fd {
-    fn drop(&mut self) {
-        unsafe {
-            libc::close(self.contents);
-        }
-    }
-}
-
-unsafe fn open(path: *c_char, fd_mode: c_int, mode: c_int) -> c_int {
-    libc::open(path, fd_mode, mode)
-}
-
-impl Fd {
-    pub fn open(path: &str, mode: OpenMode) -> Fd {
-        unsafe {
-            let fd_mode = match mode {
-                ForReading => O_RDONLY,
-                ForWriting => O_WRONLY | O_CREAT | O_TRUNC
-            } as c_int;
-            path.with_c_str(|c_path| {
-                Fd {
-                    contents: open(c_path, fd_mode, 493),
-                }
-            })
-        }
-    }
-
-    pub fn read(&self, buf: &mut [u8]) {
-        unsafe {
-            let mut offset = 0;
-            while offset < buf.len() {
-                let nread = libc::read(self.contents,
-                                       transmute(&mut buf[offset]),
-                                       (buf.len() - offset) as size_t);
-                if nread <= 0 {
-                    fail!();
-                }
-                offset += nread as uint;
-            }
-        }
-    }
-
-    pub fn write(&self, buf: &[u8]) {
-        unsafe {
-            let mut offset = 0;
-            while offset < buf.len() {
-                let nwritten = libc::write(self.contents,
-                                           transmute(&buf[offset]),
-                                           (buf.len() - offset) as size_t);
-                if nwritten <= 0 {
-                    fail!();
-                }
-                offset += nwritten as uint;
-            }
-        }
-    }
-
-    pub fn tell(&self) -> off_t {
-        unsafe {
-            libc::lseek(self.contents, 0, SEEK_CUR as c_int)
-        }
-    }
-}
-
-pub enum OpenMode {
-    ForReading,
-    ForWriting,
-}
 
 //
 // A tiny custom serialization infrastructure, used for savestates.
@@ -98,18 +17,18 @@ pub enum OpenMode {
 //
 
 pub trait Save {
-    fn save(&mut self, fd: &Fd);
-    fn load(&mut self, fd: &Fd);
+    fn save(&mut self, fd: &mut File);
+    fn load(&mut self, fd: &mut File);
 }
 
 impl Save for u8 {
-    fn save(&mut self, fd: &Fd) { fd.write([ *self ]) }
-    fn load(&mut self, fd: &Fd) { let mut buf = [ 0 ]; fd.read(buf); *self = buf[0]; }
+    fn save(&mut self, fd: &mut File) { fd.write([ *self ]) }
+    fn load(&mut self, fd: &mut File) { let mut buf = [ 0 ]; fd.read(buf); *self = buf[0]; }
 }
 
 impl Save for u16 {
-    fn save(&mut self, fd: &Fd) { fd.write([ *self as u8, (*self >> 8) as u8 ]) }
-    fn load(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]) }
+    fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
         fd.read(buf);
         *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
@@ -117,14 +36,14 @@ impl Save for u16 {
 }
 
 impl Save for u64 {
-    fn save(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
         for i in range(0, 8) {
             buf[i] = ((*self) >> (i * 8)) as u8;
         }
         fd.write(buf);
     }
-    fn load(&mut self, fd: &Fd) {
+    fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
         fd.read(buf);
         *self = 0;
@@ -135,19 +54,21 @@ impl Save for u64 {
 }
 
 impl<'a> Save for &'a mut [u8] {
-    fn save(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) {
         // FIXME: Unsafe due to stupid borrow check bug.
         unsafe {
             let x: &(&[u8]) = transmute(self);
             fd.write(*x);
         }
     }
-    fn load(&mut self, fd: &Fd) { fd.read(*self) }
+    fn load(&mut self, fd: &mut File) {
+        fd.read(*self);
+    }
 }
 
 impl Save for bool {
-    fn save(&mut self, fd: &Fd) { fd.write([ if *self { 0 } else { 1 } ]) }
-    fn load(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]) }
+    fn load(&mut self, fd: &mut File) {
         let mut val: [u8, ..1] = [ 0 ];
         fd.read(val);
         *self = val[0] != 0
@@ -158,10 +79,10 @@ impl Save for bool {
 macro_rules! save_struct(
     ($name:ident { $($field:ident),* }) => (
         impl Save for $name {
-            fn save(&mut self, fd: &Fd) {
+            fn save(&mut self, fd: &mut File) {
                 $(self.$field.save(fd);)*
             }
-            fn load(&mut self, fd: &Fd) {
+            fn load(&mut self, fd: &mut File) {
                 $(self.$field.load(fd);)*
             }
         }
@@ -171,11 +92,11 @@ macro_rules! save_struct(
 macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
         impl Save for $name {
-            fn save(&mut self, fd: &Fd) {
+            fn save(&mut self, fd: &mut File) {
                 let mut val: u8 = match *self { $val_0 => 0, $val_1 => 1 };
                 val.save(fd)
             }
-            fn load(&mut self, fd: &Fd) {
+            fn load(&mut self, fd: &mut File) {
                 let mut val: u8 = 0;
                 val.load(fd);
                 *self = if val == 0 { $val_0 } else { $val_1 };
@@ -209,17 +130,8 @@ impl Xorshift {
 }
 
 //
-// Basic output
+// Simple assertions
 //
-// This is reimplemented because the core Rust I/O library currently uses the garbage collector.
-//
-
-pub fn println(s: &str) {
-    unsafe {
-        libc::write(2, transmute(&s[0]), s.len() as size_t); 
-        libc::write(2, transmute(&'\n'), 1);
-    }
-}
 
 #[cfg(debug)]
 pub fn debug_assert(cond: bool, msg: &str) {

@@ -7,9 +7,10 @@
 use audio::OutputBuffer;
 use mem::Mem;
 use speex::Resampler;
-use util::{Fd, Save, Xorshift};
+use util::{Save, Xorshift};
 
 use sdl::audio;
+use std::io::File;
 use std::libc::c_int;
 
 static CYCLES_PER_EVEN_TICK: u64 = 7438;
@@ -294,14 +295,14 @@ struct Regs {
 }
 
 impl Save for Regs {
-    fn save(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) {
         self.pulses[0].save(fd);
         self.pulses[1].save(fd);
         self.triangle.save(fd);
         self.noise.save(fd);
         self.status.save(fd);
     }
-    fn load(&mut self, fd: &Fd) {
+    fn load(&mut self, fd: &mut File) {
         self.pulses[0].load(fd);
         self.pulses[1].load(fd);
         self.triangle.load(fd);

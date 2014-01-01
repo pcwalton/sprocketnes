@@ -6,9 +6,10 @@
 
 use mapper::{Irq, Mapper};
 use mem::Mem;
-use util::{Fd, Save, debug_assert};
+use util::{Save, debug_assert};
 
 use std::cast::transmute;
+use std::io::File;
 use std::libc::c_void;
 
 //
@@ -208,13 +209,17 @@ impl Mem for Vram {
 }
 
 impl Save for Vram {
-    fn save(&mut self, fd: &Fd) {
-        let mut nametables: &mut [u8] = self.nametables; nametables.save(fd);
-        let mut palette: &mut [u8] = self.palette; palette.save(fd);
+    fn save(&mut self, fd: &mut File) {
+        let mut nametables: &mut [u8] = self.nametables;
+        nametables.save(fd);
+        let mut palette: &mut [u8] = self.palette;
+        palette.save(fd);
     }
-    fn load(&mut self, fd: &Fd) {
-        let mut nametables: &mut [u8] = self.nametables; nametables.load(fd);
-        let mut palette: &mut [u8] = self.palette; palette.load(fd);
+    fn load(&mut self, fd: &mut File) {
+        let mut nametables: &mut [u8] = self.nametables;
+        nametables.load(fd);
+        let mut palette: &mut [u8] = self.palette;
+        palette.load(fd);
     }
 }
 
@@ -238,8 +243,14 @@ impl Mem for Oam {
 }
 
 impl Save for Oam {
-    fn save(&mut self, fd: &Fd) { let mut oam: &mut [u8] = self.oam; oam.save(fd); }
-    fn load(&mut self, fd: &Fd) { let mut oam: &mut [u8] = self.oam; oam.load(fd); }
+    fn save(&mut self, fd: &mut File) {
+        let mut oam: &mut [u8] = self.oam;
+        oam.save(fd);
+    }
+    fn load(&mut self, fd: &mut File) {
+        let mut oam: &mut [u8] = self.oam;
+        oam.load(fd);
+    }
 }
 
 struct Sprite {
@@ -382,7 +393,7 @@ enum SpritePriority {
 }
 
 impl Save for Ppu {
-    fn save(&mut self, fd: &Fd) {
+    fn save(&mut self, fd: &mut File) {
         self.regs.save(fd);
         self.vram.save(fd);
         self.oam.save(fd);
@@ -392,7 +403,7 @@ impl Save for Ppu {
         self.scroll_y.save(fd);
         self.cy.save(fd);
     }
-    fn load(&mut self, fd: &Fd) {
+    fn load(&mut self, fd: &mut File) {
         self.regs.load(fd);
         self.vram.load(fd);
         self.oam.load(fd);

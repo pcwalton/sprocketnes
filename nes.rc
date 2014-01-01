@@ -7,9 +7,8 @@
 #[feature(link_args, macro_rules)];
 #[no_main];
 
+extern mod native;
 extern mod sdl;
-
-use std::libc::c_char;
 
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_escape]
@@ -32,8 +31,7 @@ pub mod rom;
 pub mod speex;
 
 #[no_mangle]
-pub extern "C" fn SDL_main(argc: i32, argv: **c_char) -> i32 {
-    main::start(argc, argv);
-    0
+pub extern "C" fn SDL_main(argc: i32, argv: **u8) -> i32 {
+    native::start(argc as int, argv, proc() main::start(argc, argv)) as i32
 }
 

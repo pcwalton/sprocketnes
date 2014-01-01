@@ -5,9 +5,9 @@
 //
 
 use mem::{Mem, MemUtil};
-use util::{Fd, Save};
-#[cfg(cpuspew)]
-use util::println;
+use util::Save;
+
+use std::io::File;
 
 //
 // Constants
@@ -335,8 +335,16 @@ impl<M:Mem> Mem for Cpu<M> {
 
 // Save state logic.
 impl<M:Mem + Save> Save for Cpu<M> {
-    fn save(&mut self, fd: &Fd) { self.cy.save(fd); self.regs.save(fd); self.mem.save(fd); }
-    fn load(&mut self, fd: &Fd) { self.cy.load(fd); self.regs.load(fd); self.mem.load(fd); }
+    fn save(&mut self, fd: &mut File) {
+        self.cy.save(fd);
+        self.regs.save(fd);
+        self.mem.save(fd);
+    }
+    fn load(&mut self, fd: &mut File) {
+        self.cy.load(fd);
+        self.regs.load(fd);
+        self.mem.load(fd);
+    }
 }
 
 impl<M:Mem> Cpu<M> {
@@ -344,7 +352,7 @@ impl<M:Mem> Cpu<M> {
     #[cfg(cpuspew)]
     fn trace(&mut self) {
         let mut disassembler = Disassembler { pc: self.regs.pc, mem: &mut self.mem };
-        println(fmt!(
+        println!(
             "%04X %-20s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
             self.regs.pc as uint,
             disassembler.disassemble(),
@@ -354,7 +362,7 @@ impl<M:Mem> Cpu<M> {
             self.regs.flags as uint,
             self.regs.s as uint,
             self.cy as uint
-        ));
+        );
     }
     #[cfg(not(cpuspew))]
     fn trace(&mut self) {}
