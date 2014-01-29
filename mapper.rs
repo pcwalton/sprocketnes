@@ -24,12 +24,12 @@ pub trait Mapper {
 pub fn create_mapper(rom: ~Rom) -> ~Mapper:Send+Freeze {
     match rom.header.ines_mapper() {
         0 => {
-            box Nrom {
+            ~Nrom {
                 rom: rom,
             } as ~Mapper:Freeze+Send
         },
-        1 => box SxRom::new(rom) as ~Mapper:Freeze+Send,
-        4 => box TxRom::new(rom) as ~Mapper:Freeze+Send,
+        1 => ~SxRom::new(rom) as ~Mapper:Freeze+Send,
+        4 => ~TxRom::new(rom) as ~Mapper:Freeze+Send,
         _ => fail!("unsupported mapper")
     }
 }
@@ -123,8 +123,8 @@ impl SxRom {
             },
             accum: 0,
             write_count: 0,
-            prg_ram: box ([ 0, ..8192 ]),
-            chr_ram: box ([ 0, ..8192 ]),
+            prg_ram: ~([ 0, ..8192 ]),
+            chr_ram: ~([ 0, ..8192 ]),
         }
     }
 }

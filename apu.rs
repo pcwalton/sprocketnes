@@ -375,7 +375,7 @@ impl Apu {
                 status: ApuStatus(0),
             },
 
-            sample_buffers: box ([
+            sample_buffers: ~([
                 SampleBuffer {
                     samples: [ 0, ..178992 ]
                 },

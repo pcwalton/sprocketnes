@@ -111,7 +111,7 @@ pub fn start(argc: i32, argv: **u8) {
     };
 
     let rom_path: &str = options.rom_path;
-    let rom = box Rom::from_path(&Path::new(rom_path));
+    let rom = ~Rom::from_path(&Path::new(rom_path));
     println("Loaded ROM:");
     println(rom.header.to_str());
 

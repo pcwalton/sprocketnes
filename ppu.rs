@@ -422,7 +422,7 @@ impl Ppu {
             vram: vram,
             oam: oam,
 
-            screen: box ([ 0, ..184320 ]),
+            screen: ~([ 0, ..184320 ]),
             scanline: 0,
             ppudata_buffer: 0,
 
