@@ -5,12 +5,12 @@
 //
 
 use std::io::File;
-use std::vec;
+use std::vec::Vec;
 
 pub struct Rom {
     header: INesHeader,
-    prg: ~[u8],         // PRG-ROM
-    chr: ~[u8],         // CHR-ROM
+    prg: Vec<u8>,         // PRG-ROM
+    chr: Vec<u8>,         // CHR-ROM
 }
 
 impl Rom {
@@ -42,10 +42,10 @@ impl Rom {
             0x1a,
         ]);
 
-        let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.read(prg_rom);
-        let mut chr_rom = vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.read(chr_rom);
+        let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
+        file.read(prg_rom.as_mut_slice());
+        let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
+        file.read(chr_rom.as_mut_slice());
 
         Rom {
             header: header,
@@ -59,7 +59,7 @@ impl Rom {
     }
 }
 
-struct INesHeader {
+pub struct INesHeader {
     magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
     prg_rom_size: u8,   // number of 16K units of PRG-ROM
     chr_rom_size: u8,   // number of 8K units of CHR-ROM

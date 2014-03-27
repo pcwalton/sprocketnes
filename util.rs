@@ -21,12 +21,12 @@ pub trait Save {
 }
 
 impl Save for u8 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self ]) }
+    fn save(&mut self, fd: &mut File) { fd.write([ *self ]); }
     fn load(&mut self, fd: &mut File) { let mut buf = [ 0 ]; fd.read(buf); *self = buf[0]; }
 }
 
 impl Save for u16 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]) }
+    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]); }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
         fd.read(buf);
@@ -62,7 +62,7 @@ impl<'a> Save for &'a mut [u8] {
 }
 
 impl Save for bool {
-    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]) }
+    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]); }
     fn load(&mut self, fd: &mut File) {
         let mut val: [u8, ..1] = [ 0 ];
         fd.read(val);
@@ -131,7 +131,7 @@ impl Xorshift {
 #[cfg(debug)]
 pub fn debug_assert(cond: bool, msg: &str) {
     if !cond {
-        println(msg);
+        println!(msg);
     }
 }
 
@@ -140,7 +140,7 @@ pub fn debug_assert(_: bool, _: &str) {}
 
 #[cfg(debug)]
 pub fn debug_print(msg: &str) {
-    println(msg);
+    println!(msg);
 }
 
 #[cfg(not(debug))]

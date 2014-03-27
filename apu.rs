@@ -189,7 +189,19 @@ save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_inde
 // APU pulse sweep
 //
 
-struct ApuPulseSweep(u8);
+struct ApuPulseSweep{ val: u8 }
+
+impl Deref<u8> for ApuPulseSweep {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
+
+impl DerefMut<u8> for ApuPulseSweep {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
+    }
+}
 
 impl ApuPulseSweep {
     fn enabled(self) -> bool   { (*self >> 7) != 0         }
@@ -275,7 +287,19 @@ impl ApuNoise {
 // APUSTATUS: 0x4015
 //
 
-struct ApuStatus(u8);
+struct ApuStatus{ val: u8 }
+
+impl Deref<u8> for ApuStatus {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
+
+impl DerefMut<u8> for ApuStatus {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
+    }
+}
 
 impl ApuStatus {
     fn pulse_enabled(self, channel: u8) -> bool { ((*self >> channel) & 1) != 0 }
@@ -363,7 +387,7 @@ impl Apu {
                 pulses: [
                     ApuPulse {
                         envelope: ApuEnvelope::new(),
-                        sweep: ApuPulseSweep(0),
+                        sweep: ApuPulseSweep{val:0},
                         timer: ApuTimer::new(),
                         duty: 0,
                         sweep_cycle: 0,
@@ -372,7 +396,7 @@ impl Apu {
                 ],
                 triangle: ApuTriangle::new(),
                 noise: ApuNoise::new(),
-                status: ApuStatus(0),
+                status: ApuStatus{val:0},
             },
 
             sample_buffers: ~([
@@ -392,7 +416,7 @@ impl Apu {
     }
 
     fn update_status(&mut self, val: u8) {
-        self.regs.status = ApuStatus(val);
+        self.regs.status = ApuStatus{val:val};
 
         for i in range(0, 2) {
             if !self.regs.status.pulse_enabled(i as u8) {
@@ -416,7 +440,7 @@ impl Apu {
             0 => pulse.duty = val >> 6,
             1 => {
                 // TODO: Set reload flag.
-                pulse.sweep = ApuPulseSweep(val);
+                pulse.sweep = ApuPulseSweep{val:val};
                 pulse.sweep_cycle = 0;
             }
             2 | 3 => {}

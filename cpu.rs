@@ -91,7 +91,14 @@ impl<M:Mem> AddressingMode<M> for ImmediateAddressingMode {
     }
 }
 
-struct MemoryAddressingMode(u16);
+struct MemoryAddressingMode{val: u16}
+
+impl Deref<u16> for MemoryAddressingMode {
+    fn deref<'a>(&'a self) -> &'a u16 {
+        &self.val
+    }
+}
+
 impl<M:Mem> AddressingMode<M> for MemoryAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
@@ -443,32 +450,32 @@ impl<M:Mem> Cpu<M> {
     fn immediate(&mut self) -> ImmediateAddressingMode { ImmediateAddressingMode }
     fn accumulator(&mut self) -> AccumulatorAddressingMode { AccumulatorAddressingMode }
     fn zero_page(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadb_bump_pc() as u16)
+        MemoryAddressingMode{val: self.loadb_bump_pc() as u16}
     }
     fn zero_page_x(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode((self.loadb_bump_pc() + self.regs.x) as u16)
+        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.x) as u16}
     }
     fn zero_page_y(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode((self.loadb_bump_pc() + self.regs.y) as u16)
+        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.y) as u16}
     }
     fn absolute(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadw_bump_pc())
+        MemoryAddressingMode{val: self.loadw_bump_pc()}
     }
     fn absolute_x(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadw_bump_pc() + self.regs.x as u16)
+        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.x as u16}
     }
     fn absolute_y(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode(self.loadw_bump_pc() + self.regs.y as u16)
+        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.y as u16}
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
         let addr = self.loadw_zp(val + self.regs.x);
-        MemoryAddressingMode(addr)
+        MemoryAddressingMode{val: addr}
     }
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
         let addr = self.loadw_zp(val) + self.regs.y as u16;
-        MemoryAddressingMode(addr)
+        MemoryAddressingMode{val: addr}
     }
 
     //
