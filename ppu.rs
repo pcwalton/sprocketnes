@@ -73,6 +73,12 @@ impl Deref<u8> for PpuCtrl {
     }
 }
 
+impl DerefMut<u8> for PpuCtrl {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
+    }
+}
+
 impl PpuCtrl {
     fn x_scroll_offset(self) -> u16               { if (*self & 0x01) == 0 { 0 } else { 256 } }
     fn y_scroll_offset(self) -> u16               { if (*self & 0x02) == 0 { 0 } else { 240 } }
@@ -94,6 +100,12 @@ struct PpuMask {val: u8 }
 impl Deref<u8> for PpuMask {
     fn deref<'a>(&'a self) -> &'a u8 {
         &self.val
+    }
+}
+
+impl DerefMut<u8> for PpuMask {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
     }
 }
 
@@ -120,18 +132,24 @@ impl Deref<u8> for PpuStatus {
     }
 }
 
+impl DerefMut<u8> for PpuStatus {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
+    }
+}
+
 impl PpuStatus {
     // TODO: open bus junk in bits [0,5)
     fn set_sprite_overflow(&mut self, val: bool) {
-        self = &mut if val { PpuStatus{ val: **self | 0x20 } }
+        *self = if val { PpuStatus{ val: **self | 0x20 } }
         else { PpuStatus{ val: **self & !0x20} }
     }
     fn set_sprite_zero_hit(&mut self, val: bool) {
-        self = &mut if val { PpuStatus{ val: **self | 0x40 } }
+        *self = if val { PpuStatus{ val: **self | 0x40 } }
         else { PpuStatus{ val: **self & !0x40} }
     }
     fn set_in_vblank(&mut self, val: bool) {
-        self = &mut if val { PpuStatus{ val: **self | 0x80 } }
+        *self = if val { PpuStatus{ val: **self | 0x80 } }
         else { PpuStatus{ val: **self & !0x80} }
     }
 }

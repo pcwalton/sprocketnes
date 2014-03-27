@@ -56,6 +56,12 @@ impl Deref<[u8, ..0x800]> for Ram {
     }
 }
 
+impl DerefMut<[u8, ..0x800]> for Ram {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut [u8, ..0x800] {
+        &mut self.val
+    }
+}
+
 impl Mem for Ram {
     fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
     fn storeb(&mut self, addr: u16, val: u8) { self[addr & 0x7ff] = val }
@@ -63,12 +69,10 @@ impl Mem for Ram {
 
 impl Save for Ram {
     fn save(&mut self, fd: &mut File) {
-        let mut array: &mut [u8] = **self;
-        array.save(fd)
+        (*self).as_mut_slice().save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        let mut array: &mut [u8] = **self;
-        array.load(fd)
+        (*self).as_mut_slice().load(fd);
     }
 }
 
@@ -91,7 +95,7 @@ impl MemMap {
                apu: Apu)
                -> MemMap {
         MemMap {
-            ram: Ram{val: [ 0, ..0x800 ]},
+            ram: Ram{val: [ 0u8, ..0x800 ]},
             ppu: ppu,
             input: input,
             mapper: mapper,

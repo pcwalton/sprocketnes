@@ -197,6 +197,12 @@ impl Deref<u8> for ApuPulseSweep {
     }
 }
 
+impl DerefMut<u8> for ApuPulseSweep {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
+    }
+}
+
 impl ApuPulseSweep {
     fn enabled(self) -> bool   { (*self >> 7) != 0         }
     fn period(self) -> u8      { ((*self >> 4) & 0x7) + 1  }
@@ -286,6 +292,12 @@ struct ApuStatus{ val: u8 }
 impl Deref<u8> for ApuStatus {
     fn deref<'a>(&'a self) -> &'a u8 {
         &self.val
+    }
+}
+
+impl DerefMut<u8> for ApuStatus {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+        &mut self.val
     }
 }
 

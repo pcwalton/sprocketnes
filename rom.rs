@@ -59,7 +59,7 @@ impl Rom {
     }
 }
 
-struct INesHeader {
+pub struct INesHeader {
     magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
     prg_rom_size: u8,   // number of 16K units of PRG-ROM
     chr_rom_size: u8,   // number of 8K units of CHR-ROM
