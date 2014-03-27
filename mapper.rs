@@ -67,7 +67,13 @@ impl Mapper for Nrom {
 // See http://wiki.nesdev.com/w/index.php/Nintendo_MMC1
 //
 
-struct SxCtrl(u8);
+struct SxCtrl{ val: u8 }
+
+impl Deref<u8> for SxCtrl {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
 
 pub enum Mirroring {
     OneScreenLower,
@@ -116,7 +122,7 @@ impl SxRom {
         SxRom {
             rom: rom,
             regs: SxRegs {
-                ctrl: SxCtrl(3 << 2),
+                ctrl: SxCtrl{val: 3 << 2},
                 chr_bank_0: 0,
                 chr_bank_1: 0,
                 prg_bank: 0,
@@ -159,7 +165,7 @@ impl Mapper for SxRom {
         if (val & 0x80) != 0 {
             self.write_count = 0;
             self.accum = 0;
-            self.regs.ctrl = SxCtrl(*self.regs.ctrl | (3 << 2));
+            self.regs.ctrl = SxCtrl{val: *self.regs.ctrl | (3 << 2)};
             return;
         }
 
@@ -172,7 +178,7 @@ impl Mapper for SxRom {
 
             // Write to the right internal register.
             if addr <= 0x9fff {
-                self.regs.ctrl = SxCtrl(self.accum);
+                self.regs.ctrl = SxCtrl{val: self.accum};
             } else if addr <= 0xbfff {
                 self.regs.chr_bank_0 = self.accum;
             } else if addr <= 0xdfff {
@@ -198,7 +204,13 @@ impl Mapper for SxRom {
 // See http://wiki.nesdev.com/w/index.php/MMC3
 //
 
-struct TxBankSelect(u8);
+struct TxBankSelect{ val: u8 }
+
+impl Deref<u8> for TxBankSelect {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
 
 enum TxPrgBankMode {
     Swappable8000,
@@ -235,7 +247,7 @@ impl TxRom {
     fn new(rom: ~Rom) -> TxRom {
         TxRom {
             rom: rom,
-            regs: TxRegs { bank_select: TxBankSelect(0) },
+            regs: TxRegs { bank_select: TxBankSelect{val: 0} },
             prg_ram: ~([ 0, ..8192 ]),
 
             chr_banks_2k: [ 0, 0 ],
@@ -291,7 +303,7 @@ impl Mapper for TxRom {
         } else if addr < 0xa000 {
             if (addr & 1) == 0 {
                 // Bank select.
-                self.regs.bank_select = TxBankSelect(val);
+                self.regs.bank_select = TxBankSelect{val: val};
             } else {
                 // Bank data.
                 let bank_update_select = self.regs.bank_select.bank_update_select();
