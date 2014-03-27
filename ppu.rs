@@ -60,11 +60,17 @@ save_struct!(Regs { ctrl, mask, status, oam_addr, scroll, addr })
 // PPUCTRL: 0x2000
 //
 
-struct PpuCtrl(u8);
+struct PpuCtrl{ val: u8 }
 
 enum SpriteSize {
     SpriteSize8x8,
     SpriteSize8x16
+}
+
+impl Deref<u8> for PpuCtrl {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
 }
 
 impl PpuCtrl {
@@ -83,7 +89,13 @@ impl PpuCtrl {
 // PPUMASK: 0x2001
 //
 
-struct PpuMask(u8);
+struct PpuMask {val: u8 }
+
+impl Deref<u8> for PpuMask {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
 
 impl PpuMask {
     // 0x01: grayscale
@@ -100,18 +112,27 @@ impl PpuMask {
 // PPUSTATUS: 0x2002
 //
 
-struct PpuStatus(u8);
+struct PpuStatus { val: u8 }
+
+impl Deref<u8> for PpuStatus {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
 
 impl PpuStatus {
     // TODO: open bus junk in bits [0,5)
     fn set_sprite_overflow(&mut self, val: bool) {
-        if val { *self = PpuStatus(**self | 0x20) } else { *self = PpuStatus(**self & !0x20) }
+        self = &mut if val { PpuStatus{ val: **self | 0x20 } }
+        else { PpuStatus{ val: **self & !0x20} }
     }
     fn set_sprite_zero_hit(&mut self, val: bool) {
-        if val { *self = PpuStatus(**self | 0x40) } else { *self = PpuStatus(**self & !0x40) }
+        self = &mut if val { PpuStatus{ val: **self | 0x40 } }
+        else { PpuStatus{ val: **self & !0x40} }
     }
     fn set_in_vblank(&mut self, val: bool) {
-        if val { *self = PpuStatus(**self | 0x80) } else { *self = PpuStatus(**self & !0x80) }
+        self = &mut if val { PpuStatus{ val: **self | 0x80 } }
+        else { PpuStatus{ val: **self & !0x80} }
     }
 }
 
@@ -174,7 +195,7 @@ impl Mem for Vram {
     #[inline(always)]
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
-            let mut mapper = self.mapper.borrow().borrow_mut();
+            let mut mapper = self.mapper.borrow_mut();
             mapper.get().chr_loadb(addr)
         } else if addr < 0x3f00 {   // Name table area
             self.nametables[addr & 0x07ff]
@@ -186,7 +207,7 @@ impl Mem for Vram {
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
-            let mut mapper = self.mapper.borrow().borrow_mut();
+            let mut mapper = self.mapper.borrow_mut();
             mapper.get().chr_storeb(addr, val)
         } else if addr < 0x3f00 {           // Name table area
             let addr = addr & 0x07ff;
@@ -339,7 +360,7 @@ impl Mem for Ppu {
         debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
         match addr & 7 {
             0 => self.update_ppuctrl(val),
-            1 => self.regs.mask = PpuMask(val),
+            1 => self.regs.mask = PpuMask{val: val},
             2 => (),    // PPUSTATUS is read-only
             3 => self.regs.oam_addr = val,
             4 => self.write_oamdata(val),
@@ -412,9 +433,9 @@ impl Ppu {
     pub fn new(vram: Vram, oam: Oam) -> Ppu {
         Ppu {
             regs: Regs {
-                ctrl: PpuCtrl(0),
-                mask: PpuMask(0),
-                status: PpuStatus(0),
+                ctrl: PpuCtrl{val: 0},
+                mask: PpuMask{val: 0},
+                status: PpuStatus{val:0},
                 oam_addr: 0,
                 scroll: PpuScroll { x: 0, y: 0, next: XDir },
                 addr: PpuAddr { val: 0, next: Hi },
@@ -451,7 +472,7 @@ impl Ppu {
     //
 
     fn update_ppuctrl(&mut self, val: u8) {
-        self.regs.ctrl = PpuCtrl(val);
+        self.regs.ctrl = PpuCtrl{val:val};
 
         self.scroll_x = (self.scroll_x & 0xff) | self.regs.ctrl.x_scroll_offset();
         self.scroll_y = (self.scroll_y & 0xff) | self.regs.ctrl.y_scroll_offset();
@@ -773,7 +794,7 @@ impl Ppu {
             self.scanline += 1;
 
             {
-                let mut mapper = self.vram.mapper.borrow().borrow_mut();
+                let mut mapper = self.vram.mapper.borrow_mut();
                 if mapper.get().next_scanline() == Irq {
                     result.scanline_irq = true
                 }
