@@ -7,8 +7,8 @@
 #[feature(link_args, macro_rules)];
 #[no_main];
 
-extern mod native;
-extern mod sdl;
+extern crate native;
+extern crate sdl;
 
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_escape]

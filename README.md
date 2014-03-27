@@ -49,6 +49,10 @@ library installed; on the Mac you can install it with `brew install speex`.
 Finally, you will also need the Rust master branch; no Rust release can build
 `sprocketnes`.
 
+To build:
+
+    rustc nes.rs -L<SDL-LIB>
+
 There are numerous demos and games available for free for use with this
 emulator at http://nesdev.com/.
 
