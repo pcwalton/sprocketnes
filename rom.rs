@@ -9,8 +9,8 @@ use std::vec::Vec;
 
 pub struct Rom {
     header: INesHeader,
-    prg: ~[u8],         // PRG-ROM
-    chr: ~[u8],         // CHR-ROM
+    prg: Vec<u8>,         // PRG-ROM
+    chr: Vec<u8>,         // CHR-ROM
 }
 
 impl Rom {
@@ -43,9 +43,9 @@ impl Rom {
         ]);
 
         let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.read(prg_rom);
+        file.read(prg_rom.as_mut_slice());
         let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.read(chr_rom);
+        file.read(chr_rom.as_mut_slice());
 
         Rom {
             header: header,
