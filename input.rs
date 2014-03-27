@@ -23,7 +23,13 @@ static STROBE_STATE_DOWN: u8     = 5;
 static STROBE_STATE_LEFT: u8     = 6;
 static STROBE_STATE_RIGHT: u8    = 7;
 
-struct StrobeState(u8);
+struct StrobeState{ val: u8 }
+
+impl Deref<u8> for StrobeState {
+    fn deref<'a>(&'a self) -> &'a u8 {
+        &self.val
+    }
+}
 
 impl StrobeState {
     // Given a GamePadState structure, returns the state of the given button.
@@ -42,11 +48,11 @@ impl StrobeState {
     }
 
     fn next(&mut self) {
-        *self = StrobeState((**self + 1) & 7);
+        *self = StrobeState{val: (**self + 1) & 7};
     }
 
     fn reset(&mut self) {
-        *self = StrobeState(STROBE_STATE_A);
+        *self = StrobeState{val: STROBE_STATE_A};
     }
 }
 
@@ -91,7 +97,7 @@ impl Input {
                 select: false,
                 start: false,
 
-                strobe_state: StrobeState(STROBE_STATE_A)
+                strobe_state: StrobeState{val: STROBE_STATE_A}
             }
         }
     }
