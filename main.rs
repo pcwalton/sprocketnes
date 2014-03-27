@@ -118,7 +118,7 @@ pub fn start(argc: i32, argv: **u8) {
     let audio_buffer = audio::open();
 
     let mapper: ~Mapper:Freeze+Send = mapper::create_mapper(rom);
-    let mapper = Rc::from_mut(RefCell::new(mapper));
+    let mapper = Rc::new(RefCell::new(mapper));
     let ppu = Ppu::new(Vram::new(mapper.clone()), Oam::new());
     let input = Input::new();
     let apu = Apu::new(audio_buffer);
