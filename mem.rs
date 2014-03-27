@@ -48,7 +48,13 @@ impl<M:Mem> MemUtil for M {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram([u8, ..0x800]);
+pub struct Ram { val: [u8, ..0x800] }
+
+impl Deref<[u8, ..0x800]> for Ram {
+    fn deref<'a>(&'a self) -> &'a [u8, ..0x800] {
+        &self.val
+    }
+}
 
 impl Mem for Ram {
     fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
@@ -85,7 +91,7 @@ impl MemMap {
                apu: Apu)
                -> MemMap {
         MemMap {
-            ram: Ram([ 0, ..0x800 ]),
+            ram: Ram{val: [ 0, ..0x800 ]},
             ppu: ppu,
             input: input,
             mapper: mapper,
@@ -107,7 +113,7 @@ impl Mem for MemMap {
         } else if addr < 0x6000 {
             0   // FIXME: I think some mappers use regs in this area?
         } else {
-            let mut mapper = self.mapper.borrow().borrow_mut();
+            let mut mapper = self.mapper.borrow_mut();
             mapper.get().prg_loadb(addr)
         }
     }
@@ -123,7 +129,7 @@ impl Mem for MemMap {
         } else if addr < 0x6000 {
             // Nothing. FIXME: I think some mappers use regs in this area?
         } else {
-            let mut mapper = self.mapper.borrow().borrow_mut();
+            let mut mapper = self.mapper.borrow_mut();
             mapper.get().prg_storeb(addr, val)
         }
     }
