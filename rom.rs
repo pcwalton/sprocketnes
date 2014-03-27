@@ -5,7 +5,7 @@
 //
 
 use std::io::File;
-use std::vec;
+use std::vec::Vec;
 
 pub struct Rom {
     header: INesHeader,
@@ -42,9 +42,9 @@ impl Rom {
             0x1a,
         ]);
 
-        let mut prg_rom = vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
+        let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
         file.read(prg_rom);
-        let mut chr_rom = vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
+        let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
         file.read(chr_rom);
 
         Rom {
