@@ -60,11 +60,11 @@ struct Options {
 }
 
 fn usage() {
-    println("usage: sprocketnes [options] <path-to-rom>");
-    println("options:");
-    println("    -1 scale by 1x (default)");
-    println("    -2 scale by 2x");
-    println("    -3 scale by 3x");
+    println!("usage: sprocketnes [options] <path-to-rom>");
+    println!("options:");
+    println!("    -1 scale by 1x (default)");
+    println!("    -2 scale by 2x");
+    println!("    -3 scale by 3x");
 }
 
 fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
@@ -112,8 +112,7 @@ pub fn start(argc: i32, argv: **u8) {
 
     let rom_path: &str = options.rom_path;
     let rom = ~Rom::from_path(&Path::new(rom_path));
-    println("Loaded ROM:");
-    println(rom.header.to_str());
+    println!("Loaded ROM:\n{}", rom.header.to_str());
 
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();

@@ -131,7 +131,7 @@ impl Xorshift {
 #[cfg(debug)]
 pub fn debug_assert(cond: bool, msg: &str) {
     if !cond {
-        println(msg);
+        println!(msg);
     }
 }
 
@@ -140,7 +140,7 @@ pub fn debug_assert(_: bool, _: &str) {}
 
 #[cfg(debug)]
 pub fn debug_print(msg: &str) {
-    println(msg);
+    println!(msg);
 }
 
 #[cfg(not(debug))]
