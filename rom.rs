@@ -8,15 +8,15 @@ use std::io::File;
 use std::vec::Vec;
 
 pub struct Rom {
-    header: INesHeader,
-    prg: Vec<u8>,         // PRG-ROM
-    chr: Vec<u8>,         // CHR-ROM
+    pub header: INesHeader,
+    pub prg: Vec<u8>,         // PRG-ROM
+    pub chr: Vec<u8>,         // CHR-ROM
 }
 
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        file.read(buffer);
+        file.fill(buffer).unwrap();
 
         let header = INesHeader {
             magic: [
@@ -43,9 +43,9 @@ impl Rom {
         ]);
 
         let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.read(prg_rom.as_mut_slice());
+        file.fill(prg_rom.as_mut_slice()).unwrap();
         let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.read(chr_rom.as_mut_slice());
+        file.fill(chr_rom.as_mut_slice()).unwrap();
 
         Rom {
             header: header,
@@ -60,15 +60,15 @@ impl Rom {
 }
 
 pub struct INesHeader {
-    magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
-    prg_rom_size: u8,   // number of 16K units of PRG-ROM
-    chr_rom_size: u8,   // number of 8K units of CHR-ROM
-    flags_6: u8,
-    flags_7: u8,
-    prg_ram_size: u8,   // number of 8K units of PRG-RAM
-    flags_9: u8,
-    flags_10: u8,
-    zero: [u8, ..5],    // always zero
+    pub magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
+    pub prg_rom_size: u8,   // number of 16K units of PRG-ROM
+    pub chr_rom_size: u8,   // number of 8K units of CHR-ROM
+    pub flags_6: u8,
+    pub flags_7: u8,
+    pub prg_ram_size: u8,   // number of 8K units of PRG-RAM
+    pub flags_9: u8,
+    pub flags_10: u8,
+    pub zero: [u8, ..5],    // always zero
 }
 
 impl INesHeader {

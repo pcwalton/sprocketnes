@@ -48,7 +48,7 @@ impl<M:Mem> MemUtil for M {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram { val: [u8, ..0x800] }
+pub struct Ram { pub val: [u8, ..0x800] }
 
 impl Deref<[u8, ..0x800]> for Ram {
     fn deref<'a>(&'a self) -> &'a [u8, ..0x800] {
@@ -63,8 +63,8 @@ impl DerefMut<[u8, ..0x800]> for Ram {
 }
 
 impl Mem for Ram {
-    fn loadb(&mut self, addr: u16) -> u8     { self[addr & 0x7ff] }
-    fn storeb(&mut self, addr: u16, val: u8) { self[addr & 0x7ff] = val }
+    fn loadb(&mut self, addr: u16) -> u8     { self[addr as uint & 0x7ff] }
+    fn storeb(&mut self, addr: u16, val: u8) { self[addr as uint & 0x7ff] = val }
 }
 
 impl Save for Ram {
@@ -81,17 +81,17 @@ impl Save for Ram {
 //
 
 pub struct MemMap {
-    ram: Ram,
-    ppu: Ppu,
-    input: Input,
-    mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
-    apu: Apu,
+    pub ram: Ram,
+    pub ppu: Ppu,
+    pub input: Input,
+    pub mapper: Rc<RefCell<~Mapper:Send>>,
+    pub apu: Apu,
 }
 
 impl MemMap {
     pub fn new(ppu: Ppu,
                input: Input,
-               mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
+               mapper: Rc<RefCell<~Mapper:Send>>,
                apu: Apu)
                -> MemMap {
         MemMap {
@@ -118,7 +118,7 @@ impl Mem for MemMap {
             0   // FIXME: I think some mappers use regs in this area?
         } else {
             let mut mapper = self.mapper.borrow_mut();
-            mapper.get().prg_loadb(addr)
+            mapper.prg_loadb(addr)
         }
     }
     fn storeb(&mut self, addr: u16, val: u8) {
@@ -134,7 +134,7 @@ impl Mem for MemMap {
             // Nothing. FIXME: I think some mappers use regs in this area?
         } else {
             let mut mapper = self.mapper.borrow_mut();
-            mapper.get().prg_storeb(addr, val)
+            mapper.prg_storeb(addr, val)
         }
     }
 }

@@ -29,7 +29,7 @@ extern {
 }
 
 pub struct Resampler {
-    priv speex_resampler: *SpeexResamplerState,
+    speex_resampler: *SpeexResamplerState,
 }
 
 impl Resampler {

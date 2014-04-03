@@ -194,13 +194,13 @@ save_enum!(PpuAddrByte { Hi, Lo })
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
-    mapper: Rc<RefCell<~Mapper:Freeze+Send>>,
-    nametables: [u8, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
-    palette: [u8, ..0x20],
+    pub mapper: Rc<RefCell<~Mapper:Send>>,
+    pub nametables: [u8, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
+    pub palette: [u8, ..0x20],
 }
 
 impl Vram {
-    pub fn new(mapper: Rc<RefCell<~Mapper:Send+Freeze>>) -> Vram {
+    pub fn new(mapper: Rc<RefCell<~Mapper:Send>>) -> Vram {
         Vram {
             mapper: mapper,
             nametables: [ 0, ..0x800 ],
@@ -214,11 +214,11 @@ impl Mem for Vram {
     fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {          // Tilesets 0 or 1
             let mut mapper = self.mapper.borrow_mut();
-            mapper.get().chr_loadb(addr)
+            mapper.chr_loadb(addr)
         } else if addr < 0x3f00 {   // Name table area
-            self.nametables[addr & 0x07ff]
+            self.nametables[addr as uint & 0x07ff]
         } else if addr < 0x4000 {   // Palette area
-            self.palette[addr & 0x1f]
+            self.palette[addr as uint & 0x1f]
         } else {
             fail!("invalid VRAM read")
         }
@@ -226,16 +226,16 @@ impl Mem for Vram {
     fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
             let mut mapper = self.mapper.borrow_mut();
-            mapper.get().chr_storeb(addr, val)
+            mapper.chr_storeb(addr, val)
         } else if addr < 0x3f00 {           // Name table area
             let addr = addr & 0x07ff;
-            self.nametables[addr] = val;
+            self.nametables[addr as uint] = val;
         } else if addr < 0x4000 {   // Palette area
             let mut addr = addr & 0x1f;
             if addr == 0x10 {
                 addr = 0x00;    // Mirror sprite background color into universal background color.
             }
-            self.palette[addr] = val;
+            self.palette[addr as uint] = val;
         }
     }
 }
@@ -260,7 +260,7 @@ impl Save for Vram {
 //
 
 pub struct Oam {
-    oam: [u8, ..0x100]
+    pub oam: [u8, ..0x100]
 }
 
 impl Oam {
@@ -270,8 +270,8 @@ impl Oam {
 }
 
 impl Mem for Oam {
-    fn loadb(&mut self, addr: u16) -> u8     { self.oam[addr] }
-    fn storeb(&mut self, addr: u16, val: u8) { self.oam[addr] = val }
+    fn loadb(&mut self, addr: u16) -> u8     { self.oam[addr as uint] }
+    fn storeb(&mut self, addr: u16, val: u8) { self.oam[addr as uint] = val }
 }
 
 impl Save for Oam {
@@ -344,7 +344,7 @@ pub struct Ppu {
     vram: Vram,
     oam: Oam,
 
-    screen: ~([u8, ..184320]),  // 256 * 240 * 3
+    pub screen: ~([u8, ..184320]),  // 256 * 240 * 3
     scanline: u16,
     ppudata_buffer: u8,
 
@@ -392,9 +392,9 @@ impl Mem for Ppu {
 
 #[deriving(Eq)]
 pub struct StepResult {
-    new_frame: bool,    // We wrapped around to the next scanline.
-    vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
-    scanline_irq: bool, // The mapper wants to execute a scanline IRQ.
+    pub new_frame: bool,    // We wrapped around to the next scanline.
+    pub vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
+    pub scanline_irq: bool, // The mapper wants to execute a scanline IRQ.
 }
 
 struct Rgb {
@@ -479,9 +479,9 @@ impl Ppu {
     #[inline(always)]
     fn get_color(&self, palette_index: u8) -> Rgb {
         Rgb {
-            r: PALETTE[palette_index * 3 + 2],
-            g: PALETTE[palette_index * 3 + 1],
-            b: PALETTE[palette_index * 3 + 0],
+            r: PALETTE[palette_index as uint * 3 + 2],
+            g: PALETTE[palette_index as uint * 3 + 1],
+            b: PALETTE[palette_index as uint * 3 + 0],
         }
     }
 
@@ -813,7 +813,7 @@ impl Ppu {
 
             {
                 let mut mapper = self.vram.mapper.borrow_mut();
-                if mapper.get().next_scanline() == Irq {
+                if mapper.next_scanline() == Irq {
                     result.scanline_irq = true
                 }
             }

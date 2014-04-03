@@ -21,15 +21,15 @@ pub trait Save {
 }
 
 impl Save for u8 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self ]); }
-    fn load(&mut self, fd: &mut File) { let mut buf = [ 0 ]; fd.read(buf); *self = buf[0]; }
+    fn save(&mut self, fd: &mut File) { fd.write([ *self ]).unwrap(); }
+    fn load(&mut self, fd: &mut File) { let mut buf = [ 0 ]; fd.fill(buf).unwrap(); *self = buf[0]; }
 }
 
 impl Save for u16 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]); }
+    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
-        fd.read(buf);
+        fd.fill(buf).unwrap();
         *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
     }
 }
@@ -37,16 +37,16 @@ impl Save for u16 {
 impl Save for u64 {
     fn save(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        for i in range(0, 8) {
+        for i in range(0u, 8) {
             buf[i] = ((*self) >> (i * 8)) as u8;
         }
-        fd.write(buf);
+        fd.write(buf).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        fd.read(buf);
+        fd.fill(buf).unwrap();
         *self = 0;
-        for i in range(0, 8) {
+        for i in range(0u, 8) {
             *self = *self | (buf[i] as u64 << (i * 8));
         }
     }
@@ -54,18 +54,18 @@ impl Save for u64 {
 
 impl<'a> Save for &'a mut [u8] {
     fn save(&mut self, fd: &mut File) {
-        fd.write(*self);
+        fd.write(*self).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        fd.read(*self);
+        fd.fill(*self).unwrap();
     }
 }
 
 impl Save for bool {
-    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]); }
+    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
         let mut val: [u8, ..1] = [ 0 ];
-        fd.read(val);
+        fd.fill(val).unwrap();
         *self = val[0] != 0
     }
 }
@@ -105,10 +105,10 @@ macro_rules! save_enum(
 //
 
 pub struct Xorshift {
-    x: u32,
-    y: u32,
-    z: u32,
-    w: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+    pub w: u32,
 }
 
 impl Xorshift {
@@ -150,6 +150,7 @@ pub fn debug_print(_: &str) {}
 // Bindings for `gettimeofday(2)`
 //
 
+#[allow(non_camel_case_types)]
 struct timeval {
     tv_sec: time_t,
     tv_usec: u32,

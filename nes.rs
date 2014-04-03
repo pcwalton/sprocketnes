@@ -4,8 +4,8 @@
 // Author: Patrick Walton
 //
 
-#[feature(link_args, macro_rules)];
-#[no_main];
+#![feature(link_args, macro_rules)]
+#![no_main]
 
 extern crate native;
 extern crate sdl;

@@ -61,20 +61,20 @@ impl StrobeState {
 //
 
 pub struct GamePadState {
-    left: bool,
-    down: bool,
-    up: bool,
-    right: bool,
-    a: bool,
-    b: bool,
-    select: bool,
-    start: bool,
+    pub left: bool,
+    pub down: bool,
+    pub up: bool,
+    pub right: bool,
+    pub a: bool,
+    pub b: bool,
+    pub select: bool,
+    pub start: bool,
 
     strobe_state: StrobeState,
 }
 
 pub struct Input {
-    gamepad_0: GamePadState
+    pub gamepad_0: GamePadState
 }
 
 pub enum InputResult {

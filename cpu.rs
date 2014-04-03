@@ -318,13 +318,13 @@ macro_rules! decode_op {
 // Main CPU implementation
 //
 
-type Cycles = u64;
+pub type Cycles = u64;
 
 /// The main CPU structure definition.
 pub struct Cpu<M> {
-    cy: Cycles,
+    pub cy: Cycles,
     regs: Regs,
-    mem: M,
+    pub mem: M,
 }
 
 // The CPU implements Mem so that it can handle writes to the DMA register.
@@ -724,7 +724,7 @@ impl<M:Mem> Cpu<M> {
         let op = self.loadb_bump_pc();
         decode_op!(op, self);
 
-        self.cy += CYCLE_TABLE[op] as Cycles;
+        self.cy += CYCLE_TABLE[op as uint] as Cycles;
     }
 
     /// External interfaces

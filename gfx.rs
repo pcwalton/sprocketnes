@@ -168,8 +168,8 @@ fn draw_glyph(pixels: &mut [u8],
                     let mut index = (y + y_index) * (surface_width as int) * 3 + (x + x_index) * 3;
                     index += channel;
 
-                    if index < pixels.len() as int {
-                        pixels[index] = color_byte;
+                    if index >= 0 && index < pixels.len() as int {
+                        pixels[index as uint] = color_byte;
                     }
                 }
             }
@@ -178,7 +178,7 @@ fn draw_glyph(pixels: &mut [u8],
 }
 
 pub fn draw_text(pixels: &mut [u8], surface_width: uint, mut x: int, y: int, string: &str) {
-    for i in range(0, string.len()) {
+    for i in range(0u, string.len()) {
         let glyph_index = (string[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
             draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
@@ -261,9 +261,9 @@ impl Scale {
 }
 
 pub struct Gfx {
-    screen: ~Surface,
-    scale: Scale,
-    status_line: StatusLine,
+    pub screen: ~Surface,
+    pub scale: Scale,
+    pub status_line: StatusLine,
 }
 
 macro_rules! scaler(

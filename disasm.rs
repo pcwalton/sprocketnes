@@ -7,8 +7,8 @@
 use mem::Mem;
 
 pub struct Disassembler<'a,M> {
-    pc: u16,
-    mem: &'a mut M
+    pub pc: u16,
+    pub mem: &'a mut M
 }
 
 impl<'a,M:Mem> Disassembler<'a,M> {
