@@ -99,22 +99,22 @@ impl SxCtrl {
     }
 }
 
-pub struct SxRegs {
-    pub ctrl: SxCtrl,   // $8000-$9FFF
-    pub chr_bank_0: u8, // $A000-$BFFF
-    pub chr_bank_1: u8, // $C000-$DFFF
-    pub prg_bank: u8,   // $E000-$FFFF
+struct SxRegs {
+    ctrl: SxCtrl,   // $8000-$9FFF
+    chr_bank_0: u8, // $A000-$BFFF
+    chr_bank_1: u8, // $C000-$DFFF
+    prg_bank: u8,   // $E000-$FFFF
 }
 
 pub struct SxRom {
-    pub rom: ~Rom,
-    pub regs: SxRegs,
+    rom: ~Rom,
+    regs: SxRegs,
     // The internal accumulator.
-    pub accum: u8,
+    accum: u8,
     // The write count. At the 5th write, we update the register.
-    pub write_count: u8,
-    pub prg_ram: ~([u8, ..8192]),
-    pub chr_ram: ~([u8, ..8192]),
+    write_count: u8,
+    prg_ram: ~([u8, ..8192]),
+    chr_ram: ~([u8, ..8192]),
 }
 
 impl SxRom {

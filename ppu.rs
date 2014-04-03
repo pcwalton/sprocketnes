@@ -340,20 +340,20 @@ impl Sprite {
 // The main PPU structure. This structure is separate from the PPU memory just as the CPU is.
 
 pub struct Ppu {
-    pub regs: Regs,
-    pub vram: Vram,
-    pub oam: Oam,
+    regs: Regs,
+    vram: Vram,
+    oam: Oam,
 
     pub screen: ~([u8, ..184320]),  // 256 * 240 * 3
-    pub scanline: u16,
-    pub ppudata_buffer: u8,
+    scanline: u16,
+    ppudata_buffer: u8,
 
     // NB: These two cannot always be computed from PPUCTRL and PPUSCROLL, because PPUADDR *also*
     // updates the scroll position. This is important to emulate.
-    pub scroll_x: u16,
-    pub scroll_y: u16,
+    scroll_x: u16,
+    scroll_y: u16,
 
-    pub cy: u64
+    cy: u64
 }
 
 impl Mem for Ppu {

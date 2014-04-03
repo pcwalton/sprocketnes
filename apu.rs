@@ -11,7 +11,6 @@ use util::{Save, Xorshift};
 
 use sdl::audio;
 use std::io::File;
-use std::libc::c_int;
 
 static CYCLES_PER_EVEN_TICK: u64 = 7438;
 static CYCLES_PER_ODD_TICK: u64 = 7439;
@@ -242,7 +241,7 @@ impl ApuTriangle {
         self.length.storeb(addr, val, DisableBit7);
 
         if (addr & 3) == 0 {
-            self.linear_counter_reload = (val & 0x7f);
+            self.linear_counter_reload = val & 0x7f;
             //self.linear_counter = self.linear_counter_reload;
             self.linear_counter_halt = true;
         }
@@ -348,12 +347,12 @@ struct SampleBuffer {
 //
 
 pub struct Apu {
-    pub regs: Regs,
+    regs: Regs,
 
-    pub sample_buffers: ~([SampleBuffer, ..5]),
-    pub sample_buffer_offset: uint,
-    pub output_buffer: *mut OutputBuffer,
-    pub resampler: Resampler,
+    sample_buffers: ~([SampleBuffer, ..5]),
+    sample_buffer_offset: uint,
+    output_buffer: *mut OutputBuffer,
+    resampler: Resampler,
 
     pub cy: u64,
     pub ticks: u64,

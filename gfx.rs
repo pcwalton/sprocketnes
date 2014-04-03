@@ -237,7 +237,7 @@ impl StatusLineText {
 }
 
 pub struct StatusLine {
-    pub text: StatusLineText,
+    text: StatusLineText,
 }
 
 impl StatusLine {

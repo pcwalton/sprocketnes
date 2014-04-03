@@ -318,12 +318,12 @@ macro_rules! decode_op {
 // Main CPU implementation
 //
 
-type Cycles = u64;
+pub type Cycles = u64;
 
 /// The main CPU structure definition.
 pub struct Cpu<M> {
     pub cy: Cycles,
-    pub regs: Regs,
+    regs: Regs,
     pub mem: M,
 }
 

@@ -16,7 +16,7 @@ pub struct Rom {
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        file.read(buffer);
+        file.fill(buffer).unwrap();
 
         let header = INesHeader {
             magic: [
@@ -43,9 +43,9 @@ impl Rom {
         ]);
 
         let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.read(prg_rom.as_mut_slice());
+        file.fill(prg_rom.as_mut_slice()).unwrap();
         let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.read(chr_rom.as_mut_slice());
+        file.fill(chr_rom.as_mut_slice()).unwrap();
 
         Rom {
             header: header,

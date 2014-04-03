@@ -70,7 +70,7 @@ pub struct GamePadState {
     pub select: bool,
     pub start: bool,
 
-    pub strobe_state: StrobeState,
+    strobe_state: StrobeState,
 }
 
 pub struct Input {
