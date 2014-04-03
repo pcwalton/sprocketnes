@@ -21,15 +21,15 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn create_mapper(rom: ~Rom) -> ~Mapper:Send+Freeze {
+pub fn create_mapper(rom: ~Rom) -> ~Mapper:Send {
     match rom.header.ines_mapper() {
         0 => {
             ~Nrom {
                 rom: rom,
-            } as ~Mapper:Freeze+Send
+            } as ~Mapper:Send
         },
-        1 => ~SxRom::new(rom) as ~Mapper:Freeze+Send,
-        4 => ~TxRom::new(rom) as ~Mapper:Freeze+Send,
+        1 => ~SxRom::new(rom) as ~Mapper:Send,
+        4 => ~TxRom::new(rom) as ~Mapper:Send,
         _ => fail!("unsupported mapper")
     }
 }
@@ -42,7 +42,7 @@ pub fn create_mapper(rom: ~Rom) -> ~Mapper:Send+Freeze {
 
 // TODO: RAM.
 pub struct Nrom {
-    rom: ~Rom,
+    pub rom: ~Rom,
 }
 
 impl Mapper for Nrom {
@@ -100,21 +100,21 @@ impl SxCtrl {
 }
 
 pub struct SxRegs {
-    ctrl: SxCtrl,   // $8000-$9FFF
-    chr_bank_0: u8, // $A000-$BFFF
-    chr_bank_1: u8, // $C000-$DFFF
-    prg_bank: u8,   // $E000-$FFFF
+    pub ctrl: SxCtrl,   // $8000-$9FFF
+    pub chr_bank_0: u8, // $A000-$BFFF
+    pub chr_bank_1: u8, // $C000-$DFFF
+    pub prg_bank: u8,   // $E000-$FFFF
 }
 
 pub struct SxRom {
-    rom: ~Rom,
-    regs: SxRegs,
+    pub rom: ~Rom,
+    pub regs: SxRegs,
     // The internal accumulator.
-    accum: u8,
+    pub accum: u8,
     // The write count. At the 5th write, we update the register.
-    write_count: u8,
-    prg_ram: ~([u8, ..8192]),
-    chr_ram: ~([u8, ..8192]),
+    pub write_count: u8,
+    pub prg_ram: ~([u8, ..8192]),
+    pub chr_ram: ~([u8, ..8192]),
 }
 
 impl SxRom {
@@ -192,8 +192,8 @@ impl Mapper for SxRom {
     }
 
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
-    fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr]       }
-    fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr] = val }
+    fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr as uint]       }
+    fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr as uint] = val }
 
     fn next_scanline(&mut self) -> MapperResult { Continue }
 }
@@ -268,7 +268,7 @@ impl Mapper for TxRom {
         if addr < 0x6000 {
             0u8
         } else if addr < 0x8000 {
-            self.prg_ram[addr & 0x1fff]
+            self.prg_ram[addr as uint & 0x1fff]
         } else if addr < 0xa000 {
             // $8000-$9FFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
@@ -299,14 +299,14 @@ impl Mapper for TxRom {
         }
 
         if addr < 0x8000 {
-            self.prg_ram[addr & 0x1fff] = val;
+            self.prg_ram[addr as uint & 0x1fff] = val;
         } else if addr < 0xa000 {
             if (addr & 1) == 0 {
                 // Bank select.
                 self.regs.bank_select = TxBankSelect{val: val};
             } else {
                 // Bank data.
-                let bank_update_select = self.regs.bank_select.bank_update_select();
+                let bank_update_select = self.regs.bank_select.bank_update_select() as uint;
                 match bank_update_select {
                     0..1 => self.chr_banks_2k[bank_update_select] = val,
                     2..5 => self.chr_banks_1k[bank_update_select - 2] = val,

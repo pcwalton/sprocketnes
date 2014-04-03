@@ -69,7 +69,7 @@ impl ApuLength {
             3 => {
                 // FIXME: Only set `remaining` if APUSTATUS has enabled this channel.
                 self.id = val >> 3;
-                self.remaining = LENGTH_COUNTERS[self.id];
+                self.remaining = LENGTH_COUNTERS[self.id as uint];
             }
             _ => fail!("can't happen"),
         }
@@ -348,15 +348,15 @@ struct SampleBuffer {
 //
 
 pub struct Apu {
-    regs: Regs,
+    pub regs: Regs,
 
-    sample_buffers: ~([SampleBuffer, ..5]),
-    sample_buffer_offset: uint,
-    output_buffer: *mut OutputBuffer,
-    resampler: Resampler,
+    pub sample_buffers: ~([SampleBuffer, ..5]),
+    pub sample_buffer_offset: uint,
+    pub output_buffer: *mut OutputBuffer,
+    pub resampler: Resampler,
 
-    cy: u64,
-    ticks: u64,
+    pub cy: u64,
+    pub ticks: u64,
 }
 
 save_struct!(Apu { regs, cy, ticks })
@@ -418,7 +418,7 @@ impl Apu {
     fn update_status(&mut self, val: u8) {
         self.regs.status = ApuStatus{val:val};
 
-        for i in range(0, 2) {
+        for i in range(0u, 2) {
             if !self.regs.status.pulse_enabled(i as u8) {
                 self.regs.pulses[i].envelope.length.remaining = 0;
             }
@@ -454,7 +454,7 @@ impl Apu {
 
         if (addr & 3) == 2 {
             // TODO: Mode bit.
-            self.regs.noise.timer = NOISE_PERIODS[val & 0xf];
+            self.regs.noise.timer = NOISE_PERIODS[val as uint & 0xf];
         }
     }
 
@@ -485,7 +485,7 @@ impl Apu {
         // 120 Hz operations: length counter and sweep.
         if self.ticks % 2 == 0 {
             // TODO: Remember that triangle wave has a different length disable bit.
-            for i in range(0, 2) {
+            for i in range(0u, 2) {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
@@ -550,7 +550,7 @@ impl Apu {
         None
     }
 
-    fn play_pulse(&mut self, pulse_number: uint, channel: c_int) {
+    fn play_pulse(&mut self, pulse_number: uint, channel: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
         let audible = pulse.envelope.audible() && pulse.timer.audible();
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
@@ -563,7 +563,7 @@ impl Apu {
                 // TODO: Vectorize this for speed.
                 let volume = pulse.envelope.sample_volume();
                 let wavelen = pulse.timer.wavelen();
-                let waveform = PULSE_WAVEFORMS[pulse.duty];
+                let waveform = PULSE_WAVEFORMS[pulse.duty as uint];
                 let mut waveform_index = pulse.waveform_index;
                 let mut wavelen_count = pulse.timer.wavelen_count;
 
@@ -583,7 +583,7 @@ impl Apu {
         }
     }
 
-    fn play_triangle(&mut self, channel: c_int) {
+    fn play_triangle(&mut self, channel: uint) {
         let triangle = &mut self.regs.triangle;
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
@@ -603,7 +603,7 @@ impl Apu {
                     }
 
                     // FIXME: Factor out this calculation.
-                    *dest = (TRIANGLE_WAVEFORM[waveform_index] as i16 * 4) << 8;
+                    *dest = (TRIANGLE_WAVEFORM[waveform_index as uint] as i16 * 4) << 8;
                 }
 
                 triangle.waveform_index = waveform_index;
@@ -612,7 +612,7 @@ impl Apu {
         }
     }
 
-    fn play_noise(&mut self, channel: c_int) {
+    fn play_noise(&mut self, channel: uint) {
         let noise = &mut self.regs.noise;
         let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
@@ -653,9 +653,9 @@ impl Apu {
         // First, mix all sample buffers into the first one.
         //
         // FIXME: This should not be a linear mix, for accuracy.
-        for i in range(0, self.sample_buffers[0].samples.len()) {
+        for i in range(0u, self.sample_buffers[0].samples.len()) {
             let mut val = 0;
-            for j in range(0, 5) {
+            for j in range(0u, 5) {
                 val += self.sample_buffers[j].samples[i] as i32;
             }
 

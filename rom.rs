@@ -8,9 +8,9 @@ use std::io::File;
 use std::vec::Vec;
 
 pub struct Rom {
-    header: INesHeader,
-    prg: Vec<u8>,         // PRG-ROM
-    chr: Vec<u8>,         // CHR-ROM
+    pub header: INesHeader,
+    pub prg: Vec<u8>,         // PRG-ROM
+    pub chr: Vec<u8>,         // CHR-ROM
 }
 
 impl Rom {
@@ -60,15 +60,15 @@ impl Rom {
 }
 
 pub struct INesHeader {
-    magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
-    prg_rom_size: u8,   // number of 16K units of PRG-ROM
-    chr_rom_size: u8,   // number of 8K units of CHR-ROM
-    flags_6: u8,
-    flags_7: u8,
-    prg_ram_size: u8,   // number of 8K units of PRG-RAM
-    flags_9: u8,
-    flags_10: u8,
-    zero: [u8, ..5],    // always zero
+    pub magic: [u8, ..4],   // 'N' 'E' 'S' '\x1a'
+    pub prg_rom_size: u8,   // number of 16K units of PRG-ROM
+    pub chr_rom_size: u8,   // number of 8K units of CHR-ROM
+    pub flags_6: u8,
+    pub flags_7: u8,
+    pub prg_ram_size: u8,   // number of 8K units of PRG-RAM
+    pub flags_9: u8,
+    pub flags_10: u8,
+    pub zero: [u8, ..5],    // always zero
 }
 
 impl INesHeader {

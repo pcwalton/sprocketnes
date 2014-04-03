@@ -21,8 +21,8 @@ static SAMPLE_COUNT: uint = 4410 * 2;
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
 pub struct OutputBuffer {
-    samples: [u8, ..SAMPLE_COUNT],
-    play_offset: uint,
+    pub samples: [u8, ..SAMPLE_COUNT],
+    pub play_offset: uint,
 }
 
 fn nes_audio_callback(samples: &mut [u8]) {

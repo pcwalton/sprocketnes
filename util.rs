@@ -37,7 +37,7 @@ impl Save for u16 {
 impl Save for u64 {
     fn save(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        for i in range(0, 8) {
+        for i in range(0u, 8) {
             buf[i] = ((*self) >> (i * 8)) as u8;
         }
         fd.write(buf);
@@ -46,7 +46,7 @@ impl Save for u64 {
         let mut buf = [ 0, ..8 ];
         fd.read(buf);
         *self = 0;
-        for i in range(0, 8) {
+        for i in range(0u, 8) {
             *self = *self | (buf[i] as u64 << (i * 8));
         }
     }
@@ -105,10 +105,10 @@ macro_rules! save_enum(
 //
 
 pub struct Xorshift {
-    x: u32,
-    y: u32,
-    z: u32,
-    w: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+    pub w: u32,
 }
 
 impl Xorshift {
