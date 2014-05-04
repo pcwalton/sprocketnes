@@ -43,8 +43,8 @@ Other keys:
 
 * Quit: Escape
 
-If you want to build `sprocketnes`, you will first need `rust-sdl`, available
-at https://github.com/brson/rust-sdl. You will also need the Speex codec
+If you want to build `sprocketnes`, you will first need `rust-sdl2`, available
+at https://github.com/AngryLawyer/rust-sdl2. You will also need the Speex codec
 library installed; on the Mac you can install it with `brew install speex`.
 Finally, you will also need the Rust master branch; no Rust release can build
 `sprocketnes`.
