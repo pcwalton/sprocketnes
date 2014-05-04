@@ -4,11 +4,15 @@
 // Author: Patrick Walton
 //
 
-use sdl::sdl::{InitAudio, InitTimer, InitVideo};
-use sdl::sdl;
-use sdl::video::{SWSurface, Surface};
-use sdl::video;
-use std::cast::transmute;
+use sdl2::{InitAudio, InitTimer, InitVideo, InitEvents};
+use sdl2::pixels::BGR24;
+use sdl2::rect::Rect;
+use sdl2::render::{Accelerated, AccessStreaming, DriverAuto, Renderer, Texture};
+use sdl2::video::{PosCentered, Window, InputFocus};
+use sdl2;
+
+use libc::{int32_t, uint8_t};
+use std::owned::Box;
 
 static SCREEN_WIDTH: uint = 256;
 static SCREEN_HEIGHT: uint = 240;
@@ -22,13 +26,16 @@ static STATUS_LINE_X: uint = STATUS_LINE_PADDING;
 static STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
 static STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
 
+#[allow(dead_code)]
+static SCREEN_SIZE: uint = 184320;
+
 //
 // PT Ronda Seven
 //
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-static FONT_GLYPHS: [u8, ..FONT_GLYPH_LENGTH] = [
+static FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -126,7 +133,7 @@ static FONT_GLYPHS: [u8, ..FONT_GLYPH_LENGTH] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-static FONT_ADVANCES: [u8, ..FONT_GLYPH_COUNT] = [
+static FONT_ADVANCES: [uint8_t, ..FONT_GLYPH_COUNT] = [
     3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */, 
     4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */, 
     6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */, 
@@ -150,7 +157,7 @@ enum GlyphColor {
     Black,
 }
 
-fn draw_glyph(pixels: &mut [u8],
+fn draw_glyph(pixels: &mut [uint8_t],
               surface_width: uint,
               x: int,
               y: int,
@@ -177,7 +184,7 @@ fn draw_glyph(pixels: &mut [u8],
     }
 }
 
-pub fn draw_text(pixels: &mut [u8], surface_width: uint, mut x: int, y: int, string: &str) {
+pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int, string: &str) {
     for i in range(0u, string.len()) {
         let glyph_index = (string[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
@@ -196,19 +203,19 @@ enum StatusLineAnimation {
 }
 
 struct StatusLineText {
-    string: ~str,
+    string: StrBuf,
     animation: StatusLineAnimation,
 }
 
 impl StatusLineText {
     fn new() -> StatusLineText {
         StatusLineText {
-            string: "".to_str(),
+            string: "".to_strbuf(),
             animation: Idle,
         }
     }
 
-    fn set(&mut self, string: ~str) {
+    fn set(&mut self, string: StrBuf) {
         self.string = string;
         self.animation = Pausing(STATUS_LINE_PAUSE_DURATION);
     }
@@ -223,7 +230,7 @@ impl StatusLineText {
         }
     }
 
-    fn render(&self, pixels: &mut [u8]) {
+    fn render(&self, pixels: &mut [uint8_t]) {
         if self.animation == Idle {
             return;
         }
@@ -232,7 +239,7 @@ impl StatusLineText {
             SlidingOut(y) => y as int,
             Pausing(_) => STATUS_LINE_Y as int,
         };
-        draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as int, y, self.string);
+        draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as int, y, self.string.as_slice());
     }
 }
 
@@ -241,9 +248,17 @@ pub struct StatusLine {
 }
 
 impl StatusLine {
-    pub fn new() -> StatusLine       { StatusLine { text: StatusLineText::new() } }
-    pub fn set(&mut self, new_text: ~str)   { self.text.set(new_text);                   }
-    pub fn render(&self, pixels: &mut [u8]) { self.text.render(pixels);                  }
+    pub fn new() -> StatusLine {
+        StatusLine {
+            text: StatusLineText::new(),
+        }
+    }
+    pub fn set(&mut self, new_text: StrBuf) {
+        self.text.set(new_text);
+    }
+    pub fn render(&self, pixels: &mut [uint8_t]) {
+        self.text.render(pixels);
+    }
 }
 
 //
@@ -257,54 +272,21 @@ pub enum Scale {
 }
 
 impl Scale {
-    fn factor(self) -> uint { match self { Scale1x => 1, Scale2x => 2, Scale3x => 3 } }
+    fn factor(self) -> uint {
+        match self {
+            Scale1x => 1,
+            Scale2x => 2,
+            Scale3x => 3,
+        }
+    }
 }
 
 pub struct Gfx {
-    pub screen: ~Surface,
+    pub renderer: Box<Renderer>,
+    pub texture: Box<Texture>,
     pub scale: Scale,
     pub status_line: StatusLine,
 }
-
-macro_rules! scaler(
-    ($count:expr, $pixels:ident, $ppu_screen:ident) => (
-        // Type safety goes out the window when we're in a performance critical loop
-        // like this!
-
-        unsafe {
-            let mut dest: *mut u32 = transmute(&$pixels[0]);
-            let src_start: *u8 = transmute(&$ppu_screen[0]);
-
-            let mut src_y = 0;
-            while src_y < SCREEN_HEIGHT {
-                let src_scanline_start = src_start.offset((src_y * SCREEN_WIDTH * 3) as int);
-                let src_scanline_end = src_scanline_start.offset((SCREEN_WIDTH * 3) as int);
-
-                // Ugh, LLVM isn't inlining properly.
-                //
-                // FIXME: Mark for loop bodies as always inline in rustc.
-                let mut repeat_y = 0;
-                while repeat_y < $count {
-                    let mut src = src_scanline_start;
-                    while src < src_scanline_end {
-                        let r = *src as u32; src = src.offset(1);
-                        let g = *src as u32; src = src.offset(1);
-                        let b = *src as u32; src = src.offset(1);
-                        let pixel = (r << 24) | (g << 16) | (b << 8);
-
-                        let mut repeat_x = 0;
-                        while repeat_x < $count { 
-                            *dest = pixel; dest = dest.offset(1);
-                            repeat_x += 1;
-                        }
-                    }
-                    repeat_y += 1;
-                }
-                src_y += 1;
-            }
-        }
-    )
-)
 
 //
 // Main graphics routine
@@ -312,33 +294,46 @@ macro_rules! scaler(
 
 impl Gfx {
     pub fn new(scale: Scale) -> Gfx {
-        sdl::init([ InitVideo, InitAudio, InitTimer ]);
-        let screen = video::set_video_mode((SCREEN_WIDTH * scale.factor()) as int,
-                                           (SCREEN_HEIGHT * scale.factor()) as int,
-                                           32,
-                                           [ SWSurface ],
-                                           []);
+        sdl2::init(InitVideo | InitAudio | InitTimer | InitEvents);
+        let window = Window::new("sprocketnes",
+                                 PosCentered,
+                                 PosCentered,
+                                 (SCREEN_WIDTH as uint * scale.factor()) as int,
+                                 (SCREEN_HEIGHT as uint * scale.factor()) as int,
+                                 InputFocus).unwrap();
+        let renderer = Renderer::from_window(window, DriverAuto, Accelerated).unwrap();
+        let texture = renderer.create_texture(BGR24,
+                                              AccessStreaming,
+                                              SCREEN_WIDTH as int,
+                                              SCREEN_HEIGHT as int).unwrap();
 
-        Gfx { screen: screen.unwrap(), scale: scale, status_line: StatusLine::new() }
+        Gfx {
+            renderer: renderer,
+            texture: texture,
+            scale: scale,
+            status_line: StatusLine::new()
+        }
     }
 
     pub fn tick(&mut self) {
         self.status_line.text.tick();
     }
 
-    pub fn composite(&self, ppu_screen: &mut ([u8, ..184320])) {
+    pub fn composite(&self, ppu_screen: &mut ([uint8_t, ..SCREEN_SIZE])) {
         self.status_line.render(*ppu_screen);
-        self.blit(ppu_screen);
+        self.blit(&*ppu_screen);
+        drop(self.renderer.clear());
+        drop(self.renderer.copy(self.texture, None, Some(Rect {
+            x: 0,
+            y: 0,
+            w: (SCREEN_WIDTH * self.scale.factor()) as int32_t,
+            h: (SCREEN_HEIGHT * self.scale.factor()) as int32_t,
+        })));
+        self.renderer.present();
     }
 
-    fn blit(&self, ppu_screen: &([u8, ..184320])) {
-        self.screen.with_lock(|pixels| {
-            match self.scale {
-                Scale1x => scaler!(1, pixels, ppu_screen),
-                Scale2x => scaler!(2, pixels, ppu_screen),
-                Scale3x => scaler!(3, pixels, ppu_screen),
-            }
-        })
+    fn blit(&self, ppu_screen: &([uint8_t, ..SCREEN_SIZE])) {
+        self.texture.update(None, *ppu_screen, (SCREEN_WIDTH * 3) as int).unwrap()
     }
 }
 

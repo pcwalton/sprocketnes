@@ -4,8 +4,8 @@
 // Author: Patrick Walton
 //
 
+use libc::{c_int, c_void, time_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;
-use std::libc::{c_int, c_void, time_t};
 use std::ptr::null;
 
 //
@@ -20,25 +20,33 @@ pub trait Save {
     fn load(&mut self, fd: &mut File);
 }
 
-impl Save for u8 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self ]).unwrap(); }
-    fn load(&mut self, fd: &mut File) { let mut buf = [ 0 ]; fd.fill(buf).unwrap(); *self = buf[0]; }
-}
-
-impl Save for u16 {
-    fn save(&mut self, fd: &mut File) { fd.write([ *self as u8, (*self >> 8) as u8 ]).unwrap(); }
+impl Save for uint8_t {
+    fn save(&mut self, fd: &mut File) {
+        fd.write([ *self ]).unwrap();
+    }
     fn load(&mut self, fd: &mut File) {
-        let mut buf = [ 0, 0 ];
+        let mut buf = [ 0 ];
         fd.fill(buf).unwrap();
-        *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
+        *self = buf[0];
     }
 }
 
-impl Save for u64 {
+impl Save for uint16_t {
+    fn save(&mut self, fd: &mut File) {
+        fd.write([ *self as uint8_t, (*self >> 8) as uint8_t ]).unwrap();
+    }
+    fn load(&mut self, fd: &mut File) {
+        let mut buf = [ 0, 0 ];
+        fd.fill(buf).unwrap();
+        *self = (buf[0] as uint16_t) | ((buf[1] as uint16_t) << 8);
+    }
+}
+
+impl Save for uint64_t {
     fn save(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
         for i in range(0u, 8) {
-            buf[i] = ((*self) >> (i * 8)) as u8;
+            buf[i] = ((*self) >> (i * 8)) as uint8_t;
         }
         fd.write(buf).unwrap();
     }
@@ -47,12 +55,12 @@ impl Save for u64 {
         fd.fill(buf).unwrap();
         *self = 0;
         for i in range(0u, 8) {
-            *self = *self | (buf[i] as u64 << (i * 8));
+            *self = *self | (buf[i] as uint64_t << (i * 8));
         }
     }
 }
 
-impl<'a> Save for &'a mut [u8] {
+impl<'a> Save for &'a mut [uint8_t] {
     fn save(&mut self, fd: &mut File) {
         fd.write(*self).unwrap();
     }
@@ -64,7 +72,7 @@ impl<'a> Save for &'a mut [u8] {
 impl Save for bool {
     fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
-        let mut val: [u8, ..1] = [ 0 ];
+        let mut val: [uint8_t, ..1] = [ 0 ];
         fd.fill(val).unwrap();
         *self = val[0] != 0
     }
@@ -88,11 +96,11 @@ macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
         impl Save for $name {
             fn save(&mut self, fd: &mut File) {
-                let mut val: u8 = match *self { $val_0 => 0, $val_1 => 1 };
+                let mut val: uint8_t = match *self { $val_0 => 0, $val_1 => 1 };
                 val.save(fd)
             }
             fn load(&mut self, fd: &mut File) {
-                let mut val: u8 = 0;
+                let mut val: uint8_t = 0;
                 val.load(fd);
                 *self = if val == 0 { $val_0 } else { $val_1 };
             }
@@ -105,10 +113,10 @@ macro_rules! save_enum(
 //
 
 pub struct Xorshift {
-    pub x: u32,
-    pub y: u32,
-    pub z: u32,
-    pub w: u32,
+    pub x: uint32_t,
+    pub y: uint32_t,
+    pub z: uint32_t,
+    pub w: uint32_t,
 }
 
 impl Xorshift {
@@ -116,7 +124,7 @@ impl Xorshift {
         Xorshift { x: 123456789, y: 362436069, z: 521288629, w: 88675123 }
     }
 
-    pub fn next(&mut self) -> u32 {
+    pub fn next(&mut self) -> uint32_t {
         let t = self.x ^ (self.x << 11);
         self.x = self.y; self.y = self.z; self.z = self.w;
         self.w = self.w ^ (self.w >> 19) ^ (t ^ (t >> 8));
@@ -131,7 +139,7 @@ impl Xorshift {
 #[cfg(debug)]
 pub fn debug_assert(cond: bool, msg: &str) {
     if !cond {
-        println!(msg);
+        println!("{}", msg);
     }
 }
 
@@ -140,7 +148,7 @@ pub fn debug_assert(_: bool, _: &str) {}
 
 #[cfg(debug)]
 pub fn debug_print(msg: &str) {
-    println!(msg);
+    println!("{}", msg);
 }
 
 #[cfg(not(debug))]
@@ -153,18 +161,18 @@ pub fn debug_print(_: &str) {}
 #[allow(non_camel_case_types)]
 struct timeval {
     tv_sec: time_t,
-    tv_usec: u32,
+    tv_usec: uint32_t,
 }
 
 extern {
     fn gettimeofday(tp: *mut timeval, tzp: *c_void) -> c_int;
 }
 
-pub fn current_time_millis() -> u64 {
+pub fn current_time_millis() -> uint64_t {
     unsafe {
         let mut tv = timeval { tv_sec: 0, tv_usec: 0 };
         gettimeofday(&mut tv, null());
-        (tv.tv_sec as u64) * 1000 + (tv.tv_usec as u64) / 1000
+        (tv.tv_sec as uint64_t) * 1000 + (tv.tv_usec as uint64_t) / 1000
     }
 }
 

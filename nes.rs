@@ -7,8 +7,11 @@
 #![feature(link_args, macro_rules)]
 #![no_main]
 
+extern crate libc;
 extern crate native;
-extern crate sdl;
+extern crate sdl2;
+
+use libc::{int32_t, uint8_t};
 
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_escape]
@@ -31,7 +34,7 @@ pub mod rom;
 pub mod speex;
 
 #[no_mangle]
-pub extern "C" fn SDL_main(argc: i32, argv: **u8) -> i32 {
-    native::start(argc as int, argv, proc() main::start(argc, argv)) as i32
+pub extern "C" fn main(argc: int32_t, argv: **uint8_t) -> int32_t {
+    native::start(argc as int, argv, proc() main::start(argc, argv)) as int32_t
 }
 

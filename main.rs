@@ -18,25 +18,16 @@ use rom::Rom;
 use util::Save;
 use util;
 
+use libc::{int32_t, uint8_t, uint64_t};
 use std::cast;
 use std::cell::RefCell;
 use std::io::File;
+use std::owned::Box;
 use std::rc::Rc;
 use std::str;
 
-#[link(name="SDL")]
-#[link(name="SDLmain")]
-extern "C" {
-}
-
-#[cfg(target_os="macos")]
-#[link(name="objc")]
-#[link_args="-framework Cocoa"]
-extern "C" {
-}
-
 #[cfg(debug)]
-fn record_fps(last_time: &mut u64, frames: &mut uint) {
+fn record_fps(last_time: &mut uint64_t, frames: &mut uint) {
     let now = util::current_time_millis();
     if now >= *last_time + 1000 {
         println!("{} FPS", *frames);
@@ -48,14 +39,14 @@ fn record_fps(last_time: &mut u64, frames: &mut uint) {
 }
 
 #[cfg(not(debug))]
-fn record_fps(_: &mut u64, _: &mut uint) {}
+fn record_fps(_: &mut uint64_t, _: &mut uint) {}
 
 //
 // Argument parsing
 //
 
 struct Options {
-    rom_path: ~str,
+    rom_path: StrBuf,
     scale: Scale,
 }
 
@@ -67,9 +58,9 @@ fn usage() {
     println!("    -3 scale by 3x");
 }
 
-fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
+fn parse_args(argc: int32_t, argv: **uint8_t) -> Option<Options> {
     let mut options = Options {
-        rom_path: "".to_str(),
+        rom_path: StrBuf::new(),
         scale: Scale1x,
     };
 
@@ -84,11 +75,11 @@ fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
             options.scale = Scale2x;
         } else if "-3" == arg {
             options.scale = Scale3x;
-        } else if arg[0] == ('-' as u8) {
+        } else if arg[0] == ('-' as uint8_t) {
             usage();
             return None;
         } else {
-            options.rom_path = arg;
+            options.rom_path = arg.to_strbuf();
         }
     }
 
@@ -104,20 +95,20 @@ fn parse_args(argc: i32, argv: **u8) -> Option<Options> {
 // Entry point and main loop
 //
 
-pub fn start(argc: i32, argv: **u8) {
+pub fn start(argc: int32_t, argv: **uint8_t) {
     let options = match parse_args(argc, argv) {
         Some(options) => options,
         None => return,
     };
 
-    let rom_path: &str = options.rom_path;
-    let rom = ~Rom::from_path(&Path::new(rom_path));
+    let rom_path = options.rom_path.as_slice();
+    let rom = box Rom::from_path(&Path::new(rom_path));
     println!("Loaded ROM:\n{}", rom.header.to_str());
 
     let mut gfx = Gfx::new(options.scale);
     let audio_buffer = audio::open();
 
-    let mapper: ~Mapper:Send = mapper::create_mapper(rom);
+    let mapper: Box<Mapper:Send> = mapper::create_mapper(rom);
     let mapper = Rc::new(RefCell::new(mapper));
     let ppu = Ppu::new(Vram::new(mapper.clone()), Oam::new());
     let input = Input::new();
@@ -141,27 +132,27 @@ pub fn start(argc: i32, argv: **u8) {
             cpu.irq();
         }
 
+        cpu.mem.apu.step(cpu.cy);
+
         if ppu_result.new_frame {
             gfx.tick();
-            gfx.composite(cpu.mem.ppu.screen);
-            gfx.screen.flip();
+            gfx.composite(&mut *cpu.mem.ppu.screen);
             record_fps(&mut last_time, &mut frames);
+            cpu.mem.apu.play_channels();
 
             match cpu.mem.input.check_input() {
                 input::Continue => {}
                 input::Quit => break,
                 input::SaveState => {
                     cpu.save(&mut File::create(&Path::new("state.sav")).unwrap());
-                    gfx.status_line.set("Saved state".to_str());
+                    gfx.status_line.set("Saved state".to_strbuf());
                 }
                 input::LoadState => {
                     cpu.load(&mut File::open(&Path::new("state.sav")).unwrap());
-                    gfx.status_line.set("Loaded state".to_str());
+                    gfx.status_line.set("Loaded state".to_strbuf());
                 }
             }
         }
-
-        cpu.mem.apu.step(cpu.cy);
     }
 
     audio::close();

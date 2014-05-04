@@ -4,36 +4,38 @@
 // Author: Patrick Walton
 //
 
-use audio::OutputBuffer;
+use audio::{AudioLock, OutputBuffer};
+use audio;
 use mem::Mem;
 use speex::Resampler;
 use util::{Save, Xorshift};
 
-use sdl::audio;
+use libc::{int16_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;
+use std::owned::Box;
 
-static CYCLES_PER_EVEN_TICK: u64 = 7438;
-static CYCLES_PER_ODD_TICK: u64 = 7439;
+static CYCLES_PER_EVEN_TICK: uint64_t = 7438;
+static CYCLES_PER_ODD_TICK: uint64_t = 7439;
 
-static NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
-static OUTPUT_SAMPLE_RATE: u32 = 44100;
-static TICK_FREQUENCY: u32 = 240;
-static NES_SAMPLES_PER_TICK: u32 = NES_SAMPLE_RATE / TICK_FREQUENCY;
+static NES_SAMPLE_RATE: uint32_t = 1789920;   // Actual is 1789800, but this is divisible by 240.
+static OUTPUT_SAMPLE_RATE: uint32_t = 44100;
+static TICK_FREQUENCY: uint32_t = 240;
+static NES_SAMPLES_PER_TICK: uint32_t = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
-static PULSE_WAVEFORMS: [u8, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
+static PULSE_WAVEFORMS: [uint8_t, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
-static LENGTH_COUNTERS: [u8, ..32] = [
+static LENGTH_COUNTERS: [uint8_t, ..32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-static TRIANGLE_WAVEFORM: [u8, ..32] = [
+static TRIANGLE_WAVEFORM: [uint8_t, ..32] = [
     15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 ];
 
 // TODO: PAL
-static NOISE_PERIODS: [u16, ..16] = [
+static NOISE_PERIODS: [uint16_t, ..16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 ];
 
@@ -42,16 +44,16 @@ static NOISE_PERIODS: [u16, ..16] = [
 //
 
 // There are two modes in which the disable bit can be set: bit 5 (pulses) or bit 7 (triangle).
-trait DisableBit { fn bit_number(self) -> u8; }
+trait DisableBit { fn bit_number(self) -> uint8_t; }
 struct DisableBit5;
-impl DisableBit for DisableBit5 { fn bit_number(self) -> u8 { 5 } }
+impl DisableBit for DisableBit5 { fn bit_number(self) -> uint8_t { 5 } }
 struct DisableBit7;
-impl DisableBit for DisableBit7 { fn bit_number(self) -> u8 { 7 } }
+impl DisableBit for DisableBit7 { fn bit_number(self) -> uint8_t { 7 } }
 
 struct ApuLength {
     disable: bool,
-    id: u8,
-    remaining: u8,
+    id: uint8_t,
+    remaining: uint8_t,
 }
 
 save_struct!(ApuLength { disable, id, remaining })
@@ -61,7 +63,7 @@ impl ApuLength {
 
     // Channels that support the APU Length follow the same register protocol, *except* that the
     // disable bit may be different.
-    fn storeb<DB:DisableBit>(&mut self, addr: u16, val: u8, db: DB) {
+    fn storeb<DB:DisableBit>(&mut self, addr: uint16_t, val: uint8_t, db: DB) {
         match addr & 0x3 {
             0 => self.disable = ((val >> db.bit_number()) & 1) != 0,
             1 | 2 => {}
@@ -87,9 +89,9 @@ impl ApuLength {
 
 struct ApuEnvelope {
     enabled: bool,
-    volume: u8,
-    period: u8,
-    counter: u8,
+    volume: uint8_t,
+    period: uint8_t,
+    counter: uint8_t,
     length: ApuLength,
 }
 
@@ -101,7 +103,7 @@ impl ApuEnvelope {
     }
 
     // Channels that support the APU Envelope follow the same register protocol.
-    fn storeb(&mut self, addr: u16, val: u8) {
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         self.length.storeb(addr, val, DisableBit5);
 
         if (addr & 0x3) == 0 {
@@ -138,7 +140,7 @@ impl ApuEnvelope {
 
     fn loops(self) -> bool { self.length.disable }
     fn audible(&self) -> bool { self.volume > 0 && self.length.remaining > 0 }
-    fn sample_volume(&self) -> i16 { (self.volume as i16 * 4) << 8 }
+    fn sample_volume(&self) -> int16_t { (self.volume as int16_t * 4) << 8 }
 }
 
 //
@@ -146,8 +148,8 @@ impl ApuEnvelope {
 //
 
 struct ApuTimer {
-    value: u16,             // The raw timer value as written to the register.
-    wavelen_count: u64,     // How many clock ticks have passed since the last period.
+    value: uint16_t,             // The raw timer value as written to the register.
+    wavelen_count: uint64_t,     // How many clock ticks have passed since the last period.
 }
 
 save_struct!(ApuTimer { value, wavelen_count })
@@ -156,17 +158,17 @@ impl ApuTimer {
     fn new() -> ApuTimer { ApuTimer { value: 0, wavelen_count: 0 } }
 
     // Channels that support the APU Envelope follow the same register protocol.
-    fn storeb(&mut self, addr: u16, val: u8) {
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         match addr & 0x3 {
             0 | 1 => {}
-            2 => self.value = (self.value & 0xff00) | (val as u16),
-            3 => self.value = (self.value & 0x00ff) | ((val as u16 & 0x7) << 8),
+            2 => self.value = (self.value & 0xff00) | (val as uint16_t),
+            3 => self.value = (self.value & 0x00ff) | ((val as uint16_t & 0x7) << 8),
             _ => fail!("can't happen"),
         }
     }
 
     fn audible(&self) -> bool { self.value > 0 }
-    fn wavelen(&self) -> u64 { (self.value as u64 + 1) * 2 }
+    fn wavelen(&self) -> uint64_t { (self.value as uint64_t + 1) * 2 }
 }
 
 //
@@ -177,9 +179,9 @@ struct ApuPulse {
     envelope: ApuEnvelope,
     sweep: ApuPulseSweep,
     timer: ApuTimer,
-    duty: u8,
-    sweep_cycle: u8,
-    waveform_index: u8,
+    duty: uint8_t,
+    sweep_cycle: uint8_t,
+    waveform_index: uint8_t,
 }
 
 save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_index })
@@ -188,25 +190,25 @@ save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_inde
 // APU pulse sweep
 //
 
-struct ApuPulseSweep{ val: u8 }
+struct ApuPulseSweep{ val: uint8_t }
 
-impl Deref<u8> for ApuPulseSweep {
-    fn deref<'a>(&'a self) -> &'a u8 {
+impl Deref<uint8_t> for ApuPulseSweep {
+    fn deref<'a>(&'a self) -> &'a uint8_t {
         &self.val
     }
 }
 
-impl DerefMut<u8> for ApuPulseSweep {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+impl DerefMut<uint8_t> for ApuPulseSweep {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
         &mut self.val
     }
 }
 
 impl ApuPulseSweep {
     fn enabled(self) -> bool   { (*self >> 7) != 0         }
-    fn period(self) -> u8      { ((*self >> 4) & 0x7) + 1  }
+    fn period(self) -> uint8_t      { ((*self >> 4) & 0x7) + 1  }
     fn negate(self) -> bool    { ((*self >> 3) & 0x1) != 0 }
-    fn shift_count(self) -> u8 { *self & 0x7               }
+    fn shift_count(self) -> uint8_t { *self & 0x7               }
 }
 
 //
@@ -216,10 +218,10 @@ impl ApuPulseSweep {
 struct ApuTriangle {
     timer: ApuTimer,
     length: ApuLength,
-    linear_counter: u8,
-    linear_counter_reload: u8,
+    linear_counter: uint8_t,
+    linear_counter_reload: uint8_t,
     linear_counter_halt: bool,
-    waveform_index: u8,
+    waveform_index: uint8_t,
 }
 
 save_struct!(ApuTriangle { timer, length, linear_counter })
@@ -236,7 +238,7 @@ impl ApuTriangle {
         }
     }
 
-    fn storeb(&mut self, addr: u16, val: u8) {
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         self.timer.storeb(addr, val);
         self.length.storeb(addr, val, DisableBit7);
 
@@ -269,8 +271,8 @@ impl ApuTriangle {
 
 struct ApuNoise {
     envelope: ApuEnvelope,
-    timer: u16,         // The number of ticks per possible waveform change.
-    timer_count: u16,   // The number of ticks since the last timer.
+    timer: uint16_t,         // The number of ticks per possible waveform change.
+    timer_count: uint16_t,   // The number of ticks since the last timer.
     rng: Xorshift,      // The xorshift RNG. FIXME: This is inaccurate.
 }
 
@@ -286,22 +288,22 @@ impl ApuNoise {
 // APUSTATUS: 0x4015
 //
 
-struct ApuStatus{ val: u8 }
+struct ApuStatus{ val: uint8_t }
 
-impl Deref<u8> for ApuStatus {
-    fn deref<'a>(&'a self) -> &'a u8 {
+impl Deref<uint8_t> for ApuStatus {
+    fn deref<'a>(&'a self) -> &'a uint8_t {
         &self.val
     }
 }
 
-impl DerefMut<u8> for ApuStatus {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut u8 {
+impl DerefMut<uint8_t> for ApuStatus {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
         &mut self.val
     }
 }
 
 impl ApuStatus {
-    fn pulse_enabled(self, channel: u8) -> bool { ((*self >> channel) & 1) != 0 }
+    fn pulse_enabled(self, channel: uint8_t) -> bool { ((*self >> channel) & 1) != 0 }
     fn triangle_enabled(self) -> bool           { (*self & 0x04) != 0 }
     fn noise_enabled(self) -> bool              { (*self & 0x08) != 0 }
 }
@@ -338,8 +340,10 @@ impl Save for Regs {
 // Sample buffers
 //
 
+static SAMPLE_COUNT: uint = 178992;
+
 struct SampleBuffer {
-    samples: [i16, ..178992],
+    samples: [int16_t, ..SAMPLE_COUNT],
 }
 
 //
@@ -349,25 +353,25 @@ struct SampleBuffer {
 pub struct Apu {
     regs: Regs,
 
-    sample_buffers: ~([SampleBuffer, ..5]),
+    sample_buffers: Box<[SampleBuffer, ..5]>,
     sample_buffer_offset: uint,
     output_buffer: *mut OutputBuffer,
     resampler: Resampler,
 
-    pub cy: u64,
-    pub ticks: u64,
+    pub cy: uint64_t,
+    pub ticks: uint64_t,
 }
 
 save_struct!(Apu { regs, cy, ticks })
 
 impl Mem for Apu {
-    fn loadb(&mut self, addr: u16) -> u8 {
+    fn loadb(&mut self, addr: uint16_t) -> uint8_t {
         match addr {
             0x4015 => *self.regs.status,
             _ => 0
         }
     }
-    fn storeb(&mut self, addr: u16, val: u8) {
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         match addr {
             0x4000..0x4003 => self.update_pulse(addr, val, 0),
             0x4004..0x4007 => self.update_pulse(addr, val, 1),
@@ -398,9 +402,9 @@ impl Apu {
                 status: ApuStatus{val:0},
             },
 
-            sample_buffers: ~([
+            sample_buffers: box() ([
                 SampleBuffer {
-                    samples: [ 0, ..178992 ]
+                    samples: [ 0, ..SAMPLE_COUNT ]
                 },
                 ..5
             ]),
@@ -414,11 +418,11 @@ impl Apu {
         }
     }
 
-    fn update_status(&mut self, val: u8) {
+    fn update_status(&mut self, val: uint8_t) {
         self.regs.status = ApuStatus{val:val};
 
         for i in range(0u, 2) {
-            if !self.regs.status.pulse_enabled(i as u8) {
+            if !self.regs.status.pulse_enabled(i as uint8_t) {
                 self.regs.pulses[i].envelope.length.remaining = 0;
             }
         }
@@ -431,7 +435,7 @@ impl Apu {
     }
 
     // FIXME: Refactor into a method on ApuPulse itself.
-    fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: uint) {
+    fn update_pulse(&mut self, addr: uint16_t, val: uint8_t, pulse_number: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
         pulse.envelope.storeb(addr, val);   // Write to the envelope.
         pulse.timer.storeb(addr, val);      // Write to the timer.
@@ -448,7 +452,7 @@ impl Apu {
     }
 
     // FIXME: Refactor into a method on ApuNoise itself.
-    fn update_noise(&mut self, addr: u16, val: u8) {
+    fn update_noise(&mut self, addr: uint16_t, val: uint8_t) {
         self.regs.noise.envelope.storeb(addr, val);
 
         if (addr & 3) == 2 {
@@ -461,7 +465,7 @@ impl Apu {
     // Playback
     //
 
-    pub fn step(&mut self, run_to_cycle: u64) {
+    pub fn step(&mut self, run_to_cycle: uint64_t) {
         loop {
             let mut next_tick_cycle = self.cy;
             if self.ticks % 2 == 0 {
@@ -524,9 +528,6 @@ impl Apu {
         self.play_noise(3);
         self.sample_buffer_offset += NES_SAMPLES_PER_TICK as uint;
 
-        // Now play the channels, flushing the sample buffers, if necessary.
-        self.play_channels();
-
         // TODO: 60 Hz IRQ.
 
         self.ticks += 1;
@@ -536,8 +537,8 @@ impl Apu {
     // Channel playback
     //
 
-    fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [i16], offset: uint, audible: bool)
-                                     -> Option<&'a mut [i16]> {
+    fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [int16_t], offset: uint, audible: bool)
+                                     -> Option<&'a mut [int16_t]> {
         let buffer = buffer.mut_slice(offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);
@@ -602,7 +603,7 @@ impl Apu {
                     }
 
                     // FIXME: Factor out this calculation.
-                    *dest = (TRIANGLE_WAVEFORM[waveform_index as uint] as i16 * 4) << 8;
+                    *dest = (TRIANGLE_WAVEFORM[waveform_index as uint] as int16_t * 4) << 8;
                 }
 
                 triangle.waveform_index = waveform_index;
@@ -642,7 +643,7 @@ impl Apu {
     }
 
     // Resamples and flushes channel buffers to the audio output device if necessary.
-    fn play_channels(&mut self) {
+    pub fn play_channels(&mut self) {
         let sample_buffer_length = self.sample_buffers[0].samples.len();
         if self.sample_buffer_offset < sample_buffer_length {
             return;
@@ -655,7 +656,7 @@ impl Apu {
         for i in range(0u, self.sample_buffers[0].samples.len()) {
             let mut val = 0;
             for j in range(0u, 5) {
-                val += self.sample_buffers[j].samples[i] as i32;
+                val += self.sample_buffers[j].samples[i] as int32_t;
             }
 
             if val > 32767 {
@@ -664,31 +665,28 @@ impl Apu {
                 val = -32768;
             }
 
-            self.sample_buffers[0].samples[i] = val as i16;
+            self.sample_buffers[0].samples[i] = val as int16_t;
         }
 
         // Wait for the audio callback to catch up if necessary.
-        // FIXME: This is a racy spinlock; use condvars instead.
         loop {
-            let played = audio::with_lock(|| {
-                unsafe {
-                    (*self.output_buffer).play_offset == (*self.output_buffer).samples.len()
+            unsafe {
+                let lock = audio::g_mutex.lock();
+                lock.wait();
+                if (*self.output_buffer).play_offset == (*self.output_buffer).samples.len() {
+                    break
                 }
-            });
-            if played {
-                break;
             }
         }
 
         // Resample and output the audio.
-        audio::with_lock(|| {
-            unsafe {
-                let _ = self.resampler.process(0,
-                                               self.sample_buffers[0].samples,
-                                               (*self.output_buffer).samples);
-                (*self.output_buffer).play_offset = 0;
-            }
-        })
+        let _lock = AudioLock::lock();
+        unsafe {
+            let _ = self.resampler.process(0,
+                                           self.sample_buffers[0].samples,
+                                           (*self.output_buffer).samples);
+            (*self.output_buffer).play_offset = 0;
+        }
     }
 }
 

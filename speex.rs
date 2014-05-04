@@ -4,27 +4,27 @@
 // Author: Patrick Walton
 //
 
+use libc::{c_int, c_void, int16_t, uint8_t, uint32_t};
 use std::cast::transmute;
-use std::libc::{c_int, c_void};
 use std::ptr::null;
 
 type SpeexResamplerState = c_void;
 
 #[link_args="-lspeexdsp"]
 extern {
-    fn speex_resampler_init(nb_channels: u32,
-                            in_rate: u32,
-                            out_rate: u32,
+    fn speex_resampler_init(nb_channels: uint32_t,
+                            in_rate: uint32_t,
+                            out_rate: uint32_t,
                             quality: c_int,
                             err: *mut c_int)
                             -> *SpeexResamplerState;
     fn speex_resampler_destroy(st: *SpeexResamplerState);
     fn speex_resampler_process_int(st: *SpeexResamplerState,
-                                   channel_index: u32,
-                                   input: *i16,
-                                   in_len: *mut u32,
-                                   out: *i16,
-                                   out_len: *mut u32)
+                                   channel_index: uint32_t,
+                                   input: *int16_t,
+                                   in_len: *mut uint32_t,
+                                   out: *int16_t,
+                                   out_len: *mut uint32_t)
                                    -> c_int;
 }
 
@@ -33,7 +33,7 @@ pub struct Resampler {
 }
 
 impl Resampler {
-    pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
+    pub fn new(channels: uint32_t, in_rate: uint32_t, out_rate: uint32_t, quality: c_int)
                -> Result<Resampler,c_int> {
         unsafe {
             let mut err = 0;
@@ -52,11 +52,12 @@ impl Resampler {
         }
     }
 
-    pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8]) -> (u32, u32) {
+    pub fn process(&self, channel_index: uint32_t, input: &[int16_t], out: &mut [uint8_t])
+                   -> (uint32_t, uint32_t) {
         unsafe {
             assert!(input.len() <= 0xffffffff);
             assert!(out.len() / 2 <= 0xffffffff);
-            let (in_len, out_len) = (input.len() as u32, out.len() as u32 / 2);
+            let (in_len, out_len) = (input.len() as uint32_t, out.len() as uint32_t / 2);
             let mut in_len = in_len;
             let mut out_len = out_len;
             let err = speex_resampler_process_int(self.speex_resampler,
