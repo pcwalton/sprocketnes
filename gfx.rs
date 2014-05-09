@@ -308,8 +308,8 @@ impl Gfx {
                                               SCREEN_HEIGHT as int).unwrap();
 
         Gfx {
-            renderer: renderer,
-            texture: texture,
+            renderer: box renderer,
+            texture: box texture,
             scale: scale,
             status_line: StatusLine::new()
         }
