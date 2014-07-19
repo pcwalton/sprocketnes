@@ -170,7 +170,7 @@ fn draw_glyph(pixels: &mut [uint8_t],
     for y_index in range(0, 10) {
         let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
         for x_index in range(0, 8) {
-            if ((row >> (7 - x_index)) & 1) != 0 {
+            if ((row >> (7 - x_index) as uint) & 1) != 0 {
                 for channel in range(0, 3) {
                     let mut index = (y + y_index) * (surface_width as int) * 3 + (x + x_index) * 3;
                     index += channel;
@@ -186,7 +186,7 @@ fn draw_glyph(pixels: &mut [uint8_t],
 
 pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int, string: &str) {
     for i in range(0u, string.len()) {
-        let glyph_index = (string[i] - 32) as uint;
+        let glyph_index = (string.as_bytes()[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
             draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
             draw_glyph(pixels, surface_width, x, y, White, glyph_index);        // Main
@@ -195,7 +195,7 @@ pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int
     }
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq, Eq)]
 enum StatusLineAnimation {
     Idle,
     Pausing(uint),
@@ -203,19 +203,19 @@ enum StatusLineAnimation {
 }
 
 struct StatusLineText {
-    string: StrBuf,
+    string: String,
     animation: StatusLineAnimation,
 }
 
 impl StatusLineText {
     fn new() -> StatusLineText {
         StatusLineText {
-            string: "".to_strbuf(),
+            string: "".to_string(),
             animation: Idle,
         }
     }
 
-    fn set(&mut self, string: StrBuf) {
+    fn set(&mut self, string: String) {
         self.string = string;
         self.animation = Pausing(STATUS_LINE_PAUSE_DURATION);
     }
@@ -253,7 +253,7 @@ impl StatusLine {
             text: StatusLineText::new(),
         }
     }
-    pub fn set(&mut self, new_text: StrBuf) {
+    pub fn set(&mut self, new_text: String) {
         self.text.set(new_text);
     }
     pub fn render(&self, pixels: &mut [uint8_t]) {
@@ -282,7 +282,7 @@ impl Scale {
 }
 
 pub struct Gfx {
-    pub renderer: Box<Renderer>,
+    pub renderer: Box<Renderer<Window>>,
     pub texture: Box<Texture>,
     pub scale: Scale,
     pub status_line: StatusLine,
@@ -308,8 +308,8 @@ impl Gfx {
                                               SCREEN_HEIGHT as int).unwrap();
 
         Gfx {
-            renderer: renderer,
-            texture: texture,
+            renderer: box renderer,
+            texture: box texture,
             scale: scale,
             status_line: StatusLine::new()
         }
@@ -323,7 +323,7 @@ impl Gfx {
         self.status_line.render(*ppu_screen);
         self.blit(&*ppu_screen);
         drop(self.renderer.clear());
-        drop(self.renderer.copy(self.texture, None, Some(Rect {
+        drop(self.renderer.copy(&*self.texture, None, Some(Rect {
             x: 0,
             y: 0,
             w: (SCREEN_WIDTH * self.scale.factor()) as int32_t,

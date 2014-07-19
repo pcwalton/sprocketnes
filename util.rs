@@ -26,7 +26,7 @@ impl Save for uint8_t {
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0 ];
-        fd.fill(buf).unwrap();
+        fd.read_at_least(buf.len(), buf).unwrap();
         *self = buf[0];
     }
 }
@@ -37,7 +37,7 @@ impl Save for uint16_t {
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
-        fd.fill(buf).unwrap();
+        fd.read_at_least(buf.len(), buf).unwrap();
         *self = (buf[0] as uint16_t) | ((buf[1] as uint16_t) << 8);
     }
 }
@@ -52,7 +52,7 @@ impl Save for uint64_t {
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        fd.fill(buf).unwrap();
+        fd.read_at_least(buf.len(), buf).unwrap();
         *self = 0;
         for i in range(0u, 8) {
             *self = *self | (buf[i] as uint64_t << (i * 8));
@@ -65,7 +65,7 @@ impl<'a> Save for &'a mut [uint8_t] {
         fd.write(*self).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        fd.fill(*self).unwrap();
+        fd.read_at_least(self.len(), *self).unwrap();
     }
 }
 
@@ -73,7 +73,7 @@ impl Save for bool {
     fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
         let mut val: [uint8_t, ..1] = [ 0 ];
-        fd.fill(val).unwrap();
+        fd.read_at_least(val.len(), val).unwrap();
         *self = val[0] != 0
     }
 }
@@ -165,7 +165,7 @@ struct timeval {
 }
 
 extern {
-    fn gettimeofday(tp: *mut timeval, tzp: *c_void) -> c_int;
+    fn gettimeofday(tp: *mut timeval, tzp: *const c_void) -> c_int;
 }
 
 pub fn current_time_millis() -> uint64_t {

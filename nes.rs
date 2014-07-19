@@ -34,7 +34,7 @@ pub mod rom;
 pub mod speex;
 
 #[no_mangle]
-pub extern "C" fn main(argc: int32_t, argv: **uint8_t) -> int32_t {
+pub extern "C" fn main(argc: int32_t, argv: *const *const uint8_t) -> int32_t {
     native::start(argc as int, argv, proc() main::start(argc, argv)) as int32_t
 }
 

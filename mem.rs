@@ -86,14 +86,14 @@ pub struct MemMap {
     pub ram: Ram,
     pub ppu: Ppu,
     pub input: Input,
-    pub mapper: Rc<RefCell<Box<Mapper:Send>>>,
+    pub mapper: Rc<RefCell<Box<Mapper+Send>>>,
     pub apu: Apu,
 }
 
 impl MemMap {
     pub fn new(ppu: Ppu,
                input: Input,
-               mapper: Rc<RefCell<Box<Mapper:Send>>>,
+               mapper: Rc<RefCell<Box<Mapper+Send>>>,
                apu: Apu)
                -> MemMap {
         MemMap {

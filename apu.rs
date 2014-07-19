@@ -65,7 +65,7 @@ impl ApuLength {
     // disable bit may be different.
     fn storeb<DB:DisableBit>(&mut self, addr: uint16_t, val: uint8_t, db: DB) {
         match addr & 0x3 {
-            0 => self.disable = ((val >> db.bit_number()) & 1) != 0,
+            0 => self.disable = ((val >> db.bit_number() as uint) & 1) != 0,
             1 | 2 => {}
             3 => {
                 // FIXME: Only set `remaining` if APUSTATUS has enabled this channel.
@@ -303,9 +303,9 @@ impl DerefMut<uint8_t> for ApuStatus {
 }
 
 impl ApuStatus {
-    fn pulse_enabled(self, channel: uint8_t) -> bool { ((*self >> channel) & 1) != 0 }
-    fn triangle_enabled(self) -> bool           { (*self & 0x04) != 0 }
-    fn noise_enabled(self) -> bool              { (*self & 0x08) != 0 }
+    fn pulse_enabled(self, channel: uint8_t) -> bool { ((*self >> channel as uint) & 1) != 0 }
+    fn triangle_enabled(self) -> bool                { (*self & 0x04) != 0 }
+    fn noise_enabled(self) -> bool                   { (*self & 0x08) != 0 }
 }
 
 //
@@ -500,7 +500,7 @@ impl Apu {
                     pulse.sweep_cycle = 0;
 
                     if pulse.sweep.enabled() {
-                        let delta = pulse.timer.value >> pulse.sweep.shift_count();
+                        let delta = pulse.timer.value >> pulse.sweep.shift_count() as uint;
                         if !pulse.sweep.negate() {
                             pulse.timer.value += delta;
                         } else {
@@ -574,7 +574,11 @@ impl Apu {
                         waveform_index = (waveform_index + 1) % 8;
                     }
 
-                    *dest = if ((waveform >> (7 - waveform_index)) & 1) != 0 { volume } else { 0 };
+                    *dest = if ((waveform >> (7 - waveform_index) as uint) & 1) != 0 {
+                        volume
+                    } else {
+                        0
+                    };
                 }
 
                 pulse.waveform_index = waveform_index;

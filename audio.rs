@@ -10,11 +10,11 @@
 use libc::{c_int, c_void, uint8_t};
 use sdl2::audio::ll::SDL_AudioSpec;
 use sdl2::audio::{AudioDevice, AudioS16LSB};
-use std::cast;
 use std::cmp;
+use std::mem;
 use std::ptr;
 use std::raw::Slice;
-use std::unstable::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 //
 // The audio callback
@@ -33,14 +33,16 @@ pub struct OutputBuffer {
     pub play_offset: uint,
 }
 
-extern "C" fn nes_audio_callback(_: *c_void, stream: *uint8_t, len: c_int) {
+extern "C" fn nes_audio_callback(_: *const c_void,
+                                 stream: *const uint8_t,
+                                 len: c_int) {
     unsafe {
-        let samples: &mut [uint8_t] = cast::transmute(Slice {
+        let samples: &mut [uint8_t] = mem::transmute(Slice {
             data: stream,
             len: len as uint,
         });
 
-        let output_buffer: &mut OutputBuffer = cast::transmute(g_output_buffer.unwrap());
+        let output_buffer: &mut OutputBuffer = mem::transmute(g_output_buffer.unwrap());
         let play_offset = output_buffer.play_offset;
         let output_buffer_len = output_buffer.samples.len();
 
@@ -67,7 +69,7 @@ pub fn open() -> *mut OutputBuffer {
         play_offset: 0,
     };
     let output_buffer_ptr: *mut OutputBuffer = unsafe {
-        cast::transmute(&*output_buffer)
+        mem::transmute(&*output_buffer)
     };
 
     unsafe {
@@ -87,13 +89,13 @@ pub fn open() -> *mut OutputBuffer {
     };
 
     let (audio_device, _) = unsafe {
-        AudioDevice::open(None, 0, cast::transmute(&spec)).unwrap()
+        AudioDevice::open(None, 0, mem::transmute(&spec)).unwrap()
     };
     audio_device.resume();
 
     unsafe {
         g_audio_device = Some(audio_device);
-        cast::forget(output_buffer);
+        mem::forget(output_buffer);
     }
 
     output_buffer_ptr

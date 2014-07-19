@@ -29,11 +29,11 @@ impl<'a,M:Mem> Disassembler<'a,M> {
         bottom | top
     }
 
-    fn disb_bump_pc(&mut self) -> StrBuf {
-        (format!("${:02X}", self.loadb_bump_pc() as uint)).to_strbuf()
+    fn disb_bump_pc(&mut self) -> String {
+        (format!("${:02X}", self.loadb_bump_pc() as uint)).to_string()
     }
-    fn disw_bump_pc(&mut self) -> StrBuf {
-        (format!("${:04X}", self.loadw_bump_pc() as uint)).to_strbuf()
+    fn disw_bump_pc(&mut self) -> String {
+        (format!("${:04X}", self.loadw_bump_pc() as uint)).to_string()
     }
 
     //
@@ -43,134 +43,134 @@ impl<'a,M:Mem> Disassembler<'a,M> {
     // TODO: When we get method macros some of this ugly duplication can go away.
 
     // Loads
-    fn lda(&mut self, am: StrBuf) -> StrBuf { (format!("LDA {}", am)).to_strbuf() }
-    fn ldx(&mut self, am: StrBuf) -> StrBuf { (format!("LDX {}", am)).to_strbuf() }
-    fn ldy(&mut self, am: StrBuf) -> StrBuf { (format!("LDY {}", am)).to_strbuf() }
+    fn lda(&mut self, am: String) -> String { (format!("LDA {}", am)).to_string() }
+    fn ldx(&mut self, am: String) -> String { (format!("LDX {}", am)).to_string() }
+    fn ldy(&mut self, am: String) -> String { (format!("LDY {}", am)).to_string() }
 
     // Stores
-    fn sta(&mut self, am: StrBuf) -> StrBuf { (format!("STA {}", am)).to_strbuf() }
-    fn stx(&mut self, am: StrBuf) -> StrBuf { (format!("STX {}", am)).to_strbuf() }
-    fn sty(&mut self, am: StrBuf) -> StrBuf { (format!("STY {}", am)).to_strbuf() }
+    fn sta(&mut self, am: String) -> String { (format!("STA {}", am)).to_string() }
+    fn stx(&mut self, am: String) -> String { (format!("STX {}", am)).to_string() }
+    fn sty(&mut self, am: String) -> String { (format!("STY {}", am)).to_string() }
 
     // Arithmetic
-    fn adc(&mut self, am: StrBuf) -> StrBuf { (format!("ADC {}", am)).to_strbuf() }
-    fn sbc(&mut self, am: StrBuf) -> StrBuf { (format!("SBC {}", am)).to_strbuf() }
+    fn adc(&mut self, am: String) -> String { (format!("ADC {}", am)).to_string() }
+    fn sbc(&mut self, am: String) -> String { (format!("SBC {}", am)).to_string() }
 
     // Comparisons
-    fn cmp(&mut self, am: StrBuf) -> StrBuf { (format!("CMP {}", am)).to_strbuf() }
-    fn cpx(&mut self, am: StrBuf) -> StrBuf { (format!("CPX {}", am)).to_strbuf() }
-    fn cpy(&mut self, am: StrBuf) -> StrBuf { (format!("CPY {}", am)).to_strbuf() }
+    fn cmp(&mut self, am: String) -> String { (format!("CMP {}", am)).to_string() }
+    fn cpx(&mut self, am: String) -> String { (format!("CPX {}", am)).to_string() }
+    fn cpy(&mut self, am: String) -> String { (format!("CPY {}", am)).to_string() }
 
     // Bitwise operations
-    fn and(&mut self, am: StrBuf) -> StrBuf { (format!("AND {}", am)).to_strbuf() }
-    fn ora(&mut self, am: StrBuf) -> StrBuf { (format!("ORA {}", am)).to_strbuf() }
-    fn eor(&mut self, am: StrBuf) -> StrBuf { (format!("EOR {}", am)).to_strbuf() }
-    fn bit(&mut self, am: StrBuf) -> StrBuf { (format!("BIT {}", am)).to_strbuf() }
+    fn and(&mut self, am: String) -> String { (format!("AND {}", am)).to_string() }
+    fn ora(&mut self, am: String) -> String { (format!("ORA {}", am)).to_string() }
+    fn eor(&mut self, am: String) -> String { (format!("EOR {}", am)).to_string() }
+    fn bit(&mut self, am: String) -> String { (format!("BIT {}", am)).to_string() }
 
     // Shifts and rotates
-    fn rol(&mut self, am: StrBuf) -> StrBuf { (format!("ROL {}", am)).to_strbuf() }
-    fn ror(&mut self, am: StrBuf) -> StrBuf { (format!("ROR {}", am)).to_strbuf() }
-    fn asl(&mut self, am: StrBuf) -> StrBuf { (format!("ASL {}", am)).to_strbuf() }
-    fn lsr(&mut self, am: StrBuf) -> StrBuf { (format!("LSR {}", am)).to_strbuf() }
+    fn rol(&mut self, am: String) -> String { (format!("ROL {}", am)).to_string() }
+    fn ror(&mut self, am: String) -> String { (format!("ROR {}", am)).to_string() }
+    fn asl(&mut self, am: String) -> String { (format!("ASL {}", am)).to_string() }
+    fn lsr(&mut self, am: String) -> String { (format!("LSR {}", am)).to_string() }
 
     // Increments and decrements
-    fn inc(&mut self, am: StrBuf) -> StrBuf { (format!("INC {}", am)).to_strbuf() }
-    fn dec(&mut self, am: StrBuf) -> StrBuf { (format!("DEC {}", am)).to_strbuf() }
-    fn inx(&mut self) -> StrBuf           { "INX".to_strbuf()       }
-    fn dex(&mut self) -> StrBuf           { "DEX".to_strbuf()       }
-    fn iny(&mut self) -> StrBuf           { "INY".to_strbuf()       }
-    fn dey(&mut self) -> StrBuf           { "DEY".to_strbuf()       }
+    fn inc(&mut self, am: String) -> String { (format!("INC {}", am)).to_string() }
+    fn dec(&mut self, am: String) -> String { (format!("DEC {}", am)).to_string() }
+    fn inx(&mut self) -> String           { "INX".to_string()       }
+    fn dex(&mut self) -> String           { "DEX".to_string()       }
+    fn iny(&mut self) -> String           { "INY".to_string()       }
+    fn dey(&mut self) -> String           { "DEY".to_string()       }
 
     // Register moves
-    fn tax(&mut self) -> StrBuf           { "TAX".to_strbuf()       }
-    fn tay(&mut self) -> StrBuf           { "TAY".to_strbuf()       }
-    fn txa(&mut self) -> StrBuf           { "TXA".to_strbuf()       }
-    fn tya(&mut self) -> StrBuf           { "TYA".to_strbuf()       }
-    fn txs(&mut self) -> StrBuf           { "TXS".to_strbuf()       }
-    fn tsx(&mut self) -> StrBuf           { "TSX".to_strbuf()       }
+    fn tax(&mut self) -> String           { "TAX".to_string()       }
+    fn tay(&mut self) -> String           { "TAY".to_string()       }
+    fn txa(&mut self) -> String           { "TXA".to_string()       }
+    fn tya(&mut self) -> String           { "TYA".to_string()       }
+    fn txs(&mut self) -> String           { "TXS".to_string()       }
+    fn tsx(&mut self) -> String           { "TSX".to_string()       }
 
     // Flag operations
-    fn clc(&mut self) -> StrBuf           { "CLC".to_strbuf()       }
-    fn sec(&mut self) -> StrBuf           { "SEC".to_strbuf()       }
-    fn cli(&mut self) -> StrBuf           { "CLI".to_strbuf()       }
-    fn sei(&mut self) -> StrBuf           { "SEI".to_strbuf()       }
-    fn clv(&mut self) -> StrBuf           { "CLV".to_strbuf()       }
-    fn cld(&mut self) -> StrBuf           { "CLD".to_strbuf()       }
-    fn sed(&mut self) -> StrBuf           { "SED".to_strbuf()       }
+    fn clc(&mut self) -> String           { "CLC".to_string()       }
+    fn sec(&mut self) -> String           { "SEC".to_string()       }
+    fn cli(&mut self) -> String           { "CLI".to_string()       }
+    fn sei(&mut self) -> String           { "SEI".to_string()       }
+    fn clv(&mut self) -> String           { "CLV".to_string()       }
+    fn cld(&mut self) -> String           { "CLD".to_string()       }
+    fn sed(&mut self) -> String           { "SED".to_string()       }
 
     // Branches
     // FIXME: Should disassemble the displacement!
-    fn bpl(&mut self) -> StrBuf           { "BPL xx".to_strbuf()    }
-    fn bmi(&mut self) -> StrBuf           { "BMI xx".to_strbuf()    }
-    fn bvc(&mut self) -> StrBuf           { "BVC xx".to_strbuf()    }
-    fn bvs(&mut self) -> StrBuf           { "BVS xx".to_strbuf()    }
-    fn bcc(&mut self) -> StrBuf           { "BCC xx".to_strbuf()    }
-    fn bcs(&mut self) -> StrBuf           { "BCS xx".to_strbuf()    }
-    fn bne(&mut self) -> StrBuf           { "BNE xx".to_strbuf()    }
-    fn beq(&mut self) -> StrBuf           { "BEQ xx".to_strbuf()    }
+    fn bpl(&mut self) -> String           { "BPL xx".to_string()    }
+    fn bmi(&mut self) -> String           { "BMI xx".to_string()    }
+    fn bvc(&mut self) -> String           { "BVC xx".to_string()    }
+    fn bvs(&mut self) -> String           { "BVS xx".to_string()    }
+    fn bcc(&mut self) -> String           { "BCC xx".to_string()    }
+    fn bcs(&mut self) -> String           { "BCS xx".to_string()    }
+    fn bne(&mut self) -> String           { "BNE xx".to_string()    }
+    fn beq(&mut self) -> String           { "BEQ xx".to_string()    }
 
     // Jumps
     // FIXME: Should disassemble the address!
-    fn jmp(&mut self) -> StrBuf           { "JMP xx".to_strbuf()    }
-    fn jmpi(&mut self) -> StrBuf          { "JMP (xx)".to_strbuf()  }
+    fn jmp(&mut self) -> String           { "JMP xx".to_string()    }
+    fn jmpi(&mut self) -> String          { "JMP (xx)".to_string()  }
 
     // Procedure calls
     // FIXME: Should disassemble the address!
-    fn jsr(&mut self) -> StrBuf           { "JSR xx".to_strbuf()    }
-    fn rts(&mut self) -> StrBuf           { "RTS".to_strbuf()       }
-    fn brk(&mut self) -> StrBuf           { "BRK".to_strbuf()       }
-    fn rti(&mut self) -> StrBuf           { "RTI".to_strbuf()       }
+    fn jsr(&mut self) -> String           { "JSR xx".to_string()    }
+    fn rts(&mut self) -> String           { "RTS".to_string()       }
+    fn brk(&mut self) -> String           { "BRK".to_string()       }
+    fn rti(&mut self) -> String           { "RTI".to_string()       }
 
     // Stack operations
-    fn pha(&mut self) -> StrBuf           { "PHA".to_strbuf()       }
-    fn pla(&mut self) -> StrBuf           { "PLA".to_strbuf()       }
-    fn php(&mut self) -> StrBuf           { "PHP".to_strbuf()       }
-    fn plp(&mut self) -> StrBuf           { "PLP".to_strbuf()       }
+    fn pha(&mut self) -> String           { "PHA".to_string()       }
+    fn pla(&mut self) -> String           { "PLA".to_string()       }
+    fn php(&mut self) -> String           { "PHP".to_string()       }
+    fn plp(&mut self) -> String           { "PLP".to_string()       }
 
     // No operation
-    fn nop(&mut self) -> StrBuf           { "NOP".to_strbuf()       }
+    fn nop(&mut self) -> String           { "NOP".to_string()       }
 
     // Addressing modes
-    fn immediate(&mut self) -> StrBuf {
-        (format!("{}{}", "#", self.disb_bump_pc())).to_strbuf()
+    fn immediate(&mut self) -> String {
+        (format!("{}{}", "#", self.disb_bump_pc())).to_string()
     }
-    fn accumulator(&mut self) -> StrBuf {
-        StrBuf::new()
+    fn accumulator(&mut self) -> String {
+        String::new()
     }
-    fn zero_page(&mut self) -> StrBuf {
+    fn zero_page(&mut self) -> String {
         self.disb_bump_pc()
     }
-    fn zero_page_x(&mut self) -> StrBuf {
+    fn zero_page_x(&mut self) -> String {
         let mut buf = self.disb_bump_pc();
         buf.push_str(",X");
         buf
     }
-    fn zero_page_y(&mut self) -> StrBuf {
+    fn zero_page_y(&mut self) -> String {
         let mut buf = self.disb_bump_pc();
         buf.push_str(",Y");
         buf
     }
-    fn absolute(&mut self) -> StrBuf           { self.disw_bump_pc()                       }
-    fn absolute_x(&mut self) -> StrBuf {
+    fn absolute(&mut self) -> String           { self.disw_bump_pc()                       }
+    fn absolute_x(&mut self) -> String {
         let mut buf = self.disw_bump_pc();
         buf.push_str(",X");
         buf
     }
-    fn absolute_y(&mut self) -> StrBuf {
+    fn absolute_y(&mut self) -> String {
         let mut buf = self.disw_bump_pc();
         buf.push_str(",Y");
         buf
     }
-    fn indexed_indirect_x(&mut self) -> StrBuf {
-        (format!("({},X)", self.disb_bump_pc())).to_strbuf()
+    fn indexed_indirect_x(&mut self) -> String {
+        (format!("({},X)", self.disb_bump_pc())).to_string()
     }
-    fn indirect_indexed_y(&mut self) -> StrBuf {
-        (format!("({}),Y", self.disb_bump_pc())).to_strbuf()
+    fn indirect_indexed_y(&mut self) -> String {
+        (format!("({}),Y", self.disb_bump_pc())).to_string()
     }
 
     // The main disassembly routine.
     #[inline(never)]
-    pub fn disassemble(&mut self) -> StrBuf {
+    pub fn disassemble(&mut self) -> String {
         let op = self.loadb_bump_pc();
         decode_op!(op, self)
     }

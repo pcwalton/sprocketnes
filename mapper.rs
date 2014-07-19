@@ -10,7 +10,7 @@ use util;
 use libc::{uint8_t, uint16_t};
 use std::owned::Box;
 
-#[deriving(Eq)]
+#[deriving(PartialEq, Eq)]
 pub enum MapperResult {
     Continue,
     Irq,
@@ -24,15 +24,15 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper:Send> {
+pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper+Send> {
     match rom.header.ines_mapper() {
         0 => {
             box Nrom {
                 rom: rom,
-            } as Box<Mapper:Send>
+            } as Box<Mapper+Send>
         },
-        1 => box SxRom::new(rom) as Box<Mapper:Send>,
-        4 => box TxRom::new(rom) as Box<Mapper:Send>,
+        1 => box SxRom::new(rom) as Box<Mapper+Send>,
+        4 => box TxRom::new(rom) as Box<Mapper+Send>,
         _ => fail!("unsupported mapper")
     }
 }
@@ -175,7 +175,7 @@ impl Mapper for SxRom {
         }
 
         // Write the lowest bit of the value into the right location of the accumulator.
-        self.accum = self.accum | ((val & 1) << self.write_count);
+        self.accum = self.accum | ((val & 1) << (self.write_count as uint));
 
         self.write_count += 1;
         if self.write_count == 5 {

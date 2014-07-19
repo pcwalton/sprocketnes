@@ -393,37 +393,43 @@ impl<M:Mem> Cpu<M> {
     // Memory access helpers
     /// Loads the byte at the program counter and increments the program counter.
     fn loadb_bump_pc(&mut self) -> uint8_t {
-        let val = self.loadb(self.regs.pc);
+        let pc = self.regs.pc;
+        let val = self.loadb(pc);
         self.regs.pc += 1;
         val
     }
     /// Loads two bytes (little-endian) at the program counter and bumps the program counter over
     /// them.
     fn loadw_bump_pc(&mut self) -> uint16_t {
-        let val = self.loadw(self.regs.pc);
+        let pc = self.regs.pc;
+        let val = self.loadw(pc);
         self.regs.pc += 2;
         val
     }
 
     // Stack helpers
     fn pushb(&mut self, val: uint8_t) {
-        self.storeb(0x100 + self.regs.s as uint16_t, val);
+        let s = self.regs.s;
+        self.storeb(0x100 + s as uint16_t, val);
         self.regs.s -= 1;
     }
     fn pushw(&mut self, val: uint16_t) {
         // FIXME: Is this correct? FCEU has two self.storeb()s here. Might have different
         // semantics...
-        self.storew(0x100 + (self.regs.s - 1) as uint16_t, val);
+        let s = self.regs.s;
+        self.storew(0x100 + (s - 1) as uint16_t, val);
         self.regs.s -= 2;
     }
     fn popb(&mut self) -> uint8_t {
-        let val = self.loadb(0x100 + self.regs.s as uint16_t + 1);
+        let s = self.regs.s;
+        let val = self.loadb(0x100 + s as uint16_t + 1);
         self.regs.s += 1;
         val
     }
     fn popw(&mut self) -> uint16_t {
         // FIXME: See comment in pushw().
-        let val = self.loadw(0x100 + self.regs.s as uint16_t + 1);
+        let s = self.regs.s;
+        let val = self.loadw(0x100 + s as uint16_t + 1);
         self.regs.s += 2;
         val
     }
@@ -470,12 +476,14 @@ impl<M:Mem> Cpu<M> {
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
-        let addr = self.loadw_zp(val + self.regs.x);
+        let x = self.regs.x;
+        let addr = self.loadw_zp(val + x);
         MemoryAddressingMode{val: addr}
     }
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
-        let addr = self.loadw_zp(val) + self.regs.y as uint16_t;
+        let y = self.regs.y;
+        let addr = self.loadw_zp(val) + y as uint16_t;
         MemoryAddressingMode{val: addr}
     }
 
@@ -498,9 +506,18 @@ impl<M:Mem> Cpu<M> {
     }
 
     // Stores
-    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.a) }
-    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.x) }
-    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) { am.store(self, self.regs.y) }
+    fn sta<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let a = self.regs.a;
+        am.store(self, a)
+    }
+    fn stx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let x = self.regs.x;
+        am.store(self, x)
+    }
+    fn sty<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let y = self.regs.y;
+        am.store(self, y)
+    }
 
     // Arithmetic
     #[inline(always)]
@@ -514,14 +531,15 @@ impl<M:Mem> Cpu<M> {
         self.set_flag(CARRY_FLAG, (result & 0x100) != 0);
 
         let result = result as uint8_t;
-        self.set_flag(OVERFLOW_FLAG,
-                      (self.regs.a ^ val) & 0x80 == 0 && (self.regs.a ^ result) & 0x80 == 0x80);
+        let a = self.regs.a;
+        self.set_flag(OVERFLOW_FLAG, (a ^ val) & 0x80 == 0 && (a ^ result) & 0x80 == 0x80);
         self.regs.a = self.set_zn(result);
     }
     #[inline(always)]
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
-        let mut result = self.regs.a as uint32_t - val as uint32_t;
+        let a = self.regs.a;
+        let mut result = a as uint32_t - val as uint32_t;
         if !self.get_flag(CARRY_FLAG) {
             result -= 1;
         }
@@ -529,8 +547,8 @@ impl<M:Mem> Cpu<M> {
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
 
         let result = result as uint8_t;
-        self.set_flag(OVERFLOW_FLAG,
-                      (self.regs.a ^ result) & 0x80 != 0 && (self.regs.a ^ val) & 0x80 == 0x80);
+        let a = self.regs.a;
+        self.set_flag(OVERFLOW_FLAG, (a ^ result) & 0x80 != 0 && (a ^ val) & 0x80 == 0x80);
         self.regs.a = self.set_zn(result);
     }
 
@@ -541,9 +559,18 @@ impl<M:Mem> Cpu<M> {
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
         let _ = self.set_zn(result as uint8_t);
     }
-    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.a, am) }
-    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.x, am) }
-    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) { self.cmp_base(self.regs.y, am) }
+    fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let a = self.regs.a;
+        self.cmp_base(a, am)
+    }
+    fn cpx<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let x = self.regs.x;
+        self.cmp_base(x, am)
+    }
+    fn cpy<AM:AddressingMode<M>>(&mut self, am: AM) {
+        let y = self.regs.y;
+        self.cmp_base(y, am)
+    }
 
     // Bitwise operations
     fn and<AM:AddressingMode<M>>(&mut self, am: AM) {
@@ -560,7 +587,8 @@ impl<M:Mem> Cpu<M> {
     }
     fn bit<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
-        self.set_flag(ZERO_FLAG, (val & self.regs.a) == 0);
+        let a = self.regs.a;
+        self.set_flag(ZERO_FLAG, (val & a) == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
         self.set_flag(OVERFLOW_FLAG, (val & 0x40) != 0);
     }
@@ -610,18 +638,45 @@ impl<M:Mem> Cpu<M> {
         let val = self.set_zn(val - 1);
         am.store(self, val)
     }
-    fn inx(&mut self) { self.regs.x = self.set_zn(self.regs.x + 1) }
-    fn dex(&mut self) { self.regs.x = self.set_zn(self.regs.x - 1) }
-    fn iny(&mut self) { self.regs.y = self.set_zn(self.regs.y + 1) }
-    fn dey(&mut self) { self.regs.y = self.set_zn(self.regs.y - 1) }
+    fn inx(&mut self) {
+        let x = self.regs.x;
+        self.regs.x = self.set_zn(x + 1)
+    }
+    fn dex(&mut self) {
+        let x = self.regs.x;
+        self.regs.x = self.set_zn(x - 1)
+    }
+    fn iny(&mut self) {
+        let y = self.regs.y;
+        self.regs.y = self.set_zn(y + 1)
+    }
+    fn dey(&mut self) {
+        let y = self.regs.y;
+        self.regs.y = self.set_zn(y - 1)
+    }
 
     // Register moves
-    fn tax(&mut self) { self.regs.x = self.set_zn(self.regs.a) }
-    fn tay(&mut self) { self.regs.y = self.set_zn(self.regs.a) }
-    fn txa(&mut self) { self.regs.a = self.set_zn(self.regs.x) }
-    fn tya(&mut self) { self.regs.a = self.set_zn(self.regs.y) }
+    fn tax(&mut self) {
+        let a = self.regs.a;
+        self.regs.x = self.set_zn(a)
+    }
+    fn tay(&mut self) {
+        let a = self.regs.a;
+        self.regs.y = self.set_zn(a)
+    }
+    fn txa(&mut self) {
+        let x = self.regs.x;
+        self.regs.a = self.set_zn(x)
+    }
+    fn tya(&mut self) {
+        let y = self.regs.y;
+        self.regs.a = self.set_zn(y)
+    }
     fn txs(&mut self) { self.regs.s = self.regs.x }
-    fn tsx(&mut self) { self.regs.x = self.set_zn(self.regs.s) }
+    fn tsx(&mut self) {
+        let s = self.regs.s;
+        self.regs.x = self.set_zn(s)
+    }
 
     // Flag operations
     fn clc(&mut self) { self.set_flag(CARRY_FLAG, false) }
@@ -687,13 +742,16 @@ impl<M:Mem> Cpu<M> {
     // Procedure calls
     fn jsr(&mut self) {
         let addr = self.loadw_bump_pc();
-        self.pushw(self.regs.pc - 1);
+        let pc = self.regs.pc;
+        self.pushw(pc - 1);
         self.regs.pc = addr;
     }
     fn rts(&mut self) { self.regs.pc = self.popw() + 1 }
     fn brk(&mut self) {
-        self.pushw(self.regs.pc + 1);
-        self.pushb(self.regs.flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
+        let pc = self.regs.pc;
+        self.pushw(pc + 1);
+        let flags = self.regs.flags;
+        self.pushb(flags);    // FIXME: FCEU sets BREAK_FLAG and U_FLAG here, why?
         self.set_flag(IRQ_FLAG, true);
         self.regs.pc = self.loadw(BRK_VECTOR);
     }
@@ -704,12 +762,18 @@ impl<M:Mem> Cpu<M> {
     }
 
     // Stack operations
-    fn pha(&mut self) { self.pushb(self.regs.a) }
+    fn pha(&mut self) {
+        let a = self.regs.a;
+        self.pushb(a)
+    }
     fn pla(&mut self) {
         let val = self.popb();
         self.regs.a = self.set_zn(val)
     }
-    fn php(&mut self) { self.pushb(self.regs.flags | BREAK_FLAG) }
+    fn php(&mut self) {
+        let flags = self.regs.flags;
+        self.pushb(flags | BREAK_FLAG)
+    }
     fn plp(&mut self) {
         let val = self.popb();
         self.set_flags(val)
@@ -732,8 +796,9 @@ impl<M:Mem> Cpu<M> {
     pub fn reset(&mut self) { self.regs.pc = self.loadw(RESET_VECTOR); }
 
     pub fn nmi(&mut self) {
-        self.pushw(self.regs.pc);
-        self.pushb(self.regs.flags);
+        let (pc, flags) = (self.regs.pc, self.regs.flags);
+        self.pushw(pc);
+        self.pushb(flags);
         self.regs.pc = self.loadw(NMI_VECTOR);
     }
 
@@ -742,8 +807,9 @@ impl<M:Mem> Cpu<M> {
             return;
         }
 
-        self.pushw(self.regs.pc);
-        self.pushb(self.regs.flags);
+        let (pc, flags) = (self.regs.pc, self.regs.flags);
+        self.pushw(pc);
+        self.pushb(flags);
         self.regs.pc = self.loadw(BRK_VECTOR);
     }
 

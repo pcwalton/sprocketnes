@@ -5,7 +5,7 @@
 //
 
 use libc::{c_int, c_void, int16_t, uint8_t, uint32_t};
-use std::cast::transmute;
+use std::mem::transmute;
 use std::ptr::null;
 
 type SpeexResamplerState = c_void;
@@ -17,19 +17,19 @@ extern {
                             out_rate: uint32_t,
                             quality: c_int,
                             err: *mut c_int)
-                            -> *SpeexResamplerState;
-    fn speex_resampler_destroy(st: *SpeexResamplerState);
-    fn speex_resampler_process_int(st: *SpeexResamplerState,
+                            -> *const SpeexResamplerState;
+    fn speex_resampler_destroy(st: *const SpeexResamplerState);
+    fn speex_resampler_process_int(st: *const SpeexResamplerState,
                                    channel_index: uint32_t,
-                                   input: *int16_t,
+                                   input: *const int16_t,
                                    in_len: *mut uint32_t,
-                                   out: *int16_t,
+                                   out: *const int16_t,
                                    out_len: *mut uint32_t)
                                    -> c_int;
 }
 
 pub struct Resampler {
-    speex_resampler: *SpeexResamplerState,
+    speex_resampler: *const SpeexResamplerState,
 }
 
 impl Resampler {

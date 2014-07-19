@@ -196,13 +196,13 @@ save_enum!(PpuAddrByte { Hi, Lo })
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
-    pub mapper: Rc<RefCell<Box<Mapper:Send>>>,
+    pub mapper: Rc<RefCell<Box<Mapper+Send>>>,
     pub nametables: [uint8_t, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
     pub palette: [uint8_t, ..0x20],
 }
 
 impl Vram {
-    pub fn new(mapper: Rc<RefCell<Box<Mapper:Send>>>) -> Vram {
+    pub fn new(mapper: Rc<RefCell<Box<Mapper+Send>>>) -> Vram {
         Vram {
             mapper: mapper,
             nametables: [ 0, ..0x800 ],
@@ -392,7 +392,7 @@ impl Mem for Ppu {
     }
 }
 
-#[deriving(Eq)]
+#[deriving(PartialEq, Eq)]
 pub struct StepResult {
     pub new_frame: bool,    // We wrapped around to the next scanline.
     pub vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
@@ -603,7 +603,7 @@ impl Ppu {
 
     #[inline(always)]
     fn each_sprite(&mut self, f: |&mut Ppu, &Sprite, uint8_t| -> bool) {
-        for i in range(0, 64) {
+        for i in range(0i, 64) {
             let sprite = self.make_sprite_info(i as uint16_t);
             if !f(self, &sprite, i as uint8_t) {
                 return
@@ -635,8 +635,8 @@ impl Ppu {
         // Determine the color of this pixel.
         let plane0 = self.vram.loadb(pattern_offset);
         let plane1 = self.vram.loadb(pattern_offset + 8);
-        let bit0 = (plane0 >> (7 - ((x % 8) as uint8_t))) & 1;
-        let bit1 = (plane1 >> (7 - ((x % 8) as uint8_t))) & 1;
+        let bit0 = (plane0 >> ((7 - ((x % 8) as uint8_t)) as uint)) & 1;
+        let bit1 = (plane1 >> ((7 - ((x % 8) as uint8_t)) as uint)) & 1;
         (bit1 << 1) | bit0
     }
 
@@ -783,7 +783,8 @@ impl Ppu {
                 (_, Some(SpriteColor { priority: AboveBg, color: color })) => color,
             };
 
-            self.putpixel(x, self.scanline as uint, color);
+            let scanline = self.scanline;
+            self.putpixel(x, scanline as uint, color);
         }
     }
 

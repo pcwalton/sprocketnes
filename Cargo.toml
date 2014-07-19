@@ -1,0 +1,10 @@
+[package]
+
+name = "sprocketnes"
+version = "0.1.0"
+authors = [ "pcwalton@mimiga.net" ]
+
+[dependencies.sdl2]
+
+git = "https://github.com/AngryLawyer/rust-sdl2.git"
+

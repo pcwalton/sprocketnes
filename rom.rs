@@ -18,7 +18,7 @@ pub struct Rom {
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        file.fill(buffer).unwrap();
+        file.read_at_least(buffer.len(), buffer).unwrap();
 
         let header = INesHeader {
             magic: [
@@ -45,9 +45,9 @@ impl Rom {
         ]);
 
         let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.fill(prg_rom.as_mut_slice()).unwrap();
+        file.read_at_least(prg_rom.len(), prg_rom.as_mut_slice()).unwrap();
         let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.fill(chr_rom.as_mut_slice()).unwrap();
+        file.read_at_least(chr_rom.len(), chr_rom.as_mut_slice()).unwrap();
 
         Rom {
             header: header,
@@ -84,7 +84,7 @@ impl INesHeader {
         (self.flags_6 & 0x04) != 0
     }
 
-    pub fn to_str(&self) -> StrBuf {
+    pub fn to_str(&self) -> String {
         (format!("PRG-ROM size: {}\nCHR-ROM size: {}\nMapper: {}/{}\nTrainer: {}",
                  self.prg_rom_size as int,
                  self.chr_rom_size as int,
@@ -94,7 +94,7 @@ impl INesHeader {
                      "Yes"
                  } else {
                      "No"
-                 })).to_strbuf()
+                 })).to_string()
     }
 }
 
