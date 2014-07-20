@@ -193,13 +193,13 @@ save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_inde
 struct ApuPulseSweep{ val: uint8_t }
 
 impl Deref<uint8_t> for ApuPulseSweep {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
 impl DerefMut<uint8_t> for ApuPulseSweep {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
+    fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
 }
@@ -291,13 +291,13 @@ impl ApuNoise {
 struct ApuStatus{ val: uint8_t }
 
 impl Deref<uint8_t> for ApuStatus {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
 impl DerefMut<uint8_t> for ApuStatus {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
+    fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
 }
@@ -537,8 +537,8 @@ impl Apu {
     // Channel playback
     //
 
-    fn get_or_zero_sample_buffer<'a>(buffer: &'a mut [int16_t], offset: uint, audible: bool)
-                                     -> Option<&'a mut [int16_t]> {
+    fn get_or_zero_sample_buffer(buffer: &mut [int16_t], offset: uint, audible: bool)
+                                 -> Option<&mut [int16_t]> {
         let buffer = buffer.mut_slice(offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);

@@ -70,13 +70,13 @@ enum SpriteSize {
 }
 
 impl Deref<uint8_t> for PpuCtrl {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
 impl DerefMut<uint8_t> for PpuCtrl {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
+    fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
 }
@@ -100,13 +100,13 @@ impl PpuCtrl {
 struct PpuMask {val: uint8_t }
 
 impl Deref<uint8_t> for PpuMask {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
 impl DerefMut<uint8_t> for PpuMask {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
+    fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
 }
@@ -129,13 +129,13 @@ impl PpuMask {
 struct PpuStatus { val: uint8_t }
 
 impl Deref<uint8_t> for PpuStatus {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
 impl DerefMut<uint8_t> for PpuStatus {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut uint8_t {
+    fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
 }

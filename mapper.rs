@@ -73,7 +73,7 @@ impl Mapper for Nrom {
 struct SxCtrl{ val: uint8_t }
 
 impl Deref<uint8_t> for SxCtrl {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
@@ -212,7 +212,7 @@ impl Mapper for SxRom {
 struct TxBankSelect{ val: uint8_t }
 
 impl Deref<uint8_t> for TxBankSelect {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }

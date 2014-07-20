@@ -95,7 +95,7 @@ impl<M:Mem> AddressingMode<M> for ImmediateAddressingMode {
 struct MemoryAddressingMode{val: uint16_t}
 
 impl Deref<uint16_t> for MemoryAddressingMode {
-    fn deref<'a>(&'a self) -> &'a uint16_t {
+    fn deref(&self) -> &uint16_t {
         &self.val
     }
 }

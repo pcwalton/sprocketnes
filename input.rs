@@ -28,7 +28,7 @@ static STROBE_STATE_RIGHT: uint8_t    = 7;
 struct StrobeState{ val: uint8_t }
 
 impl Deref<uint8_t> for StrobeState {
-    fn deref<'a>(&'a self) -> &'a uint8_t {
+    fn deref(&self) -> &uint8_t {
         &self.val
     }
 }

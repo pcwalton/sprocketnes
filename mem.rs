@@ -53,13 +53,13 @@ impl<M:Mem> MemUtil for M {
 pub struct Ram { pub val: [uint8_t, ..0x800] }
 
 impl Deref<[uint8_t, ..0x800]> for Ram {
-    fn deref<'a>(&'a self) -> &'a [uint8_t, ..0x800] {
+    fn deref(&self) -> &[uint8_t, ..0x800] {
         &self.val
     }
 }
 
 impl DerefMut<[uint8_t, ..0x800]> for Ram {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut [uint8_t, ..0x800] {
+    fn deref_mut(&mut self) -> &mut [uint8_t, ..0x800] {
         &mut self.val
     }
 }
