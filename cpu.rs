@@ -10,6 +10,9 @@ use util::Save;
 use libc::{int8_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;
 
+#[cfg(cpuspew)]
+use disasm::Disassembler;
+
 //
 // Constants
 //
@@ -364,7 +367,7 @@ impl<M:Mem> Cpu<M> {
             mem: &mut self.mem
         };
         println!(
-            "%04X %-20s A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%4u",
+            "{:04X} {:20s} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{}",
             self.regs.pc as uint,
             disassembler.disassemble(),
             self.regs.a as uint,
