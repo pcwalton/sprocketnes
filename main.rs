@@ -24,7 +24,7 @@ use std::io::File;
 use std::mem;
 use std::owned::Box;
 use std::rc::Rc;
-use std::str;
+use std::string;
 
 #[cfg(debug)]
 fn record_fps(last_time: &mut uint64_t, frames: &mut uint) {
@@ -66,7 +66,7 @@ fn parse_args(argc: int32_t, argv: *const *const uint8_t) -> Option<Options> {
 
     for i in range(1, argc as int) {
         let arg = unsafe {
-            str::raw::from_c_str(mem::transmute(*argv.offset(i)))
+            string::raw::from_buf(mem::transmute(*argv.offset(i)))
         };
 
         if "-1" == arg.as_slice() {
