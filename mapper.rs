@@ -53,13 +53,13 @@ impl Mapper for Nrom {
         if addr < 0x8000 {
             0u8
         } else if self.rom.prg.len() > 16384 {
-            *self.rom.prg.get(addr as uint & 0x7fff)
+            self.rom.prg[addr as uint & 0x7fff]
         } else {
-            *self.rom.prg.get(addr as uint & 0x3fff)
+            self.rom.prg[addr as uint & 0x3fff]
         }
     }
     fn prg_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to PRG-ROM.
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { *self.rom.chr.get(addr as uint) }
+    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { self.rom.chr[addr as uint] }
     fn chr_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to CHR-ROM.
     fn next_scanline(&mut self) -> MapperResult { Continue }
 }
@@ -150,14 +150,14 @@ impl Mapper for SxRom {
                 FixFirstBank => 0,
                 FixLastBank => self.regs.prg_bank,
             };
-            *self.rom.prg.get((bank as uint * 16384) | ((addr & 0x3fff) as uint))
+            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
         } else {
             let bank = match self.regs.ctrl.prg_rom_mode() {
                 Switch32K => (self.regs.prg_bank & 0xfe) | 1,
                 FixFirstBank => self.regs.prg_bank,
                 FixLastBank => (*self.rom).header.prg_rom_size - 1,
             };
-            *self.rom.prg.get((bank as uint * 16384) | ((addr & 0x3fff) as uint))
+            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
         }
     }
 
@@ -280,21 +280,21 @@ impl Mapper for TxRom {
                 Swappable8000 => self.prg_banks[0],
                 SwappableC000 => self.prg_bank_count() - 2,
             };
-            *self.rom.prg.get((bank as uint * 8192) | (addr as uint & 0x1fff))
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         } else if addr < 0xc000 {
             // $A000-$BFFF is switchable.
-            *self.rom.prg.get((self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff))
+            self.rom.prg[(self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff)]
         } else if addr < 0xe000 {
             // $C000-$DFFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
                 Swappable8000 => self.prg_bank_count() - 2,
                 SwappableC000 => self.prg_banks[0],
             };
-            *self.rom.prg.get((bank as uint * 8192) | (addr as uint & 0x1fff))
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         } else {
             // $E000-$FFFF is fixed to the last bank.
             let bank = self.prg_bank_count() - 1;
-            *self.rom.prg.get((bank as uint * 8192) | (addr as uint & 0x1fff))
+            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         }
     }
 
@@ -346,9 +346,9 @@ impl Mapper for TxRom {
             _ => return 0,
         };
         if two_kb {
-            *self.rom.chr.get((bank as uint * 1024) + (addr as uint & 0x7ff))
+            self.rom.chr[(bank as uint * 1024) + (addr as uint & 0x7ff)]
         } else {
-            *self.rom.chr.get((bank as uint * 1024) | (addr as uint & 0x3ff))
+            self.rom.chr[(bank as uint * 1024) | (addr as uint & 0x3ff)]
         }
     }
 
