@@ -175,4 +175,3 @@ pub fn current_time_millis() -> uint64_t {
         (tv.tv_sec as uint64_t) * 1000 + (tv.tv_usec as uint64_t) / 1000
     }
 }
-

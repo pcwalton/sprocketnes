@@ -823,7 +823,7 @@ impl Ppu {
 
             if self.scanline == (VBLANK_SCANLINE as uint16_t) {
                 self.start_vblank(&mut result);
-            } else if self.scanline == (LAST_SCANLINE as uint16_t) { 
+            } else if self.scanline == (LAST_SCANLINE as uint16_t) {
                 result.new_frame = true;
                 self.scanline = 0;
                 self.regs.status.set_in_vblank(false);
@@ -837,4 +837,3 @@ impl Ppu {
         return result;
     }
 }
-

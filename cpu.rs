@@ -25,8 +25,8 @@ static BREAK_FLAG:    uint8_t = 1 << 4;
 static OVERFLOW_FLAG: uint8_t = 1 << 6;
 static NEGATIVE_FLAG: uint8_t = 1 << 7;
 
-static NMI_VECTOR:   uint16_t = 0xfffa; 
-static RESET_VECTOR: uint16_t = 0xfffc; 
+static NMI_VECTOR:   uint16_t = 0xfffa;
+static RESET_VECTOR: uint16_t = 0xfffc;
 static BRK_VECTOR:   uint16_t = 0xfffe;
 
 /// The number of cycles that each machine operation takes. Indexed by opcode number.
@@ -313,7 +313,7 @@ macro_rules! decode_op {
             // No operation
             0xea => $this.nop(),
 
-            _ => fail!("unimplemented or illegal instruction")
+            _ => fail!("unimplemented or illegal instruction: {}", $op)
         }
     }
 }
@@ -819,4 +819,3 @@ impl<M:Mem> Cpu<M> {
     /// The constructor.
     pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
 }
-

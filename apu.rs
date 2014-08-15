@@ -355,7 +355,7 @@ pub struct Apu {
 
     sample_buffers: Box<[SampleBuffer, ..5]>,
     sample_buffer_offset: uint,
-    output_buffer: *mut OutputBuffer,
+    output_buffer: Option<*mut OutputBuffer>,
     resampler: Resampler,
 
     pub cy: uint64_t,
@@ -384,7 +384,7 @@ impl Mem for Apu {
 }
 
 impl Apu {
-    pub fn new(output_buffer: *mut OutputBuffer) -> Apu {
+    pub fn new(output_buffer: Option<*mut OutputBuffer>) -> Apu {
         Apu {
             regs: Regs {
                 pulses: [
@@ -672,25 +672,28 @@ impl Apu {
             self.sample_buffers[0].samples[i] = val as int16_t;
         }
 
+        if self.output_buffer.is_none() {
+            return;
+        }
+        let output_buffer = self.output_buffer.unwrap();
+
         // Wait for the audio callback to catch up if necessary.
         loop {
             unsafe {
                 let lock = audio::g_mutex.lock();
                 lock.wait();
-                if (*self.output_buffer).play_offset == (*self.output_buffer).samples.len() {
+                if (*output_buffer).play_offset == (*output_buffer).samples.len() {
                     break
                 }
             }
         }
-
-        // Resample and output the audio.
         let _lock = AudioLock::lock();
         unsafe {
+            // Resample and output the audio.
             let _ = self.resampler.process(0,
                                            self.sample_buffers[0].samples,
-                                           (*self.output_buffer).samples);
-            (*self.output_buffer).play_offset = 0;
+                                           (*output_buffer).samples);
+            (*output_buffer).play_offset = 0;
         }
     }
 }
-

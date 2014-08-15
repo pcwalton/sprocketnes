@@ -97,4 +97,3 @@ impl INesHeader {
                  })).to_string()
     }
 }
-

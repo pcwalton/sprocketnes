@@ -63,7 +63,7 @@ extern "C" fn nes_audio_callback(_: *const c_void,
 // Audio initialization
 //
 
-pub fn open() -> *mut OutputBuffer {
+pub fn open() -> Option<*mut OutputBuffer> {
     let output_buffer = box OutputBuffer {
         samples: [ 0, ..8820 ],
         play_offset: 0,
@@ -73,7 +73,8 @@ pub fn open() -> *mut OutputBuffer {
     };
 
     unsafe {
-        g_output_buffer = Some(output_buffer_ptr)
+        g_output_buffer = Some(output_buffer_ptr);
+        mem::forget(output_buffer);
     }
 
     let spec = SDL_AudioSpec {
@@ -88,17 +89,20 @@ pub fn open() -> *mut OutputBuffer {
         callback: Some(nes_audio_callback),
     };
 
-    let (audio_device, _) = unsafe {
-        AudioDevice::open(None, 0, mem::transmute(&spec)).unwrap()
-    };
-    audio_device.resume();
-
     unsafe {
-        g_audio_device = Some(audio_device);
-        mem::forget(output_buffer);
+        match AudioDevice::open(None, 0, mem::transmute(&spec)) {
+            Ok(x) => {
+                let (device, _) = x;
+                device.resume();
+                g_audio_device = Some(device);
+                return Some(output_buffer_ptr)
+            },
+            Err(e) => {
+                println!("Error initializing AudioDevice: {}", e);
+                return None
+            }
+        }
     }
-
-    output_buffer_ptr
 }
 
 //
@@ -141,4 +145,3 @@ impl AudioLock {
         AudioLock
     }
 }
-

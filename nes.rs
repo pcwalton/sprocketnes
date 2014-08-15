@@ -37,4 +37,3 @@ pub mod speex;
 pub extern "C" fn main(argc: int32_t, argv: *const *const uint8_t) -> int32_t {
     native::start(argc as int, argv, proc() main::start(argc, argv)) as int32_t
 }
-
