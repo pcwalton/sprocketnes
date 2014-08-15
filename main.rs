@@ -157,4 +157,3 @@ pub fn start(argc: int32_t, argv: *const *const uint8_t) {
 
     audio::close();
 }
-
