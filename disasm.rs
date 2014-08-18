@@ -13,7 +13,7 @@ pub struct Disassembler<'a,M> {
     pub mem: &'a mut M
 }
 
-impl<'a,M:Mem> Disassembler<'a,M> {
+impl<'a,M> Disassembler<'a,M> where M: Mem {
     //
     // Loads and byte-to-string conversion
     //

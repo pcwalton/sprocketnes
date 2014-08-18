@@ -32,7 +32,7 @@ pub trait MemUtil {
     fn loadw_zp(&mut self, addr: uint8_t) -> uint16_t;
 }
 
-impl<M:Mem> MemUtil for M {
+impl<M> MemUtil for M where M: Mem {
     fn loadw(&mut self, addr: uint16_t) -> uint16_t {
         self.loadb(addr) as uint16_t | (self.loadb(addr + 1) as uint16_t << 8)
     }

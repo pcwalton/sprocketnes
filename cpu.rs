@@ -81,13 +81,13 @@ trait AddressingMode<M> {
 }
 
 struct AccumulatorAddressingMode;
-impl<M:Mem> AddressingMode<M> for AccumulatorAddressingMode {
+impl<M> AddressingMode<M> for AccumulatorAddressingMode where M: Mem {
     fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.regs.a }
     fn store(&self, cpu: &mut Cpu<M>, val: uint8_t) { cpu.regs.a = val }
 }
 
 struct ImmediateAddressingMode;
-impl<M:Mem> AddressingMode<M> for ImmediateAddressingMode {
+impl<M> AddressingMode<M> for ImmediateAddressingMode where M: Mem {
     fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.loadb_bump_pc() }
     fn store(&self, _: &mut Cpu<M>, _: uint8_t) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
@@ -103,7 +103,7 @@ impl Deref<uint16_t> for MemoryAddressingMode {
     }
 }
 
-impl<M:Mem> AddressingMode<M> for MemoryAddressingMode {
+impl<M> AddressingMode<M> for MemoryAddressingMode where M: Mem {
     fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.loadb(**self) }
     fn store(&self, cpu: &mut Cpu<M>, val: uint8_t) { cpu.storeb(**self, val) }
 }
@@ -332,7 +332,7 @@ pub struct Cpu<M> {
 }
 
 // The CPU implements Mem so that it can handle writes to the DMA register.
-impl<M:Mem> Mem for Cpu<M> {
+impl<M> Mem for Cpu<M> where M: Mem {
     fn loadb(&mut self, addr: uint16_t) -> uint8_t { self.mem.loadb(addr) }
     fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         // Handle OAM_DMA.
@@ -345,7 +345,7 @@ impl<M:Mem> Mem for Cpu<M> {
 }
 
 // Save state logic.
-impl<M:Mem + Save> Save for Cpu<M> {
+impl<M> Save for Cpu<M> where M: Mem + Save {
     fn save(&mut self, fd: &mut File) {
         self.cy.save(fd);
         self.regs.save(fd);
@@ -358,7 +358,7 @@ impl<M:Mem + Save> Save for Cpu<M> {
     }
 }
 
-impl<M:Mem> Cpu<M> {
+impl<M> Cpu<M> where M: Mem {
     // Debugging
     #[cfg(cpuspew)]
     fn trace(&mut self) {
