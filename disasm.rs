@@ -8,7 +8,7 @@ use mem::Mem;
 
 use libc::{uint8_t, uint16_t};
 
-pub struct Disassembler<'a,M> {
+pub struct Disassembler<'a,M:'a> {
     pub pc: uint16_t,
     pub mem: &'a mut M
 }
