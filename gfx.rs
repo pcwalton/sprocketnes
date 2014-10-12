@@ -7,7 +7,7 @@
 use sdl2::{INIT_AUDIO, INIT_TIMER, INIT_VIDEO, INIT_EVENTS};
 use sdl2::pixels::BGR24;
 use sdl2::rect::Rect;
-use sdl2::render::{RendererFlags, ACCELERATED, AccessStreaming, DriverAuto, Renderer, Texture};
+use sdl2::render::{ACCELERATED, AccessStreaming, DriverAuto, Renderer, Texture};
 use sdl2::video::{PosCentered, Window, INPUT_FOCUS};
 use sdl2;
 

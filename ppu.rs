@@ -287,7 +287,7 @@ impl Save for Oam {
     }
 }
 
-struct Sprite_t {
+struct SpriteStruct {
     x: uint8_t,
     y: uint8_t,
     tile_index_byte: uint8_t,
@@ -300,7 +300,7 @@ enum SpriteTiles {
     SpriteTiles8x16(uint16_t, uint16_t)
 }
 
-impl Sprite_t {
+impl SpriteStruct {
     fn tiles(&self, ppu: &Ppu) -> SpriteTiles {
         let base = ppu.regs.ctrl.sprite_pattern_table_addr();
         match ppu.regs.ctrl.sprite_size() {
@@ -592,8 +592,8 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn make_sprite_info(&mut self, index: uint16_t) -> Sprite_t {
-        Sprite_t {
+    fn make_sprite_info(&mut self, index: uint16_t) -> SpriteStruct {
+        SpriteStruct {
             y: self.oam.loadb(index * 4 + 0) + 1,
             tile_index_byte: self.oam.loadb(index * 4 + 1),
             attribute_byte: self.oam.loadb(index * 4 + 2),
@@ -602,7 +602,7 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: |&mut Ppu, &Sprite_t, uint8_t| -> bool) {
+    fn each_sprite(&mut self, f: |&mut Ppu, &SpriteStruct, uint8_t| -> bool) {
         for i in range(0i, 64) {
             let sprite = self.make_sprite_info(i as uint16_t);
             if !f(self, &sprite, i as uint8_t) {

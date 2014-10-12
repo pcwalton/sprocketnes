@@ -116,7 +116,7 @@ pub struct SxRom {
     accum: uint8_t,
     // The write count. At the 5th write, we update the register.
     write_count: uint8_t,
-    prg_ram: Box<[uint8_t, ..8192]>,
+    //prg_ram: Box<[uint8_t, ..8192]>,
     chr_ram: Box<[uint8_t, ..8192]>,
 }
 
@@ -134,7 +134,7 @@ impl SxRom {
             },
             accum: 0,
             write_count: 0,
-            prg_ram: box() ([ 0, ..8192 ]),
+            //prg_ram: box() ([ 0, ..8192 ]),
             chr_ram: box() ([ 0, ..8192 ]),
         }
     }

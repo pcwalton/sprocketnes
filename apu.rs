@@ -539,12 +539,12 @@ impl Apu {
 
     fn get_or_zero_sample_buffer(buffer: &mut [int16_t], offset: uint, audible: bool)
                                  -> Option<&mut [int16_t]> {
-        let buffer = buffer.mut_slice(offset, offset + NES_SAMPLES_PER_TICK as uint);
+        let buffer = buffer.slice_mut(offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);
         }
 
-        for dest in buffer.mut_iter() {
+        for dest in buffer.iter_mut() {
             *dest = 0;
         }
         None
@@ -567,7 +567,7 @@ impl Apu {
                 let mut waveform_index = pulse.waveform_index;
                 let mut wavelen_count = pulse.timer.wavelen_count;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -599,7 +599,7 @@ impl Apu {
                 let mut waveform_index = triangle.waveform_index;
                 let mut wavelen_count = triangle.timer.wavelen_count;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -630,7 +630,7 @@ impl Apu {
                 let mut rng = noise.rng;
                 let mut on = 1;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     timer_count += 1;
                     if timer_count >= timer {
                         timer_count = 0;
