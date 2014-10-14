@@ -16,14 +16,14 @@ use sdl2::keycode::{SKey, UpKey, XKey, ZKey};
 // The "strobe state": the order in which the NES reads the buttons.
 //
 
-static STROBE_STATE_A: uint8_t        = 0;
-static STROBE_STATE_B: uint8_t        = 1;
-static STROBE_STATE_SELECT: uint8_t   = 2;
-static STROBE_STATE_START: uint8_t    = 3;
-static STROBE_STATE_UP: uint8_t       = 4;
-static STROBE_STATE_DOWN: uint8_t     = 5;
-static STROBE_STATE_LEFT: uint8_t     = 6;
-static STROBE_STATE_RIGHT: uint8_t    = 7;
+const STROBE_STATE_A: uint8_t        = 0;
+const STROBE_STATE_B: uint8_t        = 1;
+const STROBE_STATE_SELECT: uint8_t   = 2;
+const STROBE_STATE_START: uint8_t    = 3;
+const STROBE_STATE_UP: uint8_t       = 4;
+const STROBE_STATE_DOWN: uint8_t     = 5;
+const STROBE_STATE_LEFT: uint8_t     = 6;
+const STROBE_STATE_RIGHT: uint8_t    = 7;
 
 struct StrobeState{ val: uint8_t }
 

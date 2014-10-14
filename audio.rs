@@ -8,8 +8,8 @@
 // safe.
 
 use libc::{c_int, c_void, uint8_t};
-use sdl2::audio::ll::SDL_AudioSpec;
-use sdl2::audio::{AudioDevice, AudioS16LSB};
+use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
+use sdl2::audio::AudioDevice;
 use std::cmp;
 use std::mem;
 use std::ptr;
@@ -20,7 +20,7 @@ use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 // The audio callback
 //
 
-static SAMPLE_COUNT: uint = 4410 * 2;
+const SAMPLE_COUNT: uint = 4410 * 2;
 
 static mut g_audio_device: Option<AudioDevice> = None;
 
@@ -29,7 +29,7 @@ static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 pub static mut g_mutex: StaticNativeMutex = NATIVE_MUTEX_INIT;
 
 pub struct OutputBuffer {
-    pub samples: [uint8_t, ..SAMPLE_COUNT],
+    pub samples: [uint8_t, .. SAMPLE_COUNT],
     pub play_offset: uint,
 }
 
@@ -79,7 +79,7 @@ pub fn open() -> Option<*mut OutputBuffer> {
 
     let spec = SDL_AudioSpec {
         freq: 44100,
-        format: AudioS16LSB,
+        format: AUDIO_S16LSB,
         channels: 1,
         silence: 0,
         samples: 4410,

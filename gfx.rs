@@ -4,30 +4,30 @@
 // Author: Patrick Walton
 //
 
-use sdl2::{InitAudio, InitTimer, InitVideo, InitEvents};
+use sdl2::{INIT_AUDIO, INIT_TIMER, INIT_VIDEO, INIT_EVENTS};
 use sdl2::pixels::BGR24;
 use sdl2::rect::Rect;
-use sdl2::render::{Accelerated, AccessStreaming, DriverAuto, Renderer, Texture};
-use sdl2::video::{PosCentered, Window, InputFocus};
+use sdl2::render::{ACCELERATED, AccessStreaming, DriverAuto, Renderer, Texture};
+use sdl2::video::{PosCentered, Window, INPUT_FOCUS};
 use sdl2;
 
 use libc::{int32_t, uint8_t};
 use std::owned::Box;
 
-static SCREEN_WIDTH: uint = 256;
-static SCREEN_HEIGHT: uint = 240;
+const SCREEN_WIDTH: uint = 256;
+const SCREEN_HEIGHT: uint = 240;
 
-static FONT_HEIGHT: uint = 10;
-static FONT_GLYPH_COUNT: uint = 95;
-static FONT_GLYPH_LENGTH: uint = FONT_GLYPH_COUNT * FONT_HEIGHT;
+const FONT_HEIGHT: uint = 10;
+const FONT_GLYPH_COUNT: uint = 95;
+const FONT_GLYPH_LENGTH: uint = FONT_GLYPH_COUNT * FONT_HEIGHT;
 
-static STATUS_LINE_PADDING: uint = 6;
-static STATUS_LINE_X: uint = STATUS_LINE_PADDING;
-static STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
-static STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
+const STATUS_LINE_PADDING: uint = 6;
+const STATUS_LINE_X: uint = STATUS_LINE_PADDING;
+const STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
+const STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
 
 #[allow(dead_code)]
-static SCREEN_SIZE: uint = 184320;
+const SCREEN_SIZE: uint = 184320;
 
 //
 // PT Ronda Seven
@@ -35,7 +35,7 @@ static SCREEN_SIZE: uint = 184320;
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-static FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
+const FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -133,7 +133,7 @@ static FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-static FONT_ADVANCES: [uint8_t, ..FONT_GLYPH_COUNT] = [
+const FONT_ADVANCES: [uint8_t, ..FONT_GLYPH_COUNT] = [
     3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */, 
     4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */, 
     6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */, 
@@ -294,14 +294,14 @@ pub struct Gfx {
 
 impl Gfx {
     pub fn new(scale: Scale) -> Gfx {
-        sdl2::init(InitVideo | InitAudio | InitTimer | InitEvents);
+        sdl2::init(INIT_VIDEO | INIT_AUDIO | INIT_TIMER | INIT_EVENTS);
         let window = Window::new("sprocketnes",
                                  PosCentered,
                                  PosCentered,
                                  (SCREEN_WIDTH as uint * scale.factor()) as int,
                                  (SCREEN_HEIGHT as uint * scale.factor()) as int,
-                                 InputFocus).unwrap();
-        let renderer = Renderer::from_window(window, DriverAuto, Accelerated).unwrap();
+                                 INPUT_FOCUS).unwrap();
+        let renderer = Renderer::from_window(window, DriverAuto, ACCELERATED).unwrap();
         let texture = renderer.create_texture(BGR24,
                                               AccessStreaming,
                                               SCREEN_WIDTH as int,

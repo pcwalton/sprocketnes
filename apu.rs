@@ -14,28 +14,28 @@ use libc::{int16_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;
 use std::owned::Box;
 
-static CYCLES_PER_EVEN_TICK: uint64_t = 7438;
-static CYCLES_PER_ODD_TICK: uint64_t = 7439;
+const CYCLES_PER_EVEN_TICK: uint64_t = 7438;
+const CYCLES_PER_ODD_TICK: uint64_t = 7439;
 
-static NES_SAMPLE_RATE: uint32_t = 1789920;   // Actual is 1789800, but this is divisible by 240.
-static OUTPUT_SAMPLE_RATE: uint32_t = 44100;
-static TICK_FREQUENCY: uint32_t = 240;
-static NES_SAMPLES_PER_TICK: uint32_t = NES_SAMPLE_RATE / TICK_FREQUENCY;
+const NES_SAMPLE_RATE: uint32_t = 1789920;   // Actual is 1789800, but this is divisible by 240.
+const OUTPUT_SAMPLE_RATE: uint32_t = 44100;
+const TICK_FREQUENCY: uint32_t = 240;
+const NES_SAMPLES_PER_TICK: uint32_t = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
-static PULSE_WAVEFORMS: [uint8_t, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
+const PULSE_WAVEFORMS: [uint8_t, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
-static LENGTH_COUNTERS: [uint8_t, ..32] = [
+const LENGTH_COUNTERS: [uint8_t, ..32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-static TRIANGLE_WAVEFORM: [uint8_t, ..32] = [
+const TRIANGLE_WAVEFORM: [uint8_t, ..32] = [
     15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 ];
 
 // TODO: PAL
-static NOISE_PERIODS: [uint16_t, ..16] = [
+const NOISE_PERIODS: [uint16_t, ..16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 ];
 
@@ -340,10 +340,10 @@ impl Save for Regs {
 // Sample buffers
 //
 
-static SAMPLE_COUNT: uint = 178992;
+const SAMPLE_COUNT: uint = 178992;
 
 struct SampleBuffer {
-    samples: [int16_t, ..SAMPLE_COUNT],
+    samples: [int16_t, .. SAMPLE_COUNT],
 }
 
 //
@@ -373,10 +373,10 @@ impl Mem for Apu {
     }
     fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
         match addr {
-            0x4000..0x4003 => self.update_pulse(addr, val, 0),
-            0x4004..0x4007 => self.update_pulse(addr, val, 1),
-            0x4008..0x400b => self.regs.triangle.storeb(addr, val),
-            0x400c..0x400f => self.update_noise(addr, val),
+            0x4000 ... 0x4003 => self.update_pulse(addr, val, 0),
+            0x4004 ... 0x4007 => self.update_pulse(addr, val, 1),
+            0x4008 ... 0x400b => self.regs.triangle.storeb(addr, val),
+            0x400c ... 0x400f => self.update_noise(addr, val),
             0x4015 => self.update_status(val),
             _ => {} // TODO
         }
@@ -539,12 +539,12 @@ impl Apu {
 
     fn get_or_zero_sample_buffer(buffer: &mut [int16_t], offset: uint, audible: bool)
                                  -> Option<&mut [int16_t]> {
-        let buffer = buffer.mut_slice(offset, offset + NES_SAMPLES_PER_TICK as uint);
+        let buffer = buffer.slice_mut(offset, offset + NES_SAMPLES_PER_TICK as uint);
         if audible {
             return Some(buffer);
         }
 
-        for dest in buffer.mut_iter() {
+        for dest in buffer.iter_mut() {
             *dest = 0;
         }
         None
@@ -567,7 +567,7 @@ impl Apu {
                 let mut waveform_index = pulse.waveform_index;
                 let mut wavelen_count = pulse.timer.wavelen_count;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -599,7 +599,7 @@ impl Apu {
                 let mut waveform_index = triangle.waveform_index;
                 let mut wavelen_count = triangle.timer.wavelen_count;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     wavelen_count += 1;
                     if wavelen_count >= wavelen {
                         wavelen_count = 0;
@@ -630,7 +630,7 @@ impl Apu {
                 let mut rng = noise.rng;
                 let mut on = 1;
 
-                for dest in buffer.mut_iter() {
+                for dest in buffer.iter_mut() {
                     timer_count += 1;
                     if timer_count >= timer {
                         timer_count = 0;
