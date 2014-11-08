@@ -13,7 +13,6 @@ use util::Save;
 use libc::{uint8_t, uint16_t};
 use std::cell::RefCell;
 use std::io::File;
-use std::owned::Box;
 use std::rc::Rc;
 
 //
