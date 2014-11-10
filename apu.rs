@@ -12,7 +12,6 @@ use util::{Save, Xorshift};
 
 use libc::{int16_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;
-use std::owned::Box;
 
 const CYCLES_PER_EVEN_TICK: uint64_t = 7438;
 const CYCLES_PER_ODD_TICK: uint64_t = 7439;
@@ -72,7 +71,7 @@ impl ApuLength {
                 self.id = val >> 3;
                 self.remaining = LENGTH_COUNTERS[self.id as uint];
             }
-            _ => fail!("can't happen"),
+            _ => panic!("can't happen"),
         }
     }
 
@@ -163,7 +162,7 @@ impl ApuTimer {
             0 | 1 => {}
             2 => self.value = (self.value & 0xff00) | (val as uint16_t),
             3 => self.value = (self.value & 0x00ff) | ((val as uint16_t & 0x7) << 8),
-            _ => fail!("can't happen"),
+            _ => panic!("can't happen"),
         }
     }
 
@@ -447,7 +446,7 @@ impl Apu {
                 pulse.sweep_cycle = 0;
             }
             2 | 3 => {}
-            _ => fail!("can't happen"),
+            _ => panic!("can't happen"),
         }
     }
 

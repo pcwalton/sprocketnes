@@ -22,7 +22,6 @@ use libc::{int32_t, uint8_t, uint64_t};
 use std::cell::RefCell;
 use std::io::File;
 use std::mem;
-use std::owned::Box;
 use std::rc::Rc;
 use std::string;
 

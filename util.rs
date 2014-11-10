@@ -4,7 +4,7 @@
 // Author: Patrick Walton
 //
 
-#![allow(ctypes)]
+#![allow(improper_ctypes)]
 
 use libc::{c_int, c_void, time_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::io::File;

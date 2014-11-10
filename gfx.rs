@@ -12,7 +12,6 @@ use sdl2::video::{PosCentered, Window, INPUT_FOCUS};
 use sdl2;
 
 use libc::{int32_t, uint8_t};
-use std::owned::Box;
 
 const SCREEN_WIDTH: uint = 256;
 const SCREEN_HEIGHT: uint = 240;
@@ -235,7 +234,7 @@ impl StatusLineText {
             return;
         }
         let y = match self.animation {
-            Idle => fail!(),
+            Idle => panic!(),
             SlidingOut(y) => y as int,
             Pausing(_) => STATUS_LINE_Y as int,
         };
@@ -282,7 +281,7 @@ impl Scale {
 }
 
 pub struct Gfx {
-    pub renderer: Box<Renderer<Window>>,
+    pub renderer: Box<Renderer>,
     pub texture: Box<Texture>,
     pub scale: Scale,
     pub status_line: StatusLine,
