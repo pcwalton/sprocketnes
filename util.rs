@@ -24,22 +24,22 @@ pub trait Save {
 
 impl Save for uint8_t {
     fn save(&mut self, fd: &mut File) {
-        fd.write([ *self ]).unwrap();
+        fd.write(&[ *self ]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        fd.read_at_least(buf.len(), &mut buf).unwrap();
         *self = buf[0];
     }
 }
 
 impl Save for uint16_t {
     fn save(&mut self, fd: &mut File) {
-        fd.write([ *self as uint8_t, (*self >> 8) as uint8_t ]).unwrap();
+        fd.write(&[ *self as uint8_t, (*self >> 8) as uint8_t ]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        fd.read_at_least(buf.len(), &mut buf).unwrap();
         *self = (buf[0] as uint16_t) | ((buf[1] as uint16_t) << 8);
     }
 }
@@ -50,11 +50,11 @@ impl Save for uint64_t {
         for i in range(0u, 8) {
             buf[i] = ((*self) >> (i * 8)) as uint8_t;
         }
-        fd.write(buf).unwrap();
+        fd.write(&buf).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        fd.read_at_least(buf.len(), &mut buf).unwrap();
         *self = 0;
         for i in range(0u, 8) {
             *self = *self | (buf[i] as uint64_t << (i * 8));
@@ -72,10 +72,10 @@ impl<'a> Save for &'a mut [uint8_t] {
 }
 
 impl Save for bool {
-    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
+    fn save(&mut self, fd: &mut File) { fd.write(&[ if *self { 0 } else { 1 } ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
         let mut val: [uint8_t, ..1] = [ 0 ];
-        fd.read_at_least(val.len(), val).unwrap();
+        fd.read_at_least(val.len(), &mut val).unwrap();
         *self = val[0] != 0
     }
 }
@@ -98,13 +98,13 @@ macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
         impl Save for $name {
             fn save(&mut self, fd: &mut File) {
-                let mut val: uint8_t = match *self { $val_0 => 0, $val_1 => 1 };
+                let mut val: uint8_t = match *self { $name::$val_0 => 0, $name::$val_1 => 1 };
                 val.save(fd)
             }
             fn load(&mut self, fd: &mut File) {
                 let mut val: uint8_t = 0;
                 val.load(fd);
-                *self = if val == 0 { $val_0 } else { $val_1 };
+                *self = if val == 0 { $name::$val_0 } else { $name::$val_1 };
             }
         }
     )

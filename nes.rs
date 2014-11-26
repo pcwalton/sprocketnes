@@ -8,7 +8,7 @@
 #![no_main]
 
 extern crate libc;
-extern crate native;
+extern crate rustrt;
 extern crate sdl2;
 
 use libc::{int32_t, uint8_t};
@@ -35,5 +35,5 @@ pub mod speex;
 
 #[no_mangle]
 pub extern "C" fn main(argc: int32_t, argv: *const *const uint8_t) -> int32_t {
-    native::start(argc as int, argv, proc() main::start(argc, argv)) as int32_t
+    std::rt::start(argc as int, argv, proc() main::start(argc, argv)) as int32_t
 }

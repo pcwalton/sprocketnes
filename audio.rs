@@ -8,13 +8,12 @@
 // safe.
 
 use libc::{c_int, c_void, uint8_t};
-use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
-use sdl2::audio::AudioDevice;
+use sdl2::audio::ll;
 use std::cmp;
 use std::mem;
 use std::ptr;
 use std::raw::Slice;
-use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use rustrt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 //
 // The audio callback
@@ -22,7 +21,9 @@ use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 const SAMPLE_COUNT: uint = 4410 * 2;
 
-static mut g_audio_device: Option<AudioDevice> = None;
+type AudioDeviceID = u32;
+
+static mut g_audio_device: Option<AudioDeviceID> = None;
 
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
@@ -77,9 +78,9 @@ pub fn open() -> Option<*mut OutputBuffer> {
         mem::forget(output_buffer);
     }
 
-    let spec = SDL_AudioSpec {
+    let spec = ll::SDL_AudioSpec {
         freq: 44100,
-        format: AUDIO_S16LSB,
+        format: ll::AUDIO_S16LSB,
         channels: 1,
         silence: 0,
         samples: 4410,
@@ -90,16 +91,21 @@ pub fn open() -> Option<*mut OutputBuffer> {
     };
 
     unsafe {
-        match AudioDevice::open(None, 0, mem::transmute(&spec)) {
-            Ok(x) => {
-                let (device, _) = x;
-                device.resume();
-                g_audio_device = Some(device);
-                return Some(output_buffer_ptr)
+        use std::mem::uninitialized;
+        use sdl2;
+
+        let mut obtained = uninitialized::<ll::SDL_AudioSpec>();
+
+        match ll::SDL_OpenAudioDevice(ptr::null(), 0, &spec, &mut obtained, 0) {
+            0 => {
+                println!("Error initializing AudioDevice: {}", sdl2::get_error());
+                None
             },
-            Err(e) => {
-                println!("Error initializing AudioDevice: {}", e);
-                return None
+            device_id => {
+                // start playing
+                ll::SDL_PauseAudioDevice(device_id, 0);
+                g_audio_device = Some(device_id);
+                Some(output_buffer_ptr)
             }
         }
     }
@@ -114,7 +120,7 @@ pub fn close() {
         match g_audio_device {
             None => {}
             Some(audio_device) => {
-                audio_device.close();
+                ll::SDL_CloseAudioDevice(audio_device);
                 g_audio_device = None
             }
         }
@@ -127,8 +133,8 @@ impl Drop for AudioLock {
     fn drop(&mut self) {
         unsafe {
             match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.unlock(),
+                None => {},
+                Some(audio_device) => ll::SDL_UnlockAudioDevice(audio_device)
             }
         }
     }
@@ -138,8 +144,8 @@ impl AudioLock {
     pub fn lock() -> AudioLock {
         unsafe {
             match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.lock(),
+                None => {},
+                Some(audio_device) => ll::SDL_LockAudioDevice(audio_device)
             }
         }
         AudioLock
