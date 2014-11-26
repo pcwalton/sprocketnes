@@ -18,7 +18,7 @@ pub struct Rom {
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        file.read_at_least(buffer.len(), buffer).unwrap();
+        file.read_at_least(buffer.len(), &mut buffer).unwrap();
 
         let header = INesHeader {
             magic: [

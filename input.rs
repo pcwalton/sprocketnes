@@ -7,10 +7,9 @@
 use mem::Mem;
 
 use libc::{uint8_t, uint16_t};
-use sdl2::event::{KeyDownEvent, KeyUpEvent, NoEvent, QuitEvent};
+use sdl2::event::Event;
 use sdl2::event;
-use sdl2::keycode::{DownKey, EscapeKey, KeyCode, LKey, LeftKey, RShiftKey, ReturnKey, RightKey};
-use sdl2::keycode::{SKey, UpKey, XKey, ZKey};
+use sdl2::keycode::KeyCode;
 
 //
 // The "strobe state": the order in which the NES reads the buttons.
@@ -106,14 +105,14 @@ impl Input {
 
     fn handle_gamepad_event(&mut self, key: KeyCode, down: bool) {
         match key {
-            LeftKey   => self.gamepad_0.left   = down,
-            DownKey   => self.gamepad_0.down   = down,
-            UpKey     => self.gamepad_0.up     = down,
-            RightKey  => self.gamepad_0.right  = down,
-            ZKey      => self.gamepad_0.a      = down,
-            XKey      => self.gamepad_0.b      = down,
-            RShiftKey => self.gamepad_0.select = down,
-            ReturnKey => self.gamepad_0.start  = down,
+            KeyCode::Left   => self.gamepad_0.left   = down,
+            KeyCode::Down   => self.gamepad_0.down   = down,
+            KeyCode::Up     => self.gamepad_0.up     = down,
+            KeyCode::Right  => self.gamepad_0.right  = down,
+            KeyCode::Z      => self.gamepad_0.a      = down,
+            KeyCode::X      => self.gamepad_0.b      = down,
+            KeyCode::RShift => self.gamepad_0.select = down,
+            KeyCode::Return => self.gamepad_0.start  = down,
             _         => {}
         }
     }
@@ -121,23 +120,23 @@ impl Input {
     pub fn check_input(&mut self) -> InputResult {
         loop {
             match event::poll_event() {
-                NoEvent => {
+                Event::None => {
                     break
-                }
-                KeyDownEvent(_, _, EscapeKey, _, _) => {
-                    return Quit
-                }
-                KeyDownEvent(_, _, SKey, _, _) => return SaveState,
-                KeyDownEvent(_, _, LKey, _, _) => return LoadState,
-                KeyDownEvent(_, _, key, _, _) => {
+                },
+                Event::KeyDown(_, _, KeyCode::Escape, _, _, _) => {
+                    return InputResult::Quit
+                },
+                Event::KeyDown(_, _, KeyCode::S, _, _, _) => return InputResult::SaveState,
+                Event::KeyDown(_, _, KeyCode::L, _, _, _) => return InputResult::LoadState,
+                Event::KeyDown(_, _, key, _, _, _) => {
                     self.handle_gamepad_event(key, true)
-                }
-                KeyUpEvent(_, _, key, _, _) => self.handle_gamepad_event(key, false),
-                QuitEvent(_) => return Quit,
+                },
+                Event::KeyUp(_, _, key, _, _, _) => self.handle_gamepad_event(key, false),
+                Event::Quit(_) => return InputResult::Quit,
                 _ => {}
             }
         }
-        return Continue;
+        InputResult::Continue
     }
 }
 
@@ -160,4 +159,3 @@ impl Mem for Input {
         }
     }
 }
-

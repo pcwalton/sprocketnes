@@ -7,9 +7,8 @@
 use apu::Apu;
 use audio;
 use cpu::Cpu;
-use gfx::{Gfx, Scale, Scale1x, Scale2x, Scale3x};
+use gfx::{Gfx, Scale};
 use input::Input;
-use input;
 use mapper::Mapper;
 use mapper;
 use mem::MemMap;
@@ -23,7 +22,6 @@ use std::cell::RefCell;
 use std::io::File;
 use std::mem;
 use std::rc::Rc;
-use std::string;
 
 #[cfg(debug)]
 fn record_fps(last_time: &mut uint64_t, frames: &mut uint) {
@@ -60,20 +58,20 @@ fn usage() {
 fn parse_args(argc: int32_t, argv: *const *const uint8_t) -> Option<Options> {
     let mut options = Options {
         rom_path: String::new(),
-        scale: Scale1x,
+        scale: Scale::Scale1x,
     };
 
     for i in range(1, argc as int) {
         let arg = unsafe {
-            string::raw::from_buf(mem::transmute(*argv.offset(i)))
+            String::from_raw_buf(mem::transmute(*argv.offset(i)))
         };
 
         if "-1" == arg.as_slice() {
-            options.scale = Scale1x;
+            options.scale = Scale::Scale1x;
         } else if "-2" == arg.as_slice() {
-            options.scale = Scale2x;
+            options.scale = Scale::Scale2x;
         } else if "-3" == arg.as_slice() {
-            options.scale = Scale3x;
+            options.scale = Scale::Scale3x;
         } else if arg.as_bytes()[0] == ('-' as uint8_t) {
             usage();
             return None;
@@ -134,19 +132,21 @@ pub fn start(argc: int32_t, argv: *const *const uint8_t) {
         cpu.mem.apu.step(cpu.cy);
 
         if ppu_result.new_frame {
+            use input::InputResult;
+
             gfx.tick();
             gfx.composite(&mut *cpu.mem.ppu.screen);
             record_fps(&mut last_time, &mut frames);
             cpu.mem.apu.play_channels();
 
             match cpu.mem.input.check_input() {
-                input::Continue => {}
-                input::Quit => break,
-                input::SaveState => {
+                InputResult::Continue => {},
+                InputResult::Quit => break,
+                InputResult::SaveState => {
                     cpu.save(&mut File::create(&Path::new("state.sav")).unwrap());
                     gfx.status_line.set("Saved state".to_string());
-                }
-                input::LoadState => {
+                },
+                InputResult::LoadState => {
                     cpu.load(&mut File::open(&Path::new("state.sav")).unwrap());
                     gfx.status_line.set("Loaded state".to_string());
                 }

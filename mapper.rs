@@ -60,7 +60,7 @@ impl Mapper for Nrom {
     fn prg_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to PRG-ROM.
     fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { self.rom.chr[addr as uint] }
     fn chr_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to CHR-ROM.
-    fn next_scanline(&mut self) -> MapperResult { Continue }
+    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
 
 //
@@ -93,9 +93,9 @@ enum SxPrgBankMode {
 impl SxCtrl {
     fn prg_rom_mode(self) -> SxPrgBankMode {
         match (*self >> 2) & 3 {
-            0 | 1 => Switch32K,
-            2 => FixFirstBank,
-            3 => FixLastBank,
+            0 | 1 => SxPrgBankMode::Switch32K,
+            2 => SxPrgBankMode::FixFirstBank,
+            3 => SxPrgBankMode::FixLastBank,
             _ => panic!("can't happen")
         }
     }
@@ -145,16 +145,16 @@ impl Mapper for SxRom {
             0u8
         } else if addr < 0xc000 {
             let bank = match self.regs.ctrl.prg_rom_mode() {
-                Switch32K => self.regs.prg_bank & 0xfe,
-                FixFirstBank => 0,
-                FixLastBank => self.regs.prg_bank,
+                SxPrgBankMode::Switch32K => self.regs.prg_bank & 0xfe,
+                SxPrgBankMode::FixFirstBank => 0,
+                SxPrgBankMode::FixLastBank => self.regs.prg_bank,
             };
             self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
         } else {
             let bank = match self.regs.ctrl.prg_rom_mode() {
-                Switch32K => (self.regs.prg_bank & 0xfe) | 1,
-                FixFirstBank => self.regs.prg_bank,
-                FixLastBank => (*self.rom).header.prg_rom_size - 1,
+                SxPrgBankMode::Switch32K => (self.regs.prg_bank & 0xfe) | 1,
+                SxPrgBankMode::FixFirstBank => self.regs.prg_bank,
+                SxPrgBankMode::FixLastBank => (*self.rom).header.prg_rom_size - 1,
             };
             self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
         }
@@ -199,7 +199,7 @@ impl Mapper for SxRom {
     fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t     { self.chr_ram[addr as uint]       }
     fn chr_storeb(&mut self, addr: uint16_t, val: uint8_t) { self.chr_ram[addr as uint] = val }
 
-    fn next_scanline(&mut self) -> MapperResult { Continue }
+    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
 
 //
@@ -224,7 +224,7 @@ enum TxPrgBankMode {
 impl TxBankSelect {
     fn bank_update_select(self) -> uint8_t { *self & 0x7 }
     fn prg_bank_mode(self) -> TxPrgBankMode {
-        if (*self & 0x40) == 0 { Swappable8000 } else { SwappableC000 }
+        if (*self & 0x40) == 0 { TxPrgBankMode::Swappable8000 } else { TxPrgBankMode::SwappableC000 }
     }
     fn chr_a12_inversion(self) -> bool { (*self & 0x80) != 0 }
 }
@@ -276,8 +276,8 @@ impl Mapper for TxRom {
         } else if addr < 0xa000 {
             // $8000-$9FFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
-                Swappable8000 => self.prg_banks[0],
-                SwappableC000 => self.prg_bank_count() - 2,
+                TxPrgBankMode::Swappable8000 => self.prg_banks[0],
+                TxPrgBankMode::SwappableC000 => self.prg_bank_count() - 2,
             };
             self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         } else if addr < 0xc000 {
@@ -286,8 +286,8 @@ impl Mapper for TxRom {
         } else if addr < 0xe000 {
             // $C000-$DFFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
-                Swappable8000 => self.prg_bank_count() - 2,
-                SwappableC000 => self.prg_banks[0],
+                TxPrgBankMode::Swappable8000 => self.prg_bank_count() - 2,
+                TxPrgBankMode::SwappableC000 => self.prg_banks[0],
             };
             self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
         } else {
@@ -363,11 +363,10 @@ impl Mapper for TxRom {
 
                 if self.irq_enabled {
                     util::debug_print("*** Generated IRQ! ***");
-                    return Irq;
+                    return MapperResult::Irq;
                 }
             }
         }
-        Continue
+        MapperResult::Continue
     }
 }
-

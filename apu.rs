@@ -552,7 +552,7 @@ impl Apu {
     fn play_pulse(&mut self, pulse_number: uint, channel: uint) {
         let pulse = &mut self.regs.pulses[pulse_number];
         let audible = pulse.envelope.audible() && pulse.timer.audible();
-        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         audible);
         match buffer_opt {
@@ -588,7 +588,7 @@ impl Apu {
 
     fn play_triangle(&mut self, channel: uint) {
         let triangle = &mut self.regs.triangle;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         triangle.audible());
         match buffer_opt {
@@ -617,7 +617,7 @@ impl Apu {
 
     fn play_noise(&mut self, channel: uint) {
         let noise = &mut self.regs.noise;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(self.sample_buffers[channel].samples,
+        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
                                                         self.sample_buffer_offset,
                                                         noise.envelope.audible());
         match buffer_opt {
@@ -690,8 +690,8 @@ impl Apu {
         unsafe {
             // Resample and output the audio.
             let _ = self.resampler.process(0,
-                                           self.sample_buffers[0].samples,
-                                           (*output_buffer).samples);
+                                           &mut self.sample_buffers[0].samples,
+                                           &mut (*output_buffer).samples);
             (*output_buffer).play_offset = 0;
         }
     }

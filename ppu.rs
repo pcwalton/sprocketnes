@@ -4,7 +4,7 @@
 // Author: Patrick Walton
 //
 
-use mapper::{Irq, Mapper};
+use mapper::{Mapper, MapperResult};
 use mem::Mem;
 use util::{Save, debug_assert};
 
@@ -87,7 +87,7 @@ impl PpuCtrl {
     fn sprite_pattern_table_addr(self) -> uint16_t     { if (*self & 0x08) == 0 { 0 } else { 0x1000 } }
     fn background_pattern_table_addr(self) -> uint16_t { if (*self & 0x10) == 0 { 0 } else { 0x1000 } }
     fn sprite_size(self) -> SpriteSize {
-        if (*self & 0x20) == 0 { SpriteSize8x8 } else { SpriteSize8x16 }
+        if (*self & 0x20) == 0 { SpriteSize::SpriteSize8x8 } else { SpriteSize::SpriteSize8x16 }
     }
     fn vblank_nmi(self) -> bool                   { (*self & 0x80) != 0 }
 }
@@ -243,16 +243,12 @@ impl Mem for Vram {
 
 impl Save for Vram {
     fn save(&mut self, fd: &mut File) {
-        let mut nametables: &mut [uint8_t] = self.nametables;
-        nametables.save(fd);
-        let mut palette: &mut [uint8_t] = self.palette;
-        palette.save(fd);
+        self.nametables.save(fd);
+        self.palette.save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        let mut nametables: &mut [uint8_t] = self.nametables;
-        nametables.load(fd);
-        let mut palette: &mut [uint8_t] = self.palette;
-        palette.load(fd);
+        self.nametables.load(fd);
+        self.palette.load(fd);
     }
 }
 
@@ -277,12 +273,10 @@ impl Mem for Oam {
 
 impl Save for Oam {
     fn save(&mut self, fd: &mut File) {
-        let mut oam: &mut [uint8_t] = self.oam;
-        oam.save(fd);
+        self.oam.save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        let mut oam: &mut [uint8_t] = self.oam;
-        oam.load(fd);
+        self.oam.load(fd);
     }
 }
 
@@ -303,14 +297,14 @@ impl SpriteStruct {
     fn tiles(&self, ppu: &Ppu) -> SpriteTiles {
         let base = ppu.regs.ctrl.sprite_pattern_table_addr();
         match ppu.regs.ctrl.sprite_size() {
-            SpriteSize8x8 => SpriteTiles8x8(self.tile_index_byte as uint16_t | base),
-            SpriteSize8x16 => {
+            SpriteSize::SpriteSize8x8 => SpriteTiles::SpriteTiles8x8(self.tile_index_byte as uint16_t | base),
+            SpriteSize::SpriteSize8x16 => {
                 // We ignore the base set in PPUCTRL here.
                 let mut first = (self.tile_index_byte & !1) as uint16_t;
                 if (self.tile_index_byte & 1) != 0 {
                     first += 0x1000;
                 }
-                SpriteTiles8x16(first, first + 1)
+                SpriteTiles::SpriteTiles8x16(first, first + 1)
             }
         }
     }
@@ -320,15 +314,15 @@ impl SpriteStruct {
     fn flip_vertical(&self) -> bool         { (self.attribute_byte & 0x80) != 0 }
 
     fn priority(&self) -> SpritePriority {
-        if (self.attribute_byte & 0x20) == 0 { AboveBg } else { BelowBg }
+        if (self.attribute_byte & 0x20) == 0 { SpritePriority::AboveBg } else { SpritePriority::BelowBg }
     }
 
     // Quick test to see whether this sprite is on the given scanline.
     fn on_scanline(&self, ppu: &Ppu, y: uint8_t) -> bool {
         if y < self.y { return false; }
         match ppu.regs.ctrl.sprite_size() {
-            SpriteSize8x8 => y < self.y + 8,
-            SpriteSize8x16 => y < self.y + 16
+            SpriteSize::SpriteSize8x8 => y < self.y + 8,
+            SpriteSize::SpriteSize8x16 => y < self.y + 16
         }
     }
 
@@ -456,8 +450,8 @@ impl Ppu {
                 mask: PpuMask{val: 0},
                 status: PpuStatus{val:0},
                 oam_addr: 0,
-                scroll: PpuScroll { x: 0, y: 0, next: XDir },
-                addr: PpuAddr { val: 0, next: Hi },
+                scroll: PpuScroll { x: 0, y: 0, next: PpuScrollDir::XDir },
+                addr: PpuAddr { val: 0, next: PpuAddrByte::Hi },
             },
             vram: vram,
             oam: oam,
@@ -499,17 +493,17 @@ impl Ppu {
 
     fn update_ppuscroll(&mut self, val: uint8_t) {
         match self.regs.scroll.next {
-            XDir => {
+            PpuScrollDir::XDir => {
                 self.scroll_x = (self.scroll_x & 0xff00) | (val as uint16_t);
 
                 self.regs.scroll.x = val;
-                self.regs.scroll.next = YDir;
+                self.regs.scroll.next = PpuScrollDir::YDir;
             }
-            YDir => {
+            PpuScrollDir::YDir => {
                 self.scroll_y = (self.scroll_y & 0xff00) | (val as uint16_t);
 
                 self.regs.scroll.y = val;
-                self.regs.scroll.next = XDir;
+                self.regs.scroll.next = PpuScrollDir::XDir;
             }
         }
     }
@@ -521,13 +515,13 @@ impl Ppu {
 
     fn update_ppuaddr(&mut self, val: uint8_t) {
         match self.regs.addr.next {
-            Hi => {
+            PpuAddrByte::Hi => {
                 self.regs.addr.val = (self.regs.addr.val & 0x00ff) | ((val as uint16_t) << 8);
-                self.regs.addr.next = Lo;
+                self.regs.addr.next = PpuAddrByte::Lo;
             }
-            Lo => {
+            PpuAddrByte::Lo => {
                 self.regs.addr.val = (self.regs.addr.val & 0xff00) | (val as uint16_t);
-                self.regs.addr.next = Hi;
+                self.regs.addr.next = PpuAddrByte::Hi;
 
                 // Adjust the scroll registers.
                 // TODO: This is pretty much a hack. The right way is to precisely emulate the PPU
@@ -542,8 +536,8 @@ impl Ppu {
 
     fn read_ppustatus(&mut self) -> uint8_t {
         // Reset latch.
-        self.regs.scroll.next = XDir;
-        self.regs.addr.next = Hi;
+        self.regs.scroll.next = PpuScrollDir::XDir;
+        self.regs.addr.next = PpuAddrByte::Hi;
 
         *self.regs.status
     }
@@ -627,8 +621,8 @@ impl Ppu {
         // Compute the pattern offset.
         let mut pattern_offset = (tile << 4) + (y as uint16_t);
         match kind {
-            Background => pattern_offset += self.regs.ctrl.background_pattern_table_addr(),
-            Sprite     => pattern_offset += self.regs.ctrl.sprite_pattern_table_addr(),
+            PatternPixelKind::Background => pattern_offset += self.regs.ctrl.background_pattern_table_addr(),
+            PatternPixelKind::Sprite     => pattern_offset += self.regs.ctrl.sprite_pattern_table_addr(),
         }
 
         // Determine the color of this pixel.
@@ -654,7 +648,7 @@ impl Ppu {
         let tile = self.vram.loadb(base + 32 * (y_index as uint16_t) + (x_index as uint16_t));
 
         // Fetch the pattern color.
-        let pattern_color = self.get_pattern_pixel(Background, tile as uint16_t, xsub, ysub);
+        let pattern_color = self.get_pattern_pixel(PatternPixelKind::Background, tile as uint16_t, xsub, ysub);
         if pattern_color == 0 {
             return None;    // Transparent.
         }
@@ -695,7 +689,7 @@ impl Ppu {
                     let pattern_color;
                     match sprite.tiles(self) {
                         // TODO: 8x16 rendering
-                        SpriteTiles8x8(tile) | SpriteTiles8x16(tile, _) => {
+                        SpriteTiles::SpriteTiles8x8(tile) | SpriteTiles::SpriteTiles8x16(tile, _) => {
                             let mut x = x - sprite.x;
                             if sprite.flip_horizontal() { x = 7 - x; }
 
@@ -705,7 +699,7 @@ impl Ppu {
                             debug_assert(x < 8, "sprite X miscalculation");
                             debug_assert(y < 8, "sprite Y miscalculation");
 
-                            pattern_color = self.get_pattern_pixel(Sprite, tile, x, y);
+                            pattern_color = self.get_pattern_pixel(PatternPixelKind::Sprite, tile, x, y);
                         }
                     }
 
@@ -777,9 +771,9 @@ impl Ppu {
             let color = match (background_color, sprite_color) {
                 (None, None) => backdrop_color,
                 (Some(color), None) => color,
-                (Some(color), Some(SpriteColor { priority: BelowBg, .. })) => color,
-                (None, Some(SpriteColor { priority: BelowBg, color: color })) => color,
-                (_, Some(SpriteColor { priority: AboveBg, color: color })) => color,
+                (Some(color), Some(SpriteColor { priority: SpritePriority::BelowBg, .. })) => color,
+                (None, Some(SpriteColor { priority: SpritePriority::BelowBg, color })) => color,
+                (_, Some(SpriteColor { priority: SpritePriority::AboveBg, color })) => color,
             };
 
             let scanline = self.scanline;
@@ -815,7 +809,7 @@ impl Ppu {
 
             {
                 let mut mapper = self.vram.mapper.borrow_mut();
-                if mapper.next_scanline() == Irq {
+                if mapper.next_scanline() == MapperResult::Irq {
                     result.scanline_irq = true
                 }
             }

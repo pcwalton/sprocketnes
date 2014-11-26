@@ -14,7 +14,7 @@ use std::cmp;
 use std::mem;
 use std::ptr;
 use std::raw::Slice;
-use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use rustrt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 //
 // The audio callback
