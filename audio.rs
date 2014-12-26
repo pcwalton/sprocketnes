@@ -8,13 +8,13 @@
 // safe.
 
 use libc::{c_int, c_void, uint8_t};
-use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
-use sdl2::audio::AudioDevice;
+//use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
+//use sdl2::audio::AudioDevice;
 use std::cmp;
 use std::mem;
-use std::ptr;
+//use std::ptr;
 use std::raw::Slice;
-use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use std::sync::{MUTEX_INIT, CONDVAR_INIT, StaticMutex, StaticCondvar};
 
 //
 // The audio callback
@@ -22,17 +22,20 @@ use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 const SAMPLE_COUNT: uint = 4410 * 2;
 
-static mut g_audio_device: Option<AudioDevice> = None;
+//static mut g_audio_device: Option<AudioDevice> = None;
 
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
-pub static mut g_mutex: StaticNativeMutex = NATIVE_MUTEX_INIT;
+pub static mut g_mutex: StaticMutex = MUTEX_INIT;
+pub static mut g_condvar: StaticCondvar = CONDVAR_INIT;
 
+#[allow(missing_copy_implementations)]
 pub struct OutputBuffer {
     pub samples: [uint8_t, .. SAMPLE_COUNT],
     pub play_offset: uint,
 }
 
+#[allow(dead_code)]
 extern "C" fn nes_audio_callback(_: *const c_void,
                                  stream: *const uint8_t,
                                  len: c_int) {
@@ -53,9 +56,8 @@ extern "C" fn nes_audio_callback(_: *const c_void,
             samples[i] = output_buffer.samples[i + play_offset];
         }
 
-        let lock = g_mutex.lock();
         output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
-        lock.signal();
+        g_condvar.notify_all();
     }
 }
 
@@ -76,7 +78,7 @@ pub fn open() -> Option<*mut OutputBuffer> {
         g_output_buffer = Some(output_buffer_ptr);
         mem::forget(output_buffer);
     }
-
+/*
     let spec = SDL_AudioSpec {
         freq: 44100,
         format: AUDIO_S16LSB,
@@ -98,11 +100,12 @@ pub fn open() -> Option<*mut OutputBuffer> {
                 return Some(output_buffer_ptr)
             },
             Err(e) => {
-                println!("Error initializing AudioDevice: {}", e);
+                println!("Error initializing AudioDevice: {}", e);*/
+    println!("FIXME: audio init");
                 return None
-            }
+            /*}
         }
-    }
+    }*/
 }
 
 //
@@ -110,6 +113,7 @@ pub fn open() -> Option<*mut OutputBuffer> {
 //
 
 pub fn close() {
+        /*
     unsafe {
         match g_audio_device {
             None => {}
@@ -117,31 +121,38 @@ pub fn close() {
                 audio_device.close();
                 g_audio_device = None
             }
-        }
+}
     }
+*/
+
 }
 
 pub struct AudioLock;
 
 impl Drop for AudioLock {
     fn drop(&mut self) {
+        /*
         unsafe {
             match g_audio_device {
                 None => {}
-                Some(audio_device) => audio_device.unlock(),
+                Some(audio_device) =>
+                    audio_device.unlock(),
             }
         }
+        */
     }
 }
 
 impl AudioLock {
     pub fn lock() -> AudioLock {
+        /*
         unsafe {
             match g_audio_device {
                 None => {}
                 Some(audio_device) => audio_device.lock(),
             }
         }
+        */
         AudioLock
     }
 }

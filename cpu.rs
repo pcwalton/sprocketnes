@@ -65,7 +65,7 @@ struct Regs {
     pc: uint16_t
 }
 
-save_struct!(Regs { a, x, y, s, flags, pc })
+save_struct!(Regs { a, x, y, s, flags, pc });
 
 impl Regs {
     fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }

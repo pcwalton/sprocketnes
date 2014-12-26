@@ -48,7 +48,7 @@ impl<M> MemUtil for M where M: Mem {
 //
 // The NES' paltry 2KB of RAM
 //
-
+#[allow(missing_copy_implementations)]
 pub struct Ram { pub val: [uint8_t, ..0x800] }
 
 impl Deref<[uint8_t, ..0x800]> for Ram {
@@ -142,5 +142,5 @@ impl Mem for MemMap {
     }
 }
 
-save_struct!(MemMap { ram, ppu, apu })
+save_struct!(MemMap { ram, ppu, apu });
 
