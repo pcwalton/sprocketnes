@@ -9,7 +9,6 @@ authors = [ "pcwalton@mimiga.net" ]
 name = "nes"
 path = "nes.rs"
 
-[dependencies.sdl2]
+[dependencies]
 
-git = "https://github.com/AngryLawyer/rust-sdl2.git"
-
+sdl2 = "0.0.13"
