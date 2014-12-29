@@ -88,7 +88,7 @@ pub fn open() -> Option<*mut OutputBuffer> {
         padding: 0,
         size: 0,
         userdata: ptr::null(),
-        callback: Some(nes_audio_callback),
+        callback: Some(nes_audio_callback as extern "C" fn(*const c_void, *const u8, i32)),
     };
 
     unsafe {
