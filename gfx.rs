@@ -5,10 +5,14 @@
 //
 
 use sdl2::{INIT_AUDIO, INIT_TIMER, INIT_VIDEO, INIT_EVENTS};
-use sdl2::pixels::BGR24;
+use sdl2::pixels::PixelFormatFlag::BGR24;
 use sdl2::rect::Rect;
-use sdl2::render::{ACCELERATED, AccessStreaming, DriverAuto, Renderer, Texture};
-use sdl2::video::{PosCentered, Window, INPUT_FOCUS};
+use sdl2::render::{ACCELERATED,
+                   TextureAccess,
+                   RenderDriverIndex,
+                   Renderer,
+                   Texture};
+use sdl2::video::{WindowPos, Window, INPUT_FOCUS};
 use sdl2;
 
 use libc::{int32_t, uint8_t};
@@ -163,8 +167,8 @@ fn draw_glyph(pixels: &mut [uint8_t],
               color: GlyphColor,
               glyph_index: uint) {
     let color_byte = match color {
-        White => 0xff,
-        Black => 0x00,
+        GlyphColor::White => 0xff,
+        GlyphColor::Black => 0x00,
     };
     for y_index in range(0, 10) {
         let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
@@ -187,15 +191,15 @@ pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int
     for i in range(0u, string.len()) {
         let glyph_index = (string.as_bytes()[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
-            draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
-            draw_glyph(pixels, surface_width, x, y, White, glyph_index);        // Main
+            draw_glyph(pixels, surface_width, x, y + 1, GlyphColor::Black, glyph_index);    // Shadow
+            draw_glyph(pixels, surface_width, x, y, GlyphColor::White, glyph_index);        // Main
             x += FONT_ADVANCES[glyph_index] as int;
         }
     }
 }
 
 #[deriving(PartialEq, Eq)]
-enum StatusLineAnimation {
+enum Animation {
     Idle,
     Pausing(uint),
     SlidingOut(uint),
@@ -203,40 +207,40 @@ enum StatusLineAnimation {
 
 struct StatusLineText {
     string: String,
-    animation: StatusLineAnimation,
+    animation: Animation,
 }
 
 impl StatusLineText {
     fn new() -> StatusLineText {
         StatusLineText {
             string: "".to_string(),
-            animation: Idle,
+            animation: Animation::Idle,
         }
     }
 
     fn set(&mut self, string: String) {
         self.string = string;
-        self.animation = Pausing(STATUS_LINE_PAUSE_DURATION);
+        self.animation = Animation::Pausing(STATUS_LINE_PAUSE_DURATION);
     }
 
     fn tick(&mut self) {
         self.animation = match self.animation {
-            Idle                      => Idle,
-            Pausing(0)                => SlidingOut(STATUS_LINE_Y),
-            Pausing(time)             => Pausing(time - 1),
-            SlidingOut(SCREEN_HEIGHT) => Idle,
-            SlidingOut(y)             => SlidingOut(y + 1),
+            Animation::Idle                      => Animation::Idle,
+            Animation::Pausing(0)                => Animation::SlidingOut(STATUS_LINE_Y),
+            Animation::Pausing(time)             => Animation::Pausing(time - 1),
+            Animation::SlidingOut(SCREEN_HEIGHT) => Animation::Idle,
+            Animation::SlidingOut(y)             => Animation::SlidingOut(y + 1),
         }
     }
 
     fn render(&self, pixels: &mut [uint8_t]) {
-        if self.animation == Idle {
+        if self.animation == Animation::Idle {
             return;
         }
         let y = match self.animation {
-            Idle => panic!(),
-            SlidingOut(y) => y as int,
-            Pausing(_) => STATUS_LINE_Y as int,
+            Animation::Idle => panic!(),
+            Animation::SlidingOut(y) => y as int,
+            Animation::Pausing(_) => STATUS_LINE_Y as int,
         };
         draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as int, y, self.string.as_slice());
     }
@@ -263,7 +267,7 @@ impl StatusLine {
 //
 // Screen scaling
 //
-
+#[deriving(Copy)]
 pub enum Scale {
     Scale1x,
     Scale2x,
@@ -273,9 +277,9 @@ pub enum Scale {
 impl Scale {
     fn factor(self) -> uint {
         match self {
-            Scale1x => 1,
-            Scale2x => 2,
-            Scale3x => 3,
+            Scale::Scale1x => 1,
+            Scale::Scale2x => 2,
+            Scale::Scale3x => 3,
         }
     }
 }
@@ -295,14 +299,16 @@ impl Gfx {
     pub fn new(scale: Scale) -> Gfx {
         sdl2::init(INIT_VIDEO | INIT_AUDIO | INIT_TIMER | INIT_EVENTS);
         let window = Window::new("sprocketnes",
-                                 PosCentered,
-                                 PosCentered,
+                                 WindowPos::PosCentered,
+                                 WindowPos::PosCentered,
                                  (SCREEN_WIDTH as uint * scale.factor()) as int,
                                  (SCREEN_HEIGHT as uint * scale.factor()) as int,
                                  INPUT_FOCUS).unwrap();
-        let renderer = Renderer::from_window(window, DriverAuto, ACCELERATED).unwrap();
+        let renderer = Renderer::from_window(window,
+                                             RenderDriverIndex::Auto,
+                                             ACCELERATED).unwrap();
         let texture = renderer.create_texture(BGR24,
-                                              AccessStreaming,
+                                              TextureAccess::Streaming,
                                               SCREEN_WIDTH as int,
                                               SCREEN_HEIGHT as int).unwrap();
 
@@ -319,7 +325,7 @@ impl Gfx {
     }
 
     pub fn composite(&self, ppu_screen: &mut ([uint8_t, ..SCREEN_SIZE])) {
-        self.status_line.render(*ppu_screen);
+        self.status_line.render(ppu_screen.as_mut_slice());
         self.blit(&*ppu_screen);
         drop(self.renderer.clear());
         drop(self.renderer.copy(&*self.texture, None, Some(Rect {
@@ -332,7 +338,7 @@ impl Gfx {
     }
 
     fn blit(&self, ppu_screen: &([uint8_t, ..SCREEN_SIZE])) {
-        self.texture.update(None, *ppu_screen, (SCREEN_WIDTH * 3) as int).unwrap()
+        self.texture.update(None, ppu_screen.as_slice(), (SCREEN_WIDTH * 3) as int).unwrap()
     }
 }
 

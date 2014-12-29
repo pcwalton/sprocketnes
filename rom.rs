@@ -18,7 +18,7 @@ pub struct Rom {
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
         let mut buffer = [ 0, ..16 ];
-        file.read_at_least(buffer.len(), buffer).unwrap();
+        file.read_at_least(buffer.len(), &mut buffer).unwrap();
 
         let header = INesHeader {
             magic: [
@@ -61,6 +61,7 @@ impl Rom {
     }
 }
 
+#[allow(missing_copy_implementations)]
 pub struct INesHeader {
     pub magic: [uint8_t, ..4],   // 'N' 'E' 'S' '\x1a'
     pub prg_rom_size: uint8_t,   // number of 16K units of PRG-ROM

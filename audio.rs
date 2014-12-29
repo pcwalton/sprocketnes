@@ -8,13 +8,12 @@
 // safe.
 
 use libc::{c_int, c_void, uint8_t};
-use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
-use sdl2::audio::AudioDevice;
+use sdl2::audio::ll;
 use std::cmp;
 use std::mem;
 use std::ptr;
 use std::raw::Slice;
-use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use std::sync::{MUTEX_INIT, CONDVAR_INIT, StaticMutex, StaticCondvar};
 
 //
 // The audio callback
@@ -22,12 +21,16 @@ use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
 
 const SAMPLE_COUNT: uint = 4410 * 2;
 
-static mut g_audio_device: Option<AudioDevice> = None;
+type AudioDeviceID = u32;
+
+static mut g_audio_device: Option<AudioDeviceID> = None;
 
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
-pub static mut g_mutex: StaticNativeMutex = NATIVE_MUTEX_INIT;
+pub static mut g_mutex: StaticMutex = MUTEX_INIT;
+pub static mut g_condvar: StaticCondvar = CONDVAR_INIT;
 
+#[allow(missing_copy_implementations)]
 pub struct OutputBuffer {
     pub samples: [uint8_t, .. SAMPLE_COUNT],
     pub play_offset: uint,
@@ -53,9 +56,8 @@ extern "C" fn nes_audio_callback(_: *const c_void,
             samples[i] = output_buffer.samples[i + play_offset];
         }
 
-        let lock = g_mutex.lock();
         output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
-        lock.signal();
+        g_condvar.notify_all();
     }
 }
 
@@ -77,29 +79,34 @@ pub fn open() -> Option<*mut OutputBuffer> {
         mem::forget(output_buffer);
     }
 
-    let spec = SDL_AudioSpec {
+    let spec = ll::SDL_AudioSpec {
         freq: 44100,
-        format: AUDIO_S16LSB,
+        format: ll::AUDIO_S16LSB,
         channels: 1,
         silence: 0,
         samples: 4410,
         padding: 0,
         size: 0,
         userdata: ptr::null(),
-        callback: Some(nes_audio_callback),
+        callback: Some(nes_audio_callback as extern "C" fn(*const c_void, *const u8, i32)),
     };
 
     unsafe {
-        match AudioDevice::open(None, 0, mem::transmute(&spec)) {
-            Ok(x) => {
-                let (device, _) = x;
-                device.resume();
-                g_audio_device = Some(device);
-                return Some(output_buffer_ptr)
+        use std::mem::uninitialized;
+        use sdl2;
+
+        let mut obtained = uninitialized::<ll::SDL_AudioSpec>();
+
+        match ll::SDL_OpenAudioDevice(ptr::null(), 0, &spec, &mut obtained, 0) {
+            0 => {
+                println!("Error initializing AudioDevice: {}", sdl2::get_error());
+                None
             },
-            Err(e) => {
-                println!("Error initializing AudioDevice: {}", e);
-                return None
+            device_id => {
+                // start playing
+                ll::SDL_PauseAudioDevice(device_id, 0);
+                g_audio_device = Some(device_id);
+                Some(output_buffer_ptr)
             }
         }
     }
@@ -114,11 +121,12 @@ pub fn close() {
         match g_audio_device {
             None => {}
             Some(audio_device) => {
-                audio_device.close();
+                ll::SDL_CloseAudioDevice(audio_device);
                 g_audio_device = None
             }
         }
     }
+
 }
 
 pub struct AudioLock;
@@ -127,8 +135,8 @@ impl Drop for AudioLock {
     fn drop(&mut self) {
         unsafe {
             match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.unlock(),
+                None => {},
+                Some(audio_device) => ll::SDL_UnlockAudioDevice(audio_device)
             }
         }
     }
@@ -138,8 +146,8 @@ impl AudioLock {
     pub fn lock() -> AudioLock {
         unsafe {
             match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.lock(),
+                None => {},
+                Some(audio_device) => ll::SDL_LockAudioDevice(audio_device)
             }
         }
         AudioLock
