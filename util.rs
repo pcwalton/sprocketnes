@@ -47,7 +47,7 @@ impl Save for uint16_t {
 impl Save for uint64_t {
     fn save(&mut self, fd: &mut File) {
         let mut buf = [ 0, ..8 ];
-        for i in range(0u, 8) {
+        for i in 0..8 {
             buf[i] = ((*self) >> (i * 8)) as uint8_t;
         }
         fd.write(buf).unwrap();
@@ -56,8 +56,8 @@ impl Save for uint64_t {
         let mut buf = [ 0, ..8 ];
         fd.read_at_least(buf.len(), buf).unwrap();
         *self = 0;
-        for i in range(0u, 8) {
-            *self = *self | (buf[i] as uint64_t << (i * 8));
+        for i in 0..8 {
+            *self = *self | (buf[i] as uint64_t) << (i * 8);
         }
     }
 }
@@ -74,7 +74,7 @@ impl<'a> Save for &'a mut [uint8_t] {
 impl Save for bool {
     fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
     fn load(&mut self, fd: &mut File) {
-        let mut val: [uint8_t, ..1] = [ 0 ];
+        let mut val: [uint8_t; 1] = [ 0 ];
         fd.read_at_least(val.len(), val).unwrap();
         *self = val[0] != 0
     }
@@ -92,7 +92,7 @@ macro_rules! save_struct(
             }
         }
     )
-)
+);
 
 macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
@@ -108,7 +108,7 @@ macro_rules! save_enum(
             }
         }
     )
-)
+);
 
 //
 // Random number generation

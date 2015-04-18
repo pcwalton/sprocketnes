@@ -25,7 +25,7 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
     }
     fn loadw_bump_pc(&mut self) -> uint16_t {
         let bottom = self.loadb_bump_pc() as uint16_t;
-        let top = self.loadb_bump_pc() as uint16_t << 8;
+        let top = (self.loadb_bump_pc() as uint16_t) << 8;
         bottom | top
     }
 

@@ -9,7 +9,7 @@ use util;
 
 use libc::{uint8_t, uint16_t};
 
-#[deriving(PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub enum MapperResult {
     Continue,
     Irq,
@@ -26,12 +26,12 @@ pub trait Mapper {
 pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper+Send> {
     match rom.header.ines_mapper() {
         0 => {
-            box Nrom {
+            Box::new(Nrom {
                 rom: rom,
-            } as Box<Mapper+Send>
+            }) as Box<Mapper+Send>
         },
-        1 => box SxRom::new(rom) as Box<Mapper+Send>,
-        4 => box TxRom::new(rom) as Box<Mapper+Send>,
+        1 => Box::new(SxRom::new(rom)) as Box<Mapper+Send>,
+        4 => Box::new(TxRom::new(rom)) as Box<Mapper+Send>,
         _ => panic!("unsupported mapper")
     }
 }
@@ -116,7 +116,7 @@ pub struct SxRom {
     // The write count. At the 5th write, we update the register.
     write_count: uint8_t,
     //prg_ram: Box<[uint8_t, ..8192]>,
-    chr_ram: Box<[uint8_t, ..8192]>,
+    chr_ram: Box<[uint8_t; 8192]>,
 }
 
 impl SxRom {
@@ -134,7 +134,7 @@ impl SxRom {
             accum: 0,
             write_count: 0,
             //prg_ram: box() ([ 0, ..8192 ]),
-            chr_ram: box() ([ 0, ..8192 ]),
+            chr_ram: Box::new([ 0; 8192 ]),
         }
     }
 }
@@ -236,11 +236,11 @@ struct TxRegs {
 struct TxRom {
     rom: Box<Rom>,
     regs: TxRegs,
-    prg_ram: Box<[uint8_t, ..8192]>,
+    prg_ram: Box<[uint8_t; 8192]>,
 
-    chr_banks_2k: [uint8_t, ..2],    // 2KB CHR-ROM banks
-    chr_banks_1k: [uint8_t, ..4],    // 1KB CHR-ROM banks
-    prg_banks:    [uint8_t, ..2],    // 8KB PRG-ROM banks
+    chr_banks_2k: [uint8_t; 2],    // 2KB CHR-ROM banks
+    chr_banks_1k: [uint8_t; 4],    // 1KB CHR-ROM banks
+    prg_banks:    [uint8_t; 2],    // 8KB PRG-ROM banks
 
     scanline_counter: uint8_t,
     irq_reload: uint8_t,             // Copied into the scanline counter when it hits zero.
@@ -252,7 +252,7 @@ impl TxRom {
         TxRom {
             rom: rom,
             regs: TxRegs { bank_select: TxBankSelect{val: 0} },
-            prg_ram: box() ([ 0, ..8192 ]),
+            prg_ram: Box::new([ 0; 8192 ]),
 
             chr_banks_2k: [ 0, 0 ],
             chr_banks_1k: [ 0, 0, 0, 0 ],

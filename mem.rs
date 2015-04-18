@@ -33,7 +33,7 @@ pub trait MemUtil {
 
 impl<M> MemUtil for M where M: Mem {
     fn loadw(&mut self, addr: uint16_t) -> uint16_t {
-        self.loadb(addr) as uint16_t | (self.loadb(addr + 1) as uint16_t << 8)
+        self.loadb(addr) as uint16_t | (self.loadb(addr + 1) as uint16_t) << 8
     }
     fn storew(&mut self, addr: uint16_t, val: uint16_t) {
         self.storeb(addr, (val & 0xff) as uint8_t);
@@ -41,7 +41,7 @@ impl<M> MemUtil for M where M: Mem {
     }
     // Like loadw, but has wraparound behavior on the zero page for address 0xff.
     fn loadw_zp(&mut self, addr: uint8_t) -> uint16_t {
-        self.loadb(addr as uint16_t) as uint16_t | (self.loadb((addr + 1) as uint16_t) as uint16_t << 8)
+        self.loadb(addr as uint16_t) as uint16_t | (self.loadb((addr + 1) as uint16_t) as uint16_t) << 8
     }
 }
 
@@ -49,16 +49,16 @@ impl<M> MemUtil for M where M: Mem {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram { pub val: [uint8_t, ..0x800] }
+pub struct Ram { pub val: [uint8_t; 0x800] }
 
-impl Deref<[uint8_t, ..0x800]> for Ram {
-    fn deref(&self) -> &[uint8_t, ..0x800] {
+impl Deref<[uint8_t; 0x800]> for Ram {
+    fn deref(&self) -> &[uint8_t; 0x800] {
         &self.val
     }
 }
 
-impl DerefMut<[uint8_t, ..0x800]> for Ram {
-    fn deref_mut(&mut self) -> &mut [uint8_t, ..0x800] {
+impl DerefMut<[uint8_t; 0x800]> for Ram {
+    fn deref_mut(&mut self) -> &mut [uint8_t; 0x800] {
         &mut self.val
     }
 }
@@ -142,5 +142,5 @@ impl Mem for MemMap {
     }
 }
 
-save_struct!(MemMap { ram, ppu, apu })
+save_struct!(MemMap { ram, ppu, apu });
 

@@ -21,20 +21,20 @@ const OUTPUT_SAMPLE_RATE: uint32_t = 44100;
 const TICK_FREQUENCY: uint32_t = 240;
 const NES_SAMPLES_PER_TICK: uint32_t = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
-const PULSE_WAVEFORMS: [uint8_t, ..4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
+const PULSE_WAVEFORMS: [uint8_t; 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
 
-const LENGTH_COUNTERS: [uint8_t, ..32] = [
+const LENGTH_COUNTERS: [uint8_t; 32] = [
     10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-const TRIANGLE_WAVEFORM: [uint8_t, ..32] = [
+const TRIANGLE_WAVEFORM: [uint8_t; 32] = [
     15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
      0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 ];
 
 // TODO: PAL
-const NOISE_PERIODS: [uint16_t, ..16] = [
+const NOISE_PERIODS: [uint16_t; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 ];
 
@@ -55,7 +55,7 @@ struct ApuLength {
     remaining: uint8_t,
 }
 
-save_struct!(ApuLength { disable, id, remaining })
+save_struct!(ApuLength { disable, id, remaining });
 
 impl ApuLength {
     fn new() -> ApuLength { ApuLength { disable: false, id: 0, remaining: 0 } }
@@ -94,7 +94,7 @@ struct ApuEnvelope {
     length: ApuLength,
 }
 
-save_struct!(ApuEnvelope { enabled, volume, period, counter, length })
+save_struct!(ApuEnvelope { enabled, volume, period, counter, length });
 
 impl ApuEnvelope {
     fn new() -> ApuEnvelope {
@@ -151,7 +151,7 @@ struct ApuTimer {
     wavelen_count: uint64_t,     // How many clock ticks have passed since the last period.
 }
 
-save_struct!(ApuTimer { value, wavelen_count })
+save_struct!(ApuTimer { value, wavelen_count });
 
 impl ApuTimer {
     fn new() -> ApuTimer { ApuTimer { value: 0, wavelen_count: 0 } }
@@ -183,7 +183,7 @@ struct ApuPulse {
     waveform_index: uint8_t,
 }
 
-save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_index })
+save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_index });
 
 //
 // APU pulse sweep
@@ -223,7 +223,7 @@ struct ApuTriangle {
     waveform_index: uint8_t,
 }
 
-save_struct!(ApuTriangle { timer, length, linear_counter })
+save_struct!(ApuTriangle { timer, length, linear_counter });
 
 impl ApuTriangle {
     fn new() -> ApuTriangle {
@@ -275,7 +275,7 @@ struct ApuNoise {
     rng: Xorshift,      // The xorshift RNG. FIXME: This is inaccurate.
 }
 
-save_struct!(ApuNoise { envelope, timer, timer_count })
+save_struct!(ApuNoise { envelope, timer, timer_count });
 
 impl ApuNoise {
     fn new() -> ApuNoise {
@@ -312,7 +312,7 @@ impl ApuStatus {
 //
 
 struct Regs {
-    pulses: [ApuPulse, ..2],
+    pulses: [ApuPulse; 2],
     triangle: ApuTriangle,
     noise: ApuNoise,
     status: ApuStatus,  // $4015: APUSTATUS
@@ -342,7 +342,7 @@ impl Save for Regs {
 const SAMPLE_COUNT: uint = 178992;
 
 struct SampleBuffer {
-    samples: [int16_t, .. SAMPLE_COUNT],
+    samples: [int16_t; SAMPLE_COUNT],
 }
 
 //
@@ -352,7 +352,7 @@ struct SampleBuffer {
 pub struct Apu {
     regs: Regs,
 
-    sample_buffers: Box<[SampleBuffer, ..5]>,
+    sample_buffers: Box<[SampleBuffer; 5]>,
     sample_buffer_offset: uint,
     output_buffer: Option<*mut OutputBuffer>,
     resampler: Resampler,
@@ -361,7 +361,7 @@ pub struct Apu {
     pub ticks: uint64_t,
 }
 
-save_struct!(Apu { regs, cy, ticks })
+save_struct!(Apu { regs, cy, ticks });
 
 impl Mem for Apu {
     fn loadb(&mut self, addr: uint16_t) -> uint8_t {
@@ -401,11 +401,11 @@ impl Apu {
                 status: ApuStatus{val:0},
             },
 
-            sample_buffers: box() ([
+            sample_buffers: Box::new([
                 SampleBuffer {
                     samples: [ 0, ..SAMPLE_COUNT ]
-                },
-                ..5
+                };
+                5
             ]),
 
             sample_buffer_offset: 0,
@@ -420,7 +420,7 @@ impl Apu {
     fn update_status(&mut self, val: uint8_t) {
         self.regs.status = ApuStatus{val:val};
 
-        for i in range(0u, 2) {
+        for i in range(0, 2) {
             if !self.regs.status.pulse_enabled(i as uint8_t) {
                 self.regs.pulses[i].envelope.length.remaining = 0;
             }
@@ -487,7 +487,7 @@ impl Apu {
         // 120 Hz operations: length counter and sweep.
         if self.ticks % 2 == 0 {
             // TODO: Remember that triangle wave has a different length disable bit.
-            for i in range(0u, 2) {
+            for i in range(0, 2) {
                 let pulse = &mut self.regs.pulses[i];
 
                 // Length counter.
@@ -656,9 +656,9 @@ impl Apu {
         // First, mix all sample buffers into the first one.
         //
         // FIXME: This should not be a linear mix, for accuracy.
-        for i in range(0u, self.sample_buffers[0].samples.len()) {
+        for i in range(0, self.sample_buffers[0].samples.len()) {
             let mut val = 0;
-            for j in range(0u, 5) {
+            for j in range(0, 5) {
                 val += self.sample_buffers[j].samples[i] as int32_t;
             }
 

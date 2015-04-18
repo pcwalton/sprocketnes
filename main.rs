@@ -101,7 +101,7 @@ pub fn start(argc: int32_t, argv: *const *const uint8_t) {
     };
 
     let rom_path = options.rom_path.as_slice();
-    let rom = box Rom::from_path(&Path::new(rom_path));
+    let rom = Box::new(Rom::from_path(&Path::new(rom_path)));
     println!("Loaded ROM:\n{}", rom.header.to_str());
 
     let mut gfx = Gfx::new(options.scale);
