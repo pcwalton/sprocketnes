@@ -34,7 +34,7 @@ const SCREEN_SIZE: uint = 184320;
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-const FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
+const FONT_GLYPHS: [uint8_t; FONT_GLYPH_LENGTH] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -132,19 +132,19 @@ const FONT_GLYPHS: [uint8_t, ..FONT_GLYPH_LENGTH] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-const FONT_ADVANCES: [uint8_t, ..FONT_GLYPH_COUNT] = [
-    3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */, 
-    4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */, 
-    6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */, 
-    6 /* 8 */, 6 /* 9 */, 3 /* : */, 3 /* ; */, 4 /* < */, 4 /* = */, 4 /* > */, 6 /* ? */, 
-    8 /* @ */, 6 /* A */, 6 /* B */, 6 /* C */, 6 /* D */, 6 /* E */, 6 /* F */, 6 /* G */, 
-    6 /* H */, 2 /* I */, 5 /* J */, 6 /* K */, 5 /* L */, 8 /* M */, 6 /* N */, 6 /* O */, 
-    6 /* P */, 6 /* Q */, 6 /* R */, 6 /* S */, 6 /* T */, 6 /* U */, 6 /* V */, 8 /* W */, 
-    6 /* X */, 6 /* Y */, 6 /* Z */, 4 /* [ */, 6 /* \ */, 4 /* ] */, 4 /* ^ */, 4 /* _ */, 
-    3 /* ` */, 5 /* a */, 5 /* b */, 5 /* c */, 5 /* d */, 5 /* e */, 3 /* f */, 5 /* g */, 
-    5 /* h */, 2 /* i */, 2 /* j */, 5 /* k */, 2 /* l */, 8 /* m */, 5 /* n */, 5 /* o */, 
-    5 /* p */, 5 /* q */, 4 /* r */, 4 /* s */, 4 /* t */, 5 /* u */, 5 /* v */, 8 /* w */, 
-    5 /* x */, 5 /* y */, 4 /* z */, 4 /* { */, 2 /* | */, 4 /* } */, 5 /* ~ */, 
+const FONT_ADVANCES: [uint8_t; FONT_GLYPH_COUNT] = [
+    3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */,
+    4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */,
+    6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */,
+    6 /* 8 */, 6 /* 9 */, 3 /* : */, 3 /* ; */, 4 /* < */, 4 /* = */, 4 /* > */, 6 /* ? */,
+    8 /* @ */, 6 /* A */, 6 /* B */, 6 /* C */, 6 /* D */, 6 /* E */, 6 /* F */, 6 /* G */,
+    6 /* H */, 2 /* I */, 5 /* J */, 6 /* K */, 5 /* L */, 8 /* M */, 6 /* N */, 6 /* O */,
+    6 /* P */, 6 /* Q */, 6 /* R */, 6 /* S */, 6 /* T */, 6 /* U */, 6 /* V */, 8 /* W */,
+    6 /* X */, 6 /* Y */, 6 /* Z */, 4 /* [ */, 6 /* \ */, 4 /* ] */, 4 /* ^ */, 4 /* _ */,
+    3 /* ` */, 5 /* a */, 5 /* b */, 5 /* c */, 5 /* d */, 5 /* e */, 3 /* f */, 5 /* g */,
+    5 /* h */, 2 /* i */, 2 /* j */, 5 /* k */, 2 /* l */, 8 /* m */, 5 /* n */, 5 /* o */,
+    5 /* p */, 5 /* q */, 4 /* r */, 4 /* s */, 4 /* t */, 5 /* u */, 5 /* v */, 8 /* w */,
+    5 /* x */, 5 /* y */, 4 /* z */, 4 /* { */, 2 /* | */, 4 /* } */, 5 /* ~ */,
 ];
 
 //
@@ -184,7 +184,7 @@ fn draw_glyph(pixels: &mut [uint8_t],
 }
 
 pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int, string: &str) {
-    for i in range(0u, string.len()) {
+    for i in range(0, string.len()) {
         let glyph_index = (string.as_bytes()[i] - 32) as uint;
         if glyph_index < FONT_ADVANCES.len() {
             draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
@@ -194,7 +194,7 @@ pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int
     }
 }
 
-#[deriving(PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 enum StatusLineAnimation {
     Idle,
     Pausing(uint),
@@ -307,8 +307,8 @@ impl Gfx {
                                               SCREEN_HEIGHT as int).unwrap();
 
         Gfx {
-            renderer: box renderer,
-            texture: box texture,
+            renderer: Box::new(renderer),
+            texture: Box::new(texture),
             scale: scale,
             status_line: StatusLine::new()
         }
@@ -318,7 +318,7 @@ impl Gfx {
         self.status_line.text.tick();
     }
 
-    pub fn composite(&self, ppu_screen: &mut ([uint8_t, ..SCREEN_SIZE])) {
+    pub fn composite(&self, ppu_screen: &mut ([uint8_t; SCREEN_SIZE])) {
         self.status_line.render(*ppu_screen);
         self.blit(&*ppu_screen);
         drop(self.renderer.clear());
@@ -331,7 +331,7 @@ impl Gfx {
         self.renderer.present();
     }
 
-    fn blit(&self, ppu_screen: &([uint8_t, ..SCREEN_SIZE])) {
+    fn blit(&self, ppu_screen: &([uint8_t; SCREEN_SIZE])) {
         self.texture.update(None, *ppu_screen, (SCREEN_WIDTH * 3) as int).unwrap()
     }
 }

@@ -23,7 +23,7 @@ pub static CYCLES_PER_SCANLINE: uint64_t = 114;   // 29781 cycles per frame, 261
 pub static VBLANK_SCANLINE: uint = 241;
 pub static LAST_SCANLINE: uint = 261;
 
-static PALETTE: [uint8_t, ..192] = [
+static PALETTE: [uint8_t; 192] = [
     124,124,124,    0,0,252,        0,0,188,        68,40,188,
     148,0,132,      168,0,32,       168,16,0,       136,20,0,
     80,48,0,        0,120,0,        0,104,0,        0,88,0,
@@ -55,7 +55,7 @@ struct Regs {
     addr: PpuAddr,      // PPUADDR: 0x2006
 }
 
-save_struct!(Regs { ctrl, mask, status, oam_addr, scroll, addr })
+save_struct!(Regs { ctrl, mask, status, oam_addr, scroll, addr });
 
 //
 // PPUCTRL: 0x2000
@@ -165,14 +165,14 @@ struct PpuScroll {
     next: PpuScrollDir
 }
 
-save_struct!(PpuScroll { x, y, next })
+save_struct!(PpuScroll { x, y, next });
 
 enum PpuScrollDir {
     XDir,
     YDir,
 }
 
-save_enum!(PpuScrollDir { XDir, YDir })
+save_enum!(PpuScrollDir { XDir, YDir });
 
 //
 // PPUADDR: 0x2006
@@ -183,21 +183,21 @@ struct PpuAddr {
     next: PpuAddrByte
 }
 
-save_struct!(PpuAddr { val, next })
+save_struct!(PpuAddr { val, next });
 
 enum PpuAddrByte {
     Hi,
     Lo,
 }
 
-save_enum!(PpuAddrByte { Hi, Lo })
+save_enum!(PpuAddrByte { Hi, Lo });
 
 // PPU VRAM. This implements the same Mem trait that the CPU memory does.
 
 pub struct Vram {
     pub mapper: Rc<RefCell<Box<Mapper+Send>>>,
-    pub nametables: [uint8_t, ..0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
-    pub palette: [uint8_t, ..0x20],
+    pub nametables: [uint8_t; 0x800],  // 2 nametables, 0x400 each. FIXME: Not correct for all mappers.
+    pub palette: [uint8_t; 0x20],
 }
 
 impl Vram {
@@ -261,12 +261,12 @@ impl Save for Vram {
 //
 
 pub struct Oam {
-    pub oam: [uint8_t, ..0x100]
+    pub oam: [uint8_t; 0x100]
 }
 
 impl Oam {
     pub fn new() -> Oam {
-        Oam { oam: [ 0, ..0x100 ] }
+        Oam { oam: [ 0; 0x100 ] }
     }
 }
 
@@ -345,7 +345,7 @@ pub struct Ppu {
     vram: Vram,
     oam: Oam,
 
-    pub screen: Box<[uint8_t, ..184320]>,  // 256 * 240 * 3
+    pub screen: Box<[uint8_t; 184320]>,  // 256 * 240 * 3
     scanline: uint16_t,
     ppudata_buffer: uint8_t,
 
@@ -391,7 +391,7 @@ impl Mem for Ppu {
     }
 }
 
-#[deriving(PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct StepResult {
     pub new_frame: bool,    // We wrapped around to the next scanline.
     pub vblank_nmi: bool,   // We entered VBLANK and must generate an NMI.
@@ -462,7 +462,7 @@ impl Ppu {
             vram: vram,
             oam: oam,
 
-            screen: box() ([ 0, ..184320 ]),
+            screen: Box::new([ 0; 184320 ]),
             scanline: 0,
             ppudata_buffer: 0,
 
@@ -601,8 +601,9 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite(&mut self, f: |&mut Ppu, &SpriteStruct, uint8_t| -> bool) {
-        for i in range(0i, 64) {
+    fn each_sprite<F>(&mut self, f: F)
+        where F: Fn(&mut Ppu, &SpriteStruct, uint8_t) -> bool{
+        for i in range(0, 64) {
             let sprite = self.make_sprite_info(i as uint16_t);
             if !f(self, &sprite, i as uint8_t) {
                 return
@@ -677,7 +678,7 @@ impl Ppu {
     }
 
     fn get_sprite_pixel(&mut self,
-                        visible_sprites: &[Option<uint8_t>, ..8],
+                        visible_sprites: &[Option<uint8_t>; 8],
                         x: uint8_t,
                         background_opaque: bool)
                      -> Option<SpriteColor> {
@@ -732,7 +733,7 @@ impl Ppu {
         return None;
     }
 
-    fn compute_visible_sprites(&mut self) -> [Option<uint8_t>, ..8] {
+    fn compute_visible_sprites(&mut self) -> [Option<uint8_t>; 8] {
         let mut count = 0;
         let mut result = [None, ..8];
         self.each_sprite(|this, sprite, index| {

@@ -29,7 +29,7 @@ static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 pub static mut g_mutex: StaticNativeMutex = NATIVE_MUTEX_INIT;
 
 pub struct OutputBuffer {
-    pub samples: [uint8_t, .. SAMPLE_COUNT],
+    pub samples: [uint8_t; SAMPLE_COUNT],
     pub play_offset: uint,
 }
 
@@ -64,10 +64,10 @@ extern "C" fn nes_audio_callback(_: *const c_void,
 //
 
 pub fn open() -> Option<*mut OutputBuffer> {
-    let output_buffer = box OutputBuffer {
-        samples: [ 0, ..8820 ],
+    let output_buffer = Box::new(OutputBuffer {
+        samples: [ 0; 8820 ],
         play_offset: 0,
-    };
+    });
     let output_buffer_ptr: *mut OutputBuffer = unsafe {
         mem::transmute(&*output_buffer)
     };

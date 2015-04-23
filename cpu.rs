@@ -33,7 +33,7 @@ static BRK_VECTOR:   uint16_t = 0xfffe;
 ///
 /// FIXME: This is copied from FCEU.
 
-static CYCLE_TABLE: [uint8_t, ..256] = [
+static CYCLE_TABLE: [uint8_t; 256] = [
     /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
     /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
     /*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
@@ -65,7 +65,7 @@ struct Regs {
     pc: uint16_t
 }
 
-save_struct!(Regs { a, x, y, s, flags, pc })
+save_struct!(Regs { a, x, y, s, flags, pc });
 
 impl Regs {
     fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
@@ -383,7 +383,7 @@ impl<M> Cpu<M> where M: Mem {
 
     // Performs DMA to the OAMDATA ($2004) register.
     fn dma(&mut self, hi_addr: uint8_t) {
-        for addr in range(hi_addr as uint << 8, (hi_addr + 1) as uint << 8) {
+        for addr in range(((hi_addr as uint) << 8, (hi_addr + 1) as uint) << 8) {
             let val = self.loadb(addr as uint16_t);
             self.storeb(0x2004, val);
 
@@ -739,7 +739,7 @@ impl<M> Cpu<M> where M: Mem {
         let lo = self.loadb(addr);
         let hi = self.loadb((addr & 0xff00) | ((addr + 1) & 0x00ff));
 
-        self.regs.pc = (hi as uint16_t << 8) | lo as uint16_t;
+        self.regs.pc = ((hi as uint16_t) << 8 | lo) as uint16_t;
     }
 
     // Procedure calls
