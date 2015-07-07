@@ -7,8 +7,20 @@
 #![allow(improper_ctypes)]
 
 use libc::{c_int, c_void, time_t, uint8_t, uint16_t, uint32_t, uint64_t};
-use std::io::File;
+use std::fs::File;
+use std::io::{self, Read, Write, Result};
 use std::ptr::null;
+
+/// Reads until the buffer is filled or the reader signals EOF
+pub fn read_to_buf<R: Read>(mut buf: &mut [u8], rd: &mut R) -> io::Result<()> {
+    let mut total = 0;
+    while total < buf.len() {
+        let count = try!(rd.read(&mut buf[total..]));
+        total += count;
+    }
+
+    Ok(())
+}
 
 //
 // A tiny custom serialization infrastructure, used for savestates.
@@ -24,37 +36,37 @@ pub trait Save {
 
 impl Save for uint8_t {
     fn save(&mut self, fd: &mut File) {
-        fd.write([ *self ]).unwrap();
+        fd.write_all(&[*self]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        read_to_buf(&mut buf, fd).unwrap();
         *self = buf[0];
     }
 }
 
 impl Save for uint16_t {
     fn save(&mut self, fd: &mut File) {
-        fd.write([ *self as uint8_t, (*self >> 8) as uint8_t ]).unwrap();
+        fd.write(&[*self as uint8_t, (*self >> 8) as uint8_t]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        read_to_buf(&mut buf, fd).unwrap();
         *self = (buf[0] as uint16_t) | ((buf[1] as uint16_t) << 8);
     }
 }
 
 impl Save for uint64_t {
     fn save(&mut self, fd: &mut File) {
-        let mut buf = [ 0, ..8 ];
+        let mut buf = [0; 8];
         for i in 0..8 {
             buf[i] = ((*self) >> (i * 8)) as uint8_t;
         }
-        fd.write(buf).unwrap();
+        fd.write_all(&buf).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        let mut buf = [ 0, ..8 ];
-        fd.read_at_least(buf.len(), buf).unwrap();
+        let mut buf = [0; 8];
+        read_to_buf(&mut buf, fd).unwrap();
         *self = 0;
         for i in 0..8 {
             *self = *self | (buf[i] as uint64_t) << (i * 8);
@@ -67,15 +79,17 @@ impl<'a> Save for &'a mut [uint8_t] {
         fd.write(*self).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        fd.read_at_least(self.len(), *self).unwrap();
+        read_to_buf(self, fd).unwrap();
     }
 }
 
 impl Save for bool {
-    fn save(&mut self, fd: &mut File) { fd.write([ if *self { 0 } else { 1 } ]).unwrap(); }
+    fn save(&mut self, fd: &mut File) {
+        fd.write(&[ if *self { 0 } else { 1 } ]).unwrap();
+    }
     fn load(&mut self, fd: &mut File) {
         let mut val: [uint8_t; 1] = [ 0 ];
-        fd.read_at_least(val.len(), val).unwrap();
+        read_to_buf(&mut val, fd).unwrap();
         *self = val[0] != 0
     }
 }
@@ -98,13 +112,13 @@ macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
         impl Save for $name {
             fn save(&mut self, fd: &mut File) {
-                let mut val: uint8_t = match *self { $val_0 => 0, $val_1 => 1 };
+                let mut val: uint8_t = match *self { $name::$val_0 => 0, $name::$val_1 => 1 };
                 val.save(fd)
             }
             fn load(&mut self, fd: &mut File) {
                 let mut val: uint8_t = 0;
                 val.load(fd);
-                *self = if val == 0 { $val_0 } else { $val_1 };
+                *self = if val == 0 { $name::$val_0 } else { $name::$val_1 };
             }
         }
     )
@@ -114,6 +128,7 @@ macro_rules! save_enum(
 // Random number generation
 //
 
+#[derive(Copy, Clone)]
 pub struct Xorshift {
     pub x: uint32_t,
     pub y: uint32_t,

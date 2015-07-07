@@ -7,55 +7,55 @@
 // TODO: This module is very unsafe. Adding a reader-writer audio lock to SDL would help make it
 // safe.
 
-use libc::{c_int, c_void, uint8_t};
-use sdl2::audio::ll::{ SDL_AudioSpec, AUDIO_S16LSB };
-use sdl2::audio::AudioDevice;
+use libc::uint8_t;
+use sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired, AudioDeviceLockGuard};
 use std::cmp;
 use std::mem;
-use std::ptr;
-use std::raw::Slice;
-use std::rt::mutex::{NATIVE_MUTEX_INIT, StaticNativeMutex};
+use std::slice::from_raw_parts_mut;
+use std::sync::{StaticMutex, StaticCondvar, MUTEX_INIT, CONDVAR_INIT};
 
 //
 // The audio callback
 //
 
-const SAMPLE_COUNT: uint = 4410 * 2;
+const SAMPLE_COUNT: usize = 4410 * 2;
 
-static mut g_audio_device: Option<AudioDevice> = None;
+static mut g_audio_device: Option<*mut AudioDevice<NesAudioCallback>> = None;
 
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
-pub static mut g_mutex: StaticNativeMutex = NATIVE_MUTEX_INIT;
+pub static mut g_mutex: StaticMutex = MUTEX_INIT;
+
+pub static mut g_condvar: StaticCondvar = CONDVAR_INIT;
 
 pub struct OutputBuffer {
     pub samples: [uint8_t; SAMPLE_COUNT],
-    pub play_offset: uint,
+    pub play_offset: usize,
 }
 
-extern "C" fn nes_audio_callback(_: *const c_void,
-                                 stream: *const uint8_t,
-                                 len: c_int) {
-    unsafe {
-        let samples: &mut [uint8_t] = mem::transmute(Slice {
-            data: stream,
-            len: len as uint,
-        });
+pub struct NesAudioCallback;
 
-        let output_buffer: &mut OutputBuffer = mem::transmute(g_output_buffer.unwrap());
-        let play_offset = output_buffer.play_offset;
-        let output_buffer_len = output_buffer.samples.len();
+impl AudioCallback for NesAudioCallback {
+    type Channel = i16;
 
-        for i in range(0, samples.len()) {
-            if i + play_offset >= output_buffer_len {
-                break;
+    fn callback(&mut self, buf: &mut [Self::Channel]) {
+        unsafe {
+            let samples: &mut [u8] = from_raw_parts_mut(&mut buf[0] as *mut i16 as *mut u8, buf.len() * 2);
+            let output_buffer: &mut OutputBuffer = mem::transmute(g_output_buffer.unwrap());
+            let play_offset = output_buffer.play_offset;
+            let output_buffer_len = output_buffer.samples.len();
+
+            for i in 0..samples.len() {
+                if i + play_offset >= output_buffer_len {
+                    break;
+                }
+                samples[i] = output_buffer.samples[i + play_offset];
             }
-            samples[i] = output_buffer.samples[i + play_offset];
-        }
 
-        let lock = g_mutex.lock();
-        output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
-        lock.signal();
+            let _ = g_mutex.lock();
+            output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
+            g_condvar.notify_one();
+        }
     }
 }
 
@@ -65,7 +65,7 @@ extern "C" fn nes_audio_callback(_: *const c_void,
 
 pub fn open() -> Option<*mut OutputBuffer> {
     let output_buffer = Box::new(OutputBuffer {
-        samples: [ 0; 8820 ],
+        samples: [ 0; SAMPLE_COUNT ],
         play_offset: 0,
     });
     let output_buffer_ptr: *mut OutputBuffer = unsafe {
@@ -77,24 +77,19 @@ pub fn open() -> Option<*mut OutputBuffer> {
         mem::forget(output_buffer);
     }
 
-    let spec = SDL_AudioSpec {
-        freq: 44100,
-        format: AUDIO_S16LSB,
-        channels: 1,
-        silence: 0,
-        samples: 4410,
-        padding: 0,
-        size: 0,
-        userdata: ptr::null(),
-        callback: Some(nes_audio_callback),
+    let spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(1),
+        samples: Some(4410),
     };
+    //format: AudioFormat::S16LSB,
+    //callback: Some(NesAudioCallback),
 
     unsafe {
-        match AudioDevice::open(None, 0, mem::transmute(&spec)) {
-            Ok(x) => {
-                let (device, _) = x;
+        match AudioDevice::open_playback(None, spec, |_| NesAudioCallback) {
+            Ok(device) => {
                 device.resume();
-                g_audio_device = Some(device);
+                g_audio_device = Some(mem::transmute(Box::new(device)));
                 return Some(output_buffer_ptr)
             },
             Err(e) => {
@@ -113,35 +108,16 @@ pub fn close() {
     unsafe {
         match g_audio_device {
             None => {}
-            Some(audio_device) => {
-                audio_device.close();
-                g_audio_device = None
+            Some(ptr) => {
+                let _: Box<AudioDevice<NesAudioCallback>> = mem::transmute(ptr);
+                g_audio_device = None;
             }
         }
     }
 }
 
-pub struct AudioLock;
-
-impl Drop for AudioLock {
-    fn drop(&mut self) {
-        unsafe {
-            match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.unlock(),
-            }
-        }
-    }
-}
-
-impl AudioLock {
-    pub fn lock() -> AudioLock {
-        unsafe {
-            match g_audio_device {
-                None => {}
-                Some(audio_device) => audio_device.lock(),
-            }
-        }
-        AudioLock
+pub fn lock<'a>() -> Option<AudioDeviceLockGuard<'a, NesAudioCallback>> {
+    unsafe {
+        g_audio_device.map(|dev| (*dev).lock())
     }
 }

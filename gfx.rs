@@ -4,29 +4,27 @@
 // Author: Patrick Walton
 //
 
-use sdl2::{INIT_AUDIO, INIT_TIMER, INIT_VIDEO, INIT_EVENTS};
-use sdl2::pixels::BGR24;
+use sdl2::pixels::PixelFormatEnum::BGR24;
 use sdl2::rect::Rect;
-use sdl2::render::{ACCELERATED, AccessStreaming, DriverAuto, Renderer, Texture};
-use sdl2::video::{PosCentered, Window, INPUT_FOCUS};
-use sdl2;
+use sdl2::render::{Renderer, Texture, TextureAccess};
+use sdl2::{InitBuilder, Sdl};
 
-use libc::{int32_t, uint8_t};
+use libc::uint8_t;
 
-const SCREEN_WIDTH: uint = 256;
-const SCREEN_HEIGHT: uint = 240;
+const SCREEN_WIDTH: usize = 256;
+const SCREEN_HEIGHT: usize = 240;
 
-const FONT_HEIGHT: uint = 10;
-const FONT_GLYPH_COUNT: uint = 95;
-const FONT_GLYPH_LENGTH: uint = FONT_GLYPH_COUNT * FONT_HEIGHT;
+const FONT_HEIGHT: usize = 10;
+const FONT_GLYPH_COUNT: usize = 95;
+const FONT_GLYPH_LENGTH: usize = FONT_GLYPH_COUNT * FONT_HEIGHT;
 
-const STATUS_LINE_PADDING: uint = 6;
-const STATUS_LINE_X: uint = STATUS_LINE_PADDING;
-const STATUS_LINE_Y: uint = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
-const STATUS_LINE_PAUSE_DURATION: uint = 120;                   // in 1/60 of a second
+const STATUS_LINE_PADDING: usize = 6;
+const STATUS_LINE_X: usize = STATUS_LINE_PADDING;
+const STATUS_LINE_Y: usize = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
+const STATUS_LINE_PAUSE_DURATION: usize = 120;                   // in 1/60 of a second
 
 #[allow(dead_code)]
-const SCREEN_SIZE: uint = 184320;
+const SCREEN_SIZE: usize = 184320;
 
 //
 // PT Ronda Seven
@@ -157,25 +155,25 @@ enum GlyphColor {
 }
 
 fn draw_glyph(pixels: &mut [uint8_t],
-              surface_width: uint,
-              x: int,
-              y: int,
+              surface_width: usize,
+              x: isize,
+              y: isize,
               color: GlyphColor,
-              glyph_index: uint) {
+              glyph_index: usize) {
     let color_byte = match color {
-        White => 0xff,
-        Black => 0x00,
+        GlyphColor::White => 0xff,
+        GlyphColor::Black => 0x00,
     };
-    for y_index in range(0, 10) {
-        let row = FONT_GLYPHS[glyph_index * 10 + y_index as uint];
-        for x_index in range(0, 8) {
-            if ((row >> (7 - x_index) as uint) & 1) != 0 {
-                for channel in range(0, 3) {
-                    let mut index = (y + y_index) * (surface_width as int) * 3 + (x + x_index) * 3;
+    for y_index in 0..10 {
+        let row = FONT_GLYPHS[glyph_index * 10 + y_index as usize];
+        for x_index in 0..8 {
+            if ((row >> (7 - x_index) as usize) & 1) != 0 {
+                for channel in 0..3 {
+                    let mut index = (y + y_index) * (surface_width as isize) * 3 + (x + x_index) * 3;
                     index += channel;
 
-                    if index >= 0 && index < pixels.len() as int {
-                        pixels[index as uint] = color_byte;
+                    if index >= 0 && index < pixels.len() as isize {
+                        pixels[index as usize] = color_byte;
                     }
                 }
             }
@@ -183,13 +181,13 @@ fn draw_glyph(pixels: &mut [uint8_t],
     }
 }
 
-pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int, string: &str) {
-    for i in range(0, string.len()) {
-        let glyph_index = (string.as_bytes()[i] - 32) as uint;
+pub fn draw_text(pixels: &mut [uint8_t], surface_width: usize, mut x: isize, y: isize, string: &str) {
+    for i in 0..string.len() {
+        let glyph_index = (string.as_bytes()[i] - 32) as usize;
         if glyph_index < FONT_ADVANCES.len() {
-            draw_glyph(pixels, surface_width, x, y + 1, Black, glyph_index);    // Shadow
-            draw_glyph(pixels, surface_width, x, y, White, glyph_index);        // Main
-            x += FONT_ADVANCES[glyph_index] as int;
+            draw_glyph(pixels, surface_width, x, y + 1, GlyphColor::Black, glyph_index);    // Shadow
+            draw_glyph(pixels, surface_width, x, y, GlyphColor::White, glyph_index);        // Main
+            x += FONT_ADVANCES[glyph_index] as isize;
         }
     }
 }
@@ -197,9 +195,11 @@ pub fn draw_text(pixels: &mut [uint8_t], surface_width: uint, mut x: int, y: int
 #[derive(PartialEq, Eq)]
 enum StatusLineAnimation {
     Idle,
-    Pausing(uint),
-    SlidingOut(uint),
+    Pausing(usize),
+    SlidingOut(usize),
 }
+
+use self::StatusLineAnimation::*;
 
 struct StatusLineText {
     string: String,
@@ -235,10 +235,10 @@ impl StatusLineText {
         }
         let y = match self.animation {
             Idle => panic!(),
-            SlidingOut(y) => y as int,
-            Pausing(_) => STATUS_LINE_Y as int,
+            SlidingOut(y) => y as isize,
+            Pausing(_) => STATUS_LINE_Y as isize,
         };
-        draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as int, y, self.string.as_slice());
+        draw_text(pixels, SCREEN_WIDTH, STATUS_LINE_X as isize, y, &self.string);
     }
 }
 
@@ -264,6 +264,7 @@ impl StatusLine {
 // Screen scaling
 //
 
+#[derive(Copy, Clone)]
 pub enum Scale {
     Scale1x,
     Scale2x,
@@ -271,17 +272,17 @@ pub enum Scale {
 }
 
 impl Scale {
-    fn factor(self) -> uint {
+    fn factor(self) -> usize {
         match self {
-            Scale1x => 1,
-            Scale2x => 2,
-            Scale3x => 3,
+            Scale::Scale1x => 1,
+            Scale::Scale2x => 2,
+            Scale::Scale3x => 3,
         }
     }
 }
 
-pub struct Gfx {
-    pub renderer: Box<Renderer>,
+pub struct Gfx<'a> {
+    pub renderer: Box<Renderer<'a>>,
     pub texture: Box<Texture>,
     pub scale: Scale,
     pub status_line: StatusLine,
@@ -291,48 +292,49 @@ pub struct Gfx {
 // Main graphics routine
 //
 
-impl Gfx {
-    pub fn new(scale: Scale) -> Gfx {
-        sdl2::init(INIT_VIDEO | INIT_AUDIO | INIT_TIMER | INIT_EVENTS);
-        let window = Window::new("sprocketnes",
-                                 PosCentered,
-                                 PosCentered,
-                                 (SCREEN_WIDTH as uint * scale.factor()) as int,
-                                 (SCREEN_HEIGHT as uint * scale.factor()) as int,
-                                 INPUT_FOCUS).unwrap();
-        let renderer = Renderer::from_window(window, DriverAuto, ACCELERATED).unwrap();
-        let texture = renderer.create_texture(BGR24,
-                                              AccessStreaming,
-                                              SCREEN_WIDTH as int,
-                                              SCREEN_HEIGHT as int).unwrap();
+impl <'a> Gfx<'a> {
+    pub fn new(scale: Scale) -> (Gfx<'a>, Sdl) {
+        // FIXME: Handle SDL better
 
-        Gfx {
+        let sdl = InitBuilder::new().video().audio().timer().events().unwrap();
+
+        let mut window_builder = sdl.window("sprocketnes",
+                                            (SCREEN_WIDTH as usize * scale.factor()) as u32,
+                                            (SCREEN_HEIGHT as usize * scale.factor()) as u32);
+        let window = window_builder.position_centered().build().unwrap();
+
+        let renderer = window.renderer().accelerated().build().unwrap();
+        let texture = renderer.create_texture(BGR24,
+                                              TextureAccess::Streaming,
+                                              (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32))
+                                              .unwrap();
+
+        (Gfx {
             renderer: Box::new(renderer),
             texture: Box::new(texture),
             scale: scale,
-            status_line: StatusLine::new()
-        }
+            status_line: StatusLine::new(),
+        }, sdl)
     }
 
     pub fn tick(&mut self) {
         self.status_line.text.tick();
     }
 
-    pub fn composite(&self, ppu_screen: &mut ([uint8_t; SCREEN_SIZE])) {
-        self.status_line.render(*ppu_screen);
+    pub fn composite(&mut self, ppu_screen: &mut [uint8_t; SCREEN_SIZE]) {
+        self.status_line.render(ppu_screen);
         self.blit(&*ppu_screen);
         drop(self.renderer.clear());
-        drop(self.renderer.copy(&*self.texture, None, Some(Rect {
-            x: 0,
-            y: 0,
-            w: (SCREEN_WIDTH * self.scale.factor()) as int32_t,
-            h: (SCREEN_HEIGHT * self.scale.factor()) as int32_t,
-        })));
+        drop(self.renderer.copy(&*self.texture, None, Rect::new(
+            0,
+            0,
+            (SCREEN_WIDTH * self.scale.factor()) as u32,
+            (SCREEN_HEIGHT * self.scale.factor()) as u32
+        ).unwrap()));
         self.renderer.present();
     }
 
-    fn blit(&self, ppu_screen: &([uint8_t; SCREEN_SIZE])) {
-        self.texture.update(None, *ppu_screen, (SCREEN_WIDTH * 3) as int).unwrap()
+    fn blit(&mut self, ppu_screen: &[uint8_t; SCREEN_SIZE]) {
+        self.texture.update(None, ppu_screen, SCREEN_WIDTH * 3).unwrap()
     }
 }
-

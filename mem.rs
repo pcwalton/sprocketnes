@@ -12,8 +12,9 @@ use util::Save;
 
 use libc::{uint8_t, uint16_t};
 use std::cell::RefCell;
-use std::io::File;
+use std::fs::File;
 use std::rc::Rc;
+use std::ops::{Deref, DerefMut};
 
 //
 // The memory interface
@@ -51,29 +52,31 @@ impl<M> MemUtil for M where M: Mem {
 
 pub struct Ram { pub val: [uint8_t; 0x800] }
 
-impl Deref<[uint8_t; 0x800]> for Ram {
+impl Deref for Ram {
+    type Target = [uint8_t; 0x800];
+
     fn deref(&self) -> &[uint8_t; 0x800] {
         &self.val
     }
 }
 
-impl DerefMut<[uint8_t; 0x800]> for Ram {
+impl DerefMut for Ram {
     fn deref_mut(&mut self) -> &mut [uint8_t; 0x800] {
         &mut self.val
     }
 }
 
 impl Mem for Ram {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t     { self[addr as uint & 0x7ff] }
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t) { self[addr as uint & 0x7ff] = val }
+    fn loadb(&mut self, addr: uint16_t) -> uint8_t     { self[addr as usize & 0x7ff] }
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) { self[addr as usize & 0x7ff] = val }
 }
 
 impl Save for Ram {
     fn save(&mut self, fd: &mut File) {
-        (*self).as_mut_slice().save(fd);
+        (&mut **self as &mut [u8]).save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        (*self).as_mut_slice().load(fd);
+        (&mut **self as &mut [u8]).load(fd);
     }
 }
 
@@ -97,7 +100,7 @@ impl MemMap {
                -> MemMap {
         MemMap {
             ram: Ram {
-                val: [ 0, ..0x800 ]
+                val: [ 0; 0x800 ]
             },
             ppu: ppu,
             input: input,
@@ -143,4 +146,3 @@ impl Mem for MemMap {
 }
 
 save_struct!(MemMap { ram, ppu, apu });
-

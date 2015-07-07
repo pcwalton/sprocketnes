@@ -9,6 +9,8 @@ use util;
 
 use libc::{uint8_t, uint16_t};
 
+use std::ops::Deref;
+
 #[derive(PartialEq, Eq)]
 pub enum MapperResult {
     Continue,
@@ -52,15 +54,15 @@ impl Mapper for Nrom {
         if addr < 0x8000 {
             0u8
         } else if self.rom.prg.len() > 16384 {
-            self.rom.prg[addr as uint & 0x7fff]
+            self.rom.prg[addr as usize & 0x7fff]
         } else {
-            self.rom.prg[addr as uint & 0x3fff]
+            self.rom.prg[addr as usize & 0x3fff]
         }
     }
     fn prg_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to PRG-ROM.
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { self.rom.chr[addr as uint] }
+    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { self.rom.chr[addr as usize] }
     fn chr_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to CHR-ROM.
-    fn next_scanline(&mut self) -> MapperResult { Continue }
+    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
 
 //
@@ -69,9 +71,12 @@ impl Mapper for Nrom {
 // See http://wiki.nesdev.com/w/index.php/Nintendo_MMC1
 //
 
+#[derive(Copy, Clone)]
 struct SxCtrl{ val: uint8_t }
 
-impl Deref<uint8_t> for SxCtrl {
+impl Deref for SxCtrl {
+    type Target = uint8_t;
+
     fn deref(&self) -> &uint8_t {
         &self.val
     }
@@ -93,14 +98,15 @@ enum SxPrgBankMode {
 impl SxCtrl {
     fn prg_rom_mode(self) -> SxPrgBankMode {
         match (*self >> 2) & 3 {
-            0 | 1 => Switch32K,
-            2 => FixFirstBank,
-            3 => FixLastBank,
+            0 | 1 => SxPrgBankMode::Switch32K,
+            2 => SxPrgBankMode::FixFirstBank,
+            3 => SxPrgBankMode::FixLastBank,
             _ => panic!("can't happen")
         }
     }
 }
 
+#[derive(Copy, Clone)]
 struct SxRegs {
     ctrl: SxCtrl,   // $8000-$9FFF
     chr_bank_0: uint8_t, // $A000-$BFFF
@@ -145,18 +151,18 @@ impl Mapper for SxRom {
             0u8
         } else if addr < 0xc000 {
             let bank = match self.regs.ctrl.prg_rom_mode() {
-                Switch32K => self.regs.prg_bank & 0xfe,
-                FixFirstBank => 0,
-                FixLastBank => self.regs.prg_bank,
+                SxPrgBankMode::Switch32K => self.regs.prg_bank & 0xfe,
+                SxPrgBankMode::FixFirstBank => 0,
+                SxPrgBankMode::FixLastBank => self.regs.prg_bank,
             };
-            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
+            self.rom.prg[(bank as usize * 16384) | ((addr & 0x3fff) as usize)]
         } else {
             let bank = match self.regs.ctrl.prg_rom_mode() {
-                Switch32K => (self.regs.prg_bank & 0xfe) | 1,
-                FixFirstBank => self.regs.prg_bank,
-                FixLastBank => (*self.rom).header.prg_rom_size - 1,
+                SxPrgBankMode::Switch32K => (self.regs.prg_bank & 0xfe) | 1,
+                SxPrgBankMode::FixFirstBank => self.regs.prg_bank,
+                SxPrgBankMode::FixLastBank => (*self.rom).header.prg_rom_size - 1,
             };
-            self.rom.prg[(bank as uint * 16384) | ((addr & 0x3fff) as uint)]
+            self.rom.prg[(bank as usize * 16384) | ((addr & 0x3fff) as usize)]
         }
     }
 
@@ -174,7 +180,7 @@ impl Mapper for SxRom {
         }
 
         // Write the lowest bit of the value into the right location of the accumulator.
-        self.accum = self.accum | ((val & 1) << (self.write_count as uint));
+        self.accum = self.accum | ((val & 1) << (self.write_count as usize));
 
         self.write_count += 1;
         if self.write_count == 5 {
@@ -196,10 +202,10 @@ impl Mapper for SxRom {
     }
 
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t     { self.chr_ram[addr as uint]       }
-    fn chr_storeb(&mut self, addr: uint16_t, val: uint8_t) { self.chr_ram[addr as uint] = val }
+    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t     { self.chr_ram[addr as usize]       }
+    fn chr_storeb(&mut self, addr: uint16_t, val: uint8_t) { self.chr_ram[addr as usize] = val }
 
-    fn next_scanline(&mut self) -> MapperResult { Continue }
+    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
 
 //
@@ -208,9 +214,12 @@ impl Mapper for SxRom {
 // See http://wiki.nesdev.com/w/index.php/MMC3
 //
 
+#[derive(Copy, Clone)]
 struct TxBankSelect{ val: uint8_t }
 
-impl Deref<uint8_t> for TxBankSelect {
+impl Deref for TxBankSelect {
+    type Target = uint8_t;
+
     fn deref(&self) -> &uint8_t {
         &self.val
     }
@@ -224,11 +233,16 @@ enum TxPrgBankMode {
 impl TxBankSelect {
     fn bank_update_select(self) -> uint8_t { *self & 0x7 }
     fn prg_bank_mode(self) -> TxPrgBankMode {
-        if (*self & 0x40) == 0 { Swappable8000 } else { SwappableC000 }
+        if (*self & 0x40) == 0 {
+            TxPrgBankMode::Swappable8000
+        } else {
+            TxPrgBankMode::SwappableC000
+        }
     }
     fn chr_a12_inversion(self) -> bool { (*self & 0x80) != 0 }
 }
 
+#[derive(Copy, Clone)]
 struct TxRegs {
     bank_select: TxBankSelect,  // Bank select (0x8000-0x9ffe even)
 }
@@ -272,28 +286,28 @@ impl Mapper for TxRom {
         if addr < 0x6000 {
             0u8
         } else if addr < 0x8000 {
-            self.prg_ram[addr as uint & 0x1fff]
+            self.prg_ram[addr as usize & 0x1fff]
         } else if addr < 0xa000 {
             // $8000-$9FFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
-                Swappable8000 => self.prg_banks[0],
-                SwappableC000 => self.prg_bank_count() - 2,
+                TxPrgBankMode::Swappable8000 => self.prg_banks[0],
+                TxPrgBankMode::SwappableC000 => self.prg_bank_count() - 2,
             };
-            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            self.rom.prg[(bank as usize * 8192) | (addr as usize & 0x1fff)]
         } else if addr < 0xc000 {
             // $A000-$BFFF is switchable.
-            self.rom.prg[(self.prg_banks[1] as uint * 8192) | (addr as uint & 0x1fff)]
+            self.rom.prg[(self.prg_banks[1] as usize * 8192) | (addr as usize & 0x1fff)]
         } else if addr < 0xe000 {
             // $C000-$DFFF might be switchable or fixed to the second to last bank.
             let bank = match self.regs.bank_select.prg_bank_mode() {
-                Swappable8000 => self.prg_bank_count() - 2,
-                SwappableC000 => self.prg_banks[0],
+                TxPrgBankMode::Swappable8000 => self.prg_bank_count() - 2,
+                TxPrgBankMode::SwappableC000 => self.prg_banks[0],
             };
-            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            self.rom.prg[(bank as usize * 8192) | (addr as usize & 0x1fff)]
         } else {
             // $E000-$FFFF is fixed to the last bank.
             let bank = self.prg_bank_count() - 1;
-            self.rom.prg[(bank as uint * 8192) | (addr as uint & 0x1fff)]
+            self.rom.prg[(bank as usize * 8192) | (addr as usize & 0x1fff)]
         }
     }
 
@@ -303,14 +317,14 @@ impl Mapper for TxRom {
         }
 
         if addr < 0x8000 {
-            self.prg_ram[addr as uint & 0x1fff] = val;
+            self.prg_ram[addr as usize & 0x1fff] = val;
         } else if addr < 0xa000 {
             if (addr & 1) == 0 {
                 // Bank select.
                 self.regs.bank_select = TxBankSelect{val: val};
             } else {
                 // Bank data.
-                let bank_update_select = self.regs.bank_select.bank_update_select() as uint;
+                let bank_update_select = self.regs.bank_select.bank_update_select() as usize;
                 match bank_update_select {
                     0 ... 1 => self.chr_banks_2k[bank_update_select] = val,
                     2 ... 5 => self.chr_banks_1k[bank_update_select - 2] = val,
@@ -345,9 +359,9 @@ impl Mapper for TxRom {
             _ => return 0,
         };
         if two_kb {
-            self.rom.chr[(bank as uint * 1024) + (addr as uint & 0x7ff)]
+            self.rom.chr[(bank as usize * 1024) + (addr as usize & 0x7ff)]
         } else {
-            self.rom.chr[(bank as uint * 1024) | (addr as uint & 0x3ff)]
+            self.rom.chr[(bank as usize * 1024) | (addr as usize & 0x3ff)]
         }
     }
 
@@ -363,11 +377,10 @@ impl Mapper for TxRom {
 
                 if self.irq_enabled {
                     util::debug_print("*** Generated IRQ! ***");
-                    return Irq;
+                    return MapperResult::Irq;
                 }
             }
         }
-        Continue
+        MapperResult::Continue
     }
 }
-

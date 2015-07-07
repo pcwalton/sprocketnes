@@ -8,7 +8,8 @@ use mem::{Mem, MemUtil};
 use util::Save;
 
 use libc::{int8_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
-use std::io::File;
+use std::fs::File;
+use std::ops::Deref;
 
 #[cfg(cpuspew)]
 use disasm::Disassembler;
@@ -97,7 +98,9 @@ impl<M> AddressingMode<M> for ImmediateAddressingMode where M: Mem {
 
 struct MemoryAddressingMode{val: uint16_t}
 
-impl Deref<uint16_t> for MemoryAddressingMode {
+impl Deref for MemoryAddressingMode {
+    type Target = uint16_t;
+
     fn deref(&self) -> &uint16_t {
         &self.val
     }
@@ -368,14 +371,14 @@ impl<M> Cpu<M> where M: Mem {
         };
         println!(
             "{:04X} {:20s} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{}",
-            self.regs.pc as uint,
+            self.regs.pc as usize,
             disassembler.disassemble(),
-            self.regs.a as uint,
-            self.regs.x as uint,
-            self.regs.y as uint,
-            self.regs.flags as uint,
-            self.regs.s as uint,
-            self.cy as uint
+            self.regs.a as usize,
+            self.regs.x as usize,
+            self.regs.y as usize,
+            self.regs.flags as usize,
+            self.regs.s as usize,
+            self.cy as usize
         );
     }
     #[cfg(not(cpuspew))]
@@ -383,7 +386,9 @@ impl<M> Cpu<M> where M: Mem {
 
     // Performs DMA to the OAMDATA ($2004) register.
     fn dma(&mut self, hi_addr: uint8_t) {
-        for addr in range(((hi_addr as uint) << 8, (hi_addr + 1) as uint) << 8) {
+        let start = (hi_addr as u16) << 8;
+
+        for addr in start..start + 256 {
             let val = self.loadb(addr as uint16_t);
             self.storeb(0x2004, val);
 
@@ -739,7 +744,7 @@ impl<M> Cpu<M> where M: Mem {
         let lo = self.loadb(addr);
         let hi = self.loadb((addr & 0xff00) | ((addr + 1) & 0x00ff));
 
-        self.regs.pc = ((hi as uint16_t) << 8 | lo) as uint16_t;
+        self.regs.pc = (hi as u16) << 8 | lo as u16;
     }
 
     // Procedure calls
@@ -792,7 +797,7 @@ impl<M> Cpu<M> where M: Mem {
         let op = self.loadb_bump_pc();
         decode_op!(op, self);
 
-        self.cy += CYCLE_TABLE[op as uint] as Cycles;
+        self.cy += CYCLE_TABLE[op as usize] as Cycles;
     }
 
     /// External interfaces

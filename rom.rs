@@ -4,7 +4,10 @@
 // Author: Patrick Walton
 //
 
-use std::io::File;
+use util;
+
+use std::fs::File;
+use std::path::Path;
 use std::vec::Vec;
 
 use libc::uint8_t;
@@ -17,8 +20,8 @@ pub struct Rom {
 
 impl Rom {
     fn from_file(file: &mut File) -> Rom {
-        let mut buffer = [ 0, ..16 ];
-        file.read_at_least(buffer.len(), buffer).unwrap();
+        let mut buffer = [ 0; 16 ];
+        util::read_to_buf(&mut buffer, file).unwrap();
 
         let header = INesHeader {
             magic: [
@@ -34,7 +37,7 @@ impl Rom {
             prg_ram_size: buffer[8],
             flags_9: buffer[9],
             flags_10: buffer[10],
-            zero: [ 0, ..5 ]
+            zero: [ 0; 5 ]
         };
 
         assert!(header.magic == [
@@ -44,10 +47,10 @@ impl Rom {
             0x1a,
         ]);
 
-        let mut prg_rom = Vec::from_elem(header.prg_rom_size as uint * 16384, 0u8);
-        file.read_at_least(prg_rom.len(), prg_rom.as_mut_slice()).unwrap();
-        let mut chr_rom = Vec::from_elem(header.chr_rom_size as uint * 8192, 0u8);
-        file.read_at_least(chr_rom.len(), chr_rom.as_mut_slice()).unwrap();
+        let mut prg_rom = vec![ 0u8; header.prg_rom_size as usize * 16384 ];
+        util::read_to_buf(&mut prg_rom, file).unwrap();
+        let mut chr_rom = vec![ 0u8; header.chr_rom_size as usize * 8192 ];
+        util::read_to_buf(&mut chr_rom, file).unwrap();
 
         Rom {
             header: header,
@@ -86,10 +89,10 @@ impl INesHeader {
 
     pub fn to_str(&self) -> String {
         (format!("PRG-ROM size: {}\nCHR-ROM size: {}\nMapper: {}/{}\nTrainer: {}",
-                 self.prg_rom_size as int,
-                 self.chr_rom_size as int,
-                 self.mapper() as int,
-                 self.ines_mapper() as int,
+                 self.prg_rom_size as isize,
+                 self.chr_rom_size as isize,
+                 self.mapper() as isize,
+                 self.ines_mapper() as isize,
                  if self.trainer() {
                      "Yes"
                  } else {

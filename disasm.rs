@@ -30,10 +30,10 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
     }
 
     fn disb_bump_pc(&mut self) -> String {
-        (format!("${:02X}", self.loadb_bump_pc() as uint)).to_string()
+        (format!("${:02X}", self.loadb_bump_pc() as usize)).to_string()
     }
     fn disw_bump_pc(&mut self) -> String {
-        (format!("${:04X}", self.loadw_bump_pc() as uint)).to_string()
+        (format!("${:04X}", self.loadw_bump_pc() as usize)).to_string()
     }
 
     //

@@ -4,24 +4,25 @@
 // Author: Patrick Walton
 //
 
-use mapper::{Irq, Mapper};
+use mapper::{Mapper, MapperResult};
 use mem::Mem;
 use util::{Save, debug_assert};
 
 use libc::{uint8_t, uint16_t, uint64_t};
 use std::cell::RefCell;
-use std::io::File;
+use std::fs::File;
 use std::rc::Rc;
+use std::ops::{Deref, DerefMut};
 
 //
 // Constants
 //
 
-pub static SCREEN_WIDTH: uint = 256;
-pub static SCREEN_HEIGHT: uint = 240;
+pub static SCREEN_WIDTH: usize = 256;
+pub static SCREEN_HEIGHT: usize = 240;
 pub static CYCLES_PER_SCANLINE: uint64_t = 114;   // 29781 cycles per frame, 261 scanlines
-pub static VBLANK_SCANLINE: uint = 241;
-pub static LAST_SCANLINE: uint = 261;
+pub static VBLANK_SCANLINE: usize = 241;
+pub static LAST_SCANLINE: usize = 261;
 
 static PALETTE: [uint8_t; 192] = [
     124,124,124,    0,0,252,        0,0,188,        68,40,188,
@@ -46,6 +47,7 @@ static PALETTE: [uint8_t; 192] = [
 // Registers
 //
 
+#[derive(Copy, Clone)]
 struct Regs {
     ctrl: PpuCtrl,      // PPUCTRL: 0x2000
     mask: PpuMask,      // PPUMASK: 0x2001
@@ -61,6 +63,7 @@ save_struct!(Regs { ctrl, mask, status, oam_addr, scroll, addr });
 // PPUCTRL: 0x2000
 //
 
+#[derive(Copy, Clone)]
 struct PpuCtrl{ val: uint8_t }
 
 enum SpriteSize {
@@ -68,13 +71,15 @@ enum SpriteSize {
     SpriteSize8x16
 }
 
-impl Deref<uint8_t> for PpuCtrl {
+impl Deref for PpuCtrl {
+    type Target = uint8_t;
+
     fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
-impl DerefMut<uint8_t> for PpuCtrl {
+impl DerefMut for PpuCtrl {
     fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
@@ -87,7 +92,7 @@ impl PpuCtrl {
     fn sprite_pattern_table_addr(self) -> uint16_t     { if (*self & 0x08) == 0 { 0 } else { 0x1000 } }
     fn background_pattern_table_addr(self) -> uint16_t { if (*self & 0x10) == 0 { 0 } else { 0x1000 } }
     fn sprite_size(self) -> SpriteSize {
-        if (*self & 0x20) == 0 { SpriteSize8x8 } else { SpriteSize8x16 }
+        if (*self & 0x20) == 0 { SpriteSize::SpriteSize8x8 } else { SpriteSize::SpriteSize8x16 }
     }
     fn vblank_nmi(self) -> bool                   { (*self & 0x80) != 0 }
 }
@@ -96,15 +101,18 @@ impl PpuCtrl {
 // PPUMASK: 0x2001
 //
 
+#[derive(Copy, Clone)]
 struct PpuMask {val: uint8_t }
 
-impl Deref<uint8_t> for PpuMask {
+impl Deref for PpuMask {
+    type Target = uint8_t;
+
     fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
-impl DerefMut<uint8_t> for PpuMask {
+impl DerefMut for PpuMask {
     fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
@@ -125,15 +133,18 @@ impl PpuMask {
 // PPUSTATUS: 0x2002
 //
 
+#[derive(Copy, Clone)]
 struct PpuStatus { val: uint8_t }
 
-impl Deref<uint8_t> for PpuStatus {
+impl Deref for PpuStatus {
+    type Target = uint8_t;
+
     fn deref(&self) -> &uint8_t {
         &self.val
     }
 }
 
-impl DerefMut<uint8_t> for PpuStatus {
+impl DerefMut for PpuStatus {
     fn deref_mut(&mut self) -> &mut uint8_t {
         &mut self.val
     }
@@ -159,6 +170,7 @@ impl PpuStatus {
 // PPUSCROLL: 0x2005
 //
 
+#[derive(Copy, Clone)]
 struct PpuScroll {
     x: uint8_t,
     y: uint8_t,
@@ -167,6 +179,7 @@ struct PpuScroll {
 
 save_struct!(PpuScroll { x, y, next });
 
+#[derive(Copy, Clone)]
 enum PpuScrollDir {
     XDir,
     YDir,
@@ -178,6 +191,7 @@ save_enum!(PpuScrollDir { XDir, YDir });
 // PPUADDR: 0x2006
 //
 
+#[derive(Copy, Clone)]
 struct PpuAddr {
     val: uint16_t,
     next: PpuAddrByte
@@ -185,6 +199,7 @@ struct PpuAddr {
 
 save_struct!(PpuAddr { val, next });
 
+#[derive(Copy, Clone)]
 enum PpuAddrByte {
     Hi,
     Lo,
@@ -204,8 +219,8 @@ impl Vram {
     pub fn new(mapper: Rc<RefCell<Box<Mapper+Send>>>) -> Vram {
         Vram {
             mapper: mapper,
-            nametables: [ 0, ..0x800 ],
-            palette: [ 0, ..0x20 ]
+            nametables: [ 0; 0x800 ],
+            palette: [ 0; 0x20 ]
         }
     }
 }
@@ -217,9 +232,9 @@ impl Mem for Vram {
             let mut mapper = self.mapper.borrow_mut();
             mapper.chr_loadb(addr)
         } else if addr < 0x3f00 {   // Name table area
-            self.nametables[addr as uint & 0x07ff]
+            self.nametables[addr as usize & 0x07ff]
         } else if addr < 0x4000 {   // Palette area
-            self.palette[addr as uint & 0x1f]
+            self.palette[addr as usize & 0x1f]
         } else {
             panic!("invalid VRAM read")
         }
@@ -230,28 +245,28 @@ impl Mem for Vram {
             mapper.chr_storeb(addr, val)
         } else if addr < 0x3f00 {           // Name table area
             let addr = addr & 0x07ff;
-            self.nametables[addr as uint] = val;
+            self.nametables[addr as usize] = val;
         } else if addr < 0x4000 {   // Palette area
             let mut addr = addr & 0x1f;
             if addr == 0x10 {
                 addr = 0x00;    // Mirror sprite background color into universal background color.
             }
-            self.palette[addr as uint] = val;
+            self.palette[addr as usize] = val;
         }
     }
 }
 
 impl Save for Vram {
     fn save(&mut self, fd: &mut File) {
-        let mut nametables: &mut [uint8_t] = self.nametables;
+        let mut nametables: &mut [uint8_t] = &mut self.nametables;
         nametables.save(fd);
-        let mut palette: &mut [uint8_t] = self.palette;
+        let mut palette: &mut [uint8_t] = &mut self.palette;
         palette.save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        let mut nametables: &mut [uint8_t] = self.nametables;
+        let mut nametables: &mut [uint8_t] = &mut self.nametables;
         nametables.load(fd);
-        let mut palette: &mut [uint8_t] = self.palette;
+        let mut palette: &mut [uint8_t] = &mut self.palette;
         palette.load(fd);
     }
 }
@@ -271,17 +286,17 @@ impl Oam {
 }
 
 impl Mem for Oam {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t     { self.oam[addr as uint] }
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t) { self.oam[addr as uint] = val }
+    fn loadb(&mut self, addr: uint16_t) -> uint8_t     { self.oam[addr as usize] }
+    fn storeb(&mut self, addr: uint16_t, val: uint8_t) { self.oam[addr as usize] = val }
 }
 
 impl Save for Oam {
     fn save(&mut self, fd: &mut File) {
-        let mut oam: &mut [uint8_t] = self.oam;
+        let mut oam: &mut [uint8_t] = &mut self.oam;
         oam.save(fd);
     }
     fn load(&mut self, fd: &mut File) {
-        let mut oam: &mut [uint8_t] = self.oam;
+        let mut oam: &mut [uint8_t] = &mut self.oam;
         oam.load(fd);
     }
 }
@@ -299,12 +314,14 @@ enum SpriteTiles {
     SpriteTiles8x16(uint16_t, uint16_t)
 }
 
+use self::SpriteTiles::*;
+
 impl SpriteStruct {
     fn tiles(&self, ppu: &Ppu) -> SpriteTiles {
         let base = ppu.regs.ctrl.sprite_pattern_table_addr();
         match ppu.regs.ctrl.sprite_size() {
-            SpriteSize8x8 => SpriteTiles8x8(self.tile_index_byte as uint16_t | base),
-            SpriteSize8x16 => {
+            SpriteSize::SpriteSize8x8 => SpriteTiles8x8(self.tile_index_byte as uint16_t | base),
+            SpriteSize::SpriteSize8x16 => {
                 // We ignore the base set in PPUCTRL here.
                 let mut first = (self.tile_index_byte & !1) as uint16_t;
                 if (self.tile_index_byte & 1) != 0 {
@@ -327,8 +344,8 @@ impl SpriteStruct {
     fn on_scanline(&self, ppu: &Ppu, y: uint8_t) -> bool {
         if y < self.y { return false; }
         match ppu.regs.ctrl.sprite_size() {
-            SpriteSize8x8 => y < self.y + 8,
-            SpriteSize8x16 => y < self.y + 16
+            SpriteSize::SpriteSize8x8 => y < self.y + 8,
+            SpriteSize::SpriteSize8x16 => y < self.y + 16
         }
     }
 
@@ -398,6 +415,7 @@ pub struct StepResult {
     pub scanline_irq: bool, // The mapper wants to execute a scanline IRQ.
 }
 
+#[derive(Copy, Clone)]
 struct Rgb {
     r: uint8_t,
     g: uint8_t,
@@ -424,6 +442,8 @@ enum SpritePriority {
     AboveBg,
     BelowBg,
 }
+
+use self::SpritePriority::*;
 
 impl Save for Ppu {
     fn save(&mut self, fd: &mut File) {
@@ -456,8 +476,8 @@ impl Ppu {
                 mask: PpuMask{val: 0},
                 status: PpuStatus{val:0},
                 oam_addr: 0,
-                scroll: PpuScroll { x: 0, y: 0, next: XDir },
-                addr: PpuAddr { val: 0, next: Hi },
+                scroll: PpuScroll { x: 0, y: 0, next: PpuScrollDir::XDir },
+                addr: PpuAddr { val: 0, next: PpuAddrByte::Hi },
             },
             vram: vram,
             oam: oam,
@@ -480,9 +500,9 @@ impl Ppu {
     #[inline(always)]
     fn get_color(&self, palette_index: uint8_t) -> Rgb {
         Rgb {
-            r: PALETTE[palette_index as uint * 3 + 2],
-            g: PALETTE[palette_index as uint * 3 + 1],
-            b: PALETTE[palette_index as uint * 3 + 0],
+            r: PALETTE[palette_index as usize * 3 + 2],
+            g: PALETTE[palette_index as usize * 3 + 1],
+            b: PALETTE[palette_index as usize * 3 + 0],
         }
     }
 
@@ -499,17 +519,17 @@ impl Ppu {
 
     fn update_ppuscroll(&mut self, val: uint8_t) {
         match self.regs.scroll.next {
-            XDir => {
+            PpuScrollDir::XDir => {
                 self.scroll_x = (self.scroll_x & 0xff00) | (val as uint16_t);
 
                 self.regs.scroll.x = val;
-                self.regs.scroll.next = YDir;
+                self.regs.scroll.next = PpuScrollDir::YDir;
             }
-            YDir => {
+            PpuScrollDir::YDir => {
                 self.scroll_y = (self.scroll_y & 0xff00) | (val as uint16_t);
 
                 self.regs.scroll.y = val;
-                self.regs.scroll.next = XDir;
+                self.regs.scroll.next = PpuScrollDir::XDir;
             }
         }
     }
@@ -521,13 +541,13 @@ impl Ppu {
 
     fn update_ppuaddr(&mut self, val: uint8_t) {
         match self.regs.addr.next {
-            Hi => {
+            PpuAddrByte::Hi => {
                 self.regs.addr.val = (self.regs.addr.val & 0x00ff) | ((val as uint16_t) << 8);
-                self.regs.addr.next = Lo;
+                self.regs.addr.next = PpuAddrByte::Lo;
             }
-            Lo => {
+            PpuAddrByte::Lo => {
                 self.regs.addr.val = (self.regs.addr.val & 0xff00) | (val as uint16_t);
-                self.regs.addr.next = Hi;
+                self.regs.addr.next = PpuAddrByte::Hi;
 
                 // Adjust the scroll registers.
                 // TODO: This is pretty much a hack. The right way is to precisely emulate the PPU
@@ -542,8 +562,8 @@ impl Ppu {
 
     fn read_ppustatus(&mut self) -> uint8_t {
         // Reset latch.
-        self.regs.scroll.next = XDir;
-        self.regs.addr.next = Hi;
+        self.regs.scroll.next = PpuScrollDir::XDir;
+        self.regs.addr.next = PpuAddrByte::Hi;
 
         *self.regs.status
     }
@@ -601,9 +621,9 @@ impl Ppu {
     }
 
     #[inline(always)]
-    fn each_sprite<F>(&mut self, f: F)
-        where F: Fn(&mut Ppu, &SpriteStruct, uint8_t) -> bool{
-        for i in range(0, 64) {
+    fn each_sprite<F>(&mut self, mut f: F)
+        where F: FnMut(&mut Ppu, &SpriteStruct, uint8_t) -> bool{
+        for i in 0..64 {
             let sprite = self.make_sprite_info(i as uint16_t);
             if !f(self, &sprite, i as uint8_t) {
                 return
@@ -616,7 +636,7 @@ impl Ppu {
     //
 
     #[inline(always)]
-    fn putpixel(&mut self, x: uint, y: uint, color: Rgb) {
+    fn putpixel(&mut self, x: usize, y: usize, color: Rgb) {
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 0] = color.r;
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 1] = color.g;
         self.screen[(y * SCREEN_WIDTH + x) * 3 + 2] = color.b;
@@ -628,15 +648,15 @@ impl Ppu {
         // Compute the pattern offset.
         let mut pattern_offset = (tile << 4) + (y as uint16_t);
         match kind {
-            Background => pattern_offset += self.regs.ctrl.background_pattern_table_addr(),
-            Sprite     => pattern_offset += self.regs.ctrl.sprite_pattern_table_addr(),
+            PatternPixelKind::Background => pattern_offset += self.regs.ctrl.background_pattern_table_addr(),
+            PatternPixelKind::Sprite     => pattern_offset += self.regs.ctrl.sprite_pattern_table_addr(),
         }
 
         // Determine the color of this pixel.
         let plane0 = self.vram.loadb(pattern_offset);
         let plane1 = self.vram.loadb(pattern_offset + 8);
-        let bit0 = (plane0 >> ((7 - ((x % 8) as uint8_t)) as uint)) & 1;
-        let bit1 = (plane1 >> ((7 - ((x % 8) as uint8_t)) as uint)) & 1;
+        let bit0 = (plane0 >> ((7 - ((x % 8) as uint8_t)) as usize)) & 1;
+        let bit1 = (plane1 >> ((7 - ((x % 8) as uint8_t)) as usize)) & 1;
         (bit1 << 1) | bit0
     }
 
@@ -655,7 +675,7 @@ impl Ppu {
         let tile = self.vram.loadb(base + 32 * (y_index as uint16_t) + (x_index as uint16_t));
 
         // Fetch the pattern color.
-        let pattern_color = self.get_pattern_pixel(Background, tile as uint16_t, xsub, ysub);
+        let pattern_color = self.get_pattern_pixel(PatternPixelKind::Background, tile as uint16_t, xsub, ysub);
         if pattern_color == 0 {
             return None;    // Transparent.
         }
@@ -706,7 +726,7 @@ impl Ppu {
                             debug_assert(x < 8, "sprite X miscalculation");
                             debug_assert(y < 8, "sprite Y miscalculation");
 
-                            pattern_color = self.get_pattern_pixel(Sprite, tile, x, y);
+                            pattern_color = self.get_pattern_pixel(PatternPixelKind::Sprite, tile, x, y);
                         }
                     }
 
@@ -735,7 +755,7 @@ impl Ppu {
 
     fn compute_visible_sprites(&mut self) -> [Option<uint8_t>; 8] {
         let mut count = 0;
-        let mut result = [None, ..8];
+        let mut result = [None; 8];
         self.each_sprite(|this, sprite, index| {
             if sprite.on_scanline(this, this.scanline as uint8_t) {
                 if count < 8 {
@@ -760,7 +780,7 @@ impl Ppu {
         let backdrop_color_index = self.vram.loadb(0x3f00) & 0x3f;
         let backdrop_color = self.get_color(backdrop_color_index);
 
-        for x in range(0, SCREEN_WIDTH) {
+        for x in 0..SCREEN_WIDTH {
             // FIXME: For performance, we shouldn't be recomputing the tile for every pixel.
             let mut background_color = None;
             if self.regs.mask.show_background() {
@@ -779,12 +799,12 @@ impl Ppu {
                 (None, None) => backdrop_color,
                 (Some(color), None) => color,
                 (Some(color), Some(SpriteColor { priority: BelowBg, .. })) => color,
-                (None, Some(SpriteColor { priority: BelowBg, color: color })) => color,
-                (_, Some(SpriteColor { priority: AboveBg, color: color })) => color,
+                (None, Some(SpriteColor { priority: BelowBg, color })) => color,
+                (_, Some(SpriteColor { priority: AboveBg, color })) => color,
             };
 
             let scanline = self.scanline;
-            self.putpixel(x, scanline as uint, color);
+            self.putpixel(x, scanline as usize, color);
         }
     }
 
@@ -816,7 +836,7 @@ impl Ppu {
 
             {
                 let mut mapper = self.vram.mapper.borrow_mut();
-                if mapper.next_scanline() == Irq {
+                if mapper.next_scanline() == MapperResult::Irq {
                     result.scanline_irq = true
                 }
             }
