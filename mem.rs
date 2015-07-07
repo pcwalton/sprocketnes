@@ -10,7 +10,6 @@ use mapper::Mapper;
 use ppu::Ppu;
 use util::Save;
 
-use libc::{uint8_t, uint16_t};
 use std::cell::RefCell;
 use std::fs::File;
 use std::rc::Rc;
@@ -22,27 +21,27 @@ use std::ops::{Deref, DerefMut};
 
 /// The basic memory interface
 pub trait Mem {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t;
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t);
+    fn loadb(&mut self, addr: u16) -> u8;
+    fn storeb(&mut self, addr: u16, val: u8);
 }
 
 pub trait MemUtil {
-    fn loadw(&mut self, addr: uint16_t) -> uint16_t;
-    fn storew(&mut self, addr: uint16_t, val: uint16_t);
-    fn loadw_zp(&mut self, addr: uint8_t) -> uint16_t;
+    fn loadw(&mut self, addr: u16) -> u16;
+    fn storew(&mut self, addr: u16, val: u16);
+    fn loadw_zp(&mut self, addr: u8) -> u16;
 }
 
 impl<M> MemUtil for M where M: Mem {
-    fn loadw(&mut self, addr: uint16_t) -> uint16_t {
-        self.loadb(addr) as uint16_t | (self.loadb(addr + 1) as uint16_t) << 8
+    fn loadw(&mut self, addr: u16) -> u16 {
+        self.loadb(addr) as u16 | (self.loadb(addr + 1) as u16) << 8
     }
-    fn storew(&mut self, addr: uint16_t, val: uint16_t) {
-        self.storeb(addr, (val & 0xff) as uint8_t);
-        self.storeb(addr + 1, ((val >> 8) & 0xff) as uint8_t);
+    fn storew(&mut self, addr: u16, val: u16) {
+        self.storeb(addr, (val & 0xff) as u8);
+        self.storeb(addr + 1, ((val >> 8) & 0xff) as u8);
     }
     // Like loadw, but has wraparound behavior on the zero page for address 0xff.
-    fn loadw_zp(&mut self, addr: uint8_t) -> uint16_t {
-        self.loadb(addr as uint16_t) as uint16_t | (self.loadb((addr + 1) as uint16_t) as uint16_t) << 8
+    fn loadw_zp(&mut self, addr: u8) -> u16 {
+        self.loadb(addr as u16) as u16 | (self.loadb((addr + 1) as u16) as u16) << 8
     }
 }
 
@@ -50,25 +49,25 @@ impl<M> MemUtil for M where M: Mem {
 // The NES' paltry 2KB of RAM
 //
 
-pub struct Ram { pub val: [uint8_t; 0x800] }
+pub struct Ram { pub val: [u8; 0x800] }
 
 impl Deref for Ram {
-    type Target = [uint8_t; 0x800];
+    type Target = [u8; 0x800];
 
-    fn deref(&self) -> &[uint8_t; 0x800] {
+    fn deref(&self) -> &[u8; 0x800] {
         &self.val
     }
 }
 
 impl DerefMut for Ram {
-    fn deref_mut(&mut self) -> &mut [uint8_t; 0x800] {
+    fn deref_mut(&mut self) -> &mut [u8; 0x800] {
         &mut self.val
     }
 }
 
 impl Mem for Ram {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t     { self[addr as usize & 0x7ff] }
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t) { self[addr as usize & 0x7ff] = val }
+    fn loadb(&mut self, addr: u16) -> u8     { self[addr as usize & 0x7ff] }
+    fn storeb(&mut self, addr: u16, val: u8) { self[addr as usize & 0x7ff] = val }
 }
 
 impl Save for Ram {
@@ -111,7 +110,7 @@ impl MemMap {
 }
 
 impl Mem for MemMap {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x2000 {
             self.ram.loadb(addr)
         } else if addr < 0x4000 {
@@ -127,7 +126,7 @@ impl Mem for MemMap {
             mapper.prg_loadb(addr)
         }
     }
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
+    fn storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x2000 {
             self.ram.storeb(addr, val)
         } else if addr < 0x4000 {

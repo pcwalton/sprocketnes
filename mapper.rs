@@ -7,8 +7,6 @@
 use rom::Rom;
 use util;
 
-use libc::{uint8_t, uint16_t};
-
 use std::ops::Deref;
 
 #[derive(PartialEq, Eq)]
@@ -18,10 +16,10 @@ pub enum MapperResult {
 }
 
 pub trait Mapper {
-    fn prg_loadb(&mut self, addr: uint16_t) -> uint8_t;
-    fn prg_storeb(&mut self, addr: uint16_t, val: uint8_t);
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t;
-    fn chr_storeb(&mut self, addr: uint16_t, val: uint8_t);
+    fn prg_loadb(&mut self, addr: u16) -> u8;
+    fn prg_storeb(&mut self, addr: u16, val: u8);
+    fn chr_loadb(&mut self, addr: u16) -> u8;
+    fn chr_storeb(&mut self, addr: u16, val: u8);
     fn next_scanline(&mut self) -> MapperResult;
 }
 
@@ -50,7 +48,7 @@ pub struct Nrom {
 }
 
 impl Mapper for Nrom {
-    fn prg_loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x8000 {
             0u8
         } else if self.rom.prg.len() > 16384 {
@@ -59,9 +57,9 @@ impl Mapper for Nrom {
             self.rom.prg[addr as usize & 0x3fff]
         }
     }
-    fn prg_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to PRG-ROM.
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t { self.rom.chr[addr as usize] }
-    fn chr_storeb(&mut self, _: uint16_t, _: uint8_t) {}  // Can't store to CHR-ROM.
+    fn prg_storeb(&mut self, _: u16, _: u8) {}  // Can't store to PRG-ROM.
+    fn chr_loadb(&mut self, addr: u16) -> u8 { self.rom.chr[addr as usize] }
+    fn chr_storeb(&mut self, _: u16, _: u8) {}  // Can't store to CHR-ROM.
     fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
 
@@ -72,12 +70,12 @@ impl Mapper for Nrom {
 //
 
 #[derive(Copy, Clone)]
-struct SxCtrl{ val: uint8_t }
+struct SxCtrl{ val: u8 }
 
 impl Deref for SxCtrl {
-    type Target = uint8_t;
+    type Target = u8;
 
-    fn deref(&self) -> &uint8_t {
+    fn deref(&self) -> &u8 {
         &self.val
     }
 }
@@ -109,20 +107,20 @@ impl SxCtrl {
 #[derive(Copy, Clone)]
 struct SxRegs {
     ctrl: SxCtrl,   // $8000-$9FFF
-    chr_bank_0: uint8_t, // $A000-$BFFF
-    chr_bank_1: uint8_t, // $C000-$DFFF
-    prg_bank: uint8_t,   // $E000-$FFFF
+    chr_bank_0: u8, // $A000-$BFFF
+    chr_bank_1: u8, // $C000-$DFFF
+    prg_bank: u8,   // $E000-$FFFF
 }
 
 pub struct SxRom {
     rom: Box<Rom>,
     regs: SxRegs,
     // The internal accumulator.
-    accum: uint8_t,
+    accum: u8,
     // The write count. At the 5th write, we update the register.
-    write_count: uint8_t,
-    //prg_ram: Box<[uint8_t, ..8192]>,
-    chr_ram: Box<[uint8_t; 8192]>,
+    write_count: u8,
+    //prg_ram: Box<[u8, ..8192]>,
+    chr_ram: Box<[u8; 8192]>,
 }
 
 impl SxRom {
@@ -146,7 +144,7 @@ impl SxRom {
 }
 
 impl Mapper for SxRom {
-    fn prg_loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x8000 {
             0u8
         } else if addr < 0xc000 {
@@ -166,7 +164,7 @@ impl Mapper for SxRom {
         }
     }
 
-    fn prg_storeb(&mut self, addr: uint16_t, val: uint8_t) {
+    fn prg_storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x8000 {
             return;
         }
@@ -202,8 +200,8 @@ impl Mapper for SxRom {
     }
 
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t     { self.chr_ram[addr as usize]       }
-    fn chr_storeb(&mut self, addr: uint16_t, val: uint8_t) { self.chr_ram[addr as usize] = val }
+    fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr as usize]       }
+    fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr as usize] = val }
 
     fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
 }
@@ -215,12 +213,12 @@ impl Mapper for SxRom {
 //
 
 #[derive(Copy, Clone)]
-struct TxBankSelect{ val: uint8_t }
+struct TxBankSelect{ val: u8 }
 
 impl Deref for TxBankSelect {
-    type Target = uint8_t;
+    type Target = u8;
 
-    fn deref(&self) -> &uint8_t {
+    fn deref(&self) -> &u8 {
         &self.val
     }
 }
@@ -231,7 +229,7 @@ enum TxPrgBankMode {
 }
 
 impl TxBankSelect {
-    fn bank_update_select(self) -> uint8_t { *self & 0x7 }
+    fn bank_update_select(self) -> u8 { *self & 0x7 }
     fn prg_bank_mode(self) -> TxPrgBankMode {
         if (*self & 0x40) == 0 {
             TxPrgBankMode::Swappable8000
@@ -250,14 +248,14 @@ struct TxRegs {
 struct TxRom {
     rom: Box<Rom>,
     regs: TxRegs,
-    prg_ram: Box<[uint8_t; 8192]>,
+    prg_ram: Box<[u8; 8192]>,
 
-    chr_banks_2k: [uint8_t; 2],    // 2KB CHR-ROM banks
-    chr_banks_1k: [uint8_t; 4],    // 1KB CHR-ROM banks
-    prg_banks:    [uint8_t; 2],    // 8KB PRG-ROM banks
+    chr_banks_2k: [u8; 2],    // 2KB CHR-ROM banks
+    chr_banks_1k: [u8; 4],    // 1KB CHR-ROM banks
+    prg_banks:    [u8; 2],    // 8KB PRG-ROM banks
 
-    scanline_counter: uint8_t,
-    irq_reload: uint8_t,             // Copied into the scanline counter when it hits zero.
+    scanline_counter: u8,
+    irq_reload: u8,             // Copied into the scanline counter when it hits zero.
     irq_enabled: bool,
 }
 
@@ -278,11 +276,11 @@ impl TxRom {
         }
     }
 
-    fn prg_bank_count(&self) -> uint8_t { self.rom.header.prg_rom_size * 2 }
+    fn prg_bank_count(&self) -> u8 { self.rom.header.prg_rom_size * 2 }
 }
 
 impl Mapper for TxRom {
-    fn prg_loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
         if addr < 0x6000 {
             0u8
         } else if addr < 0x8000 {
@@ -311,7 +309,7 @@ impl Mapper for TxRom {
         }
     }
 
-    fn prg_storeb(&mut self, addr: uint16_t, val: uint8_t) {
+    fn prg_storeb(&mut self, addr: u16, val: u8) {
         if addr < 0x6000 {
             return;
         }
@@ -348,7 +346,7 @@ impl Mapper for TxRom {
         }
     }
 
-    fn chr_loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn chr_loadb(&mut self, addr: u16) -> u8 {
         let (bank, two_kb) = match (addr, self.regs.bank_select.chr_a12_inversion()) {
             (0x0000 ... 0x07ff, false) | (0x1000 ... 0x17ff, true) => (self.chr_banks_2k[0], true),
             (0x0800 ... 0x0fff, false) | (0x1800 ... 0x1fff, true) => (self.chr_banks_2k[1], true),
@@ -365,7 +363,7 @@ impl Mapper for TxRom {
         }
     }
 
-    fn chr_storeb(&mut self, _: uint16_t, _: uint8_t) {
+    fn chr_storeb(&mut self, _: u16, _: u8) {
         // TODO: CHR-RAM
     }
 

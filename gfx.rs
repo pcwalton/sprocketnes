@@ -9,7 +9,6 @@ use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture, TextureAccess};
 use sdl2::{InitBuilder, Sdl};
 
-use libc::uint8_t;
 
 const SCREEN_WIDTH: usize = 256;
 const SCREEN_HEIGHT: usize = 240;
@@ -32,7 +31,7 @@ const SCREEN_SIZE: usize = 184320;
 // (c) Yusuke Kamiyamane, http://pinvoke.com/
 //
 
-const FONT_GLYPHS: [uint8_t; FONT_GLYPH_LENGTH] = [
+const FONT_GLYPHS: [u8; FONT_GLYPH_LENGTH] = [
       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // ' '
       0,  64,  64,  64,  64,  64,   0,  64,   0,   0,  // '!'
       0, 160, 160,   0,   0,   0,   0,   0,   0,   0,  // '"'
@@ -130,7 +129,7 @@ const FONT_GLYPHS: [uint8_t; FONT_GLYPH_LENGTH] = [
       0,  80, 160,   0,   0,   0,   0,   0,   0,   0,  // '~'
 ];
 
-const FONT_ADVANCES: [uint8_t; FONT_GLYPH_COUNT] = [
+const FONT_ADVANCES: [u8; FONT_GLYPH_COUNT] = [
     3 /*   */, 3 /* ! */, 4 /* " */, 6 /* # */, 6 /* $ */, 8 /* % */, 6 /* & */, 2 /* ' */,
     4 /* ( */, 4 /* ) */, 6 /* * */, 6 /* + */, 3 /* , */, 4 /* - */, 3 /* . */, 5 /* / */,
     6 /* 0 */, 3 /* 1 */, 6 /* 2 */, 6 /* 3 */, 6 /* 4 */, 6 /* 5 */, 6 /* 6 */, 6 /* 7 */,
@@ -154,7 +153,7 @@ enum GlyphColor {
     Black,
 }
 
-fn draw_glyph(pixels: &mut [uint8_t],
+fn draw_glyph(pixels: &mut [u8],
               surface_width: usize,
               x: isize,
               y: isize,
@@ -181,7 +180,7 @@ fn draw_glyph(pixels: &mut [uint8_t],
     }
 }
 
-pub fn draw_text(pixels: &mut [uint8_t], surface_width: usize, mut x: isize, y: isize, string: &str) {
+pub fn draw_text(pixels: &mut [u8], surface_width: usize, mut x: isize, y: isize, string: &str) {
     for i in 0..string.len() {
         let glyph_index = (string.as_bytes()[i] - 32) as usize;
         if glyph_index < FONT_ADVANCES.len() {
@@ -229,7 +228,7 @@ impl StatusLineText {
         }
     }
 
-    fn render(&self, pixels: &mut [uint8_t]) {
+    fn render(&self, pixels: &mut [u8]) {
         if self.animation == Idle {
             return;
         }
@@ -255,7 +254,7 @@ impl StatusLine {
     pub fn set(&mut self, new_text: String) {
         self.text.set(new_text);
     }
-    pub fn render(&self, pixels: &mut [uint8_t]) {
+    pub fn render(&self, pixels: &mut [u8]) {
         self.text.render(pixels);
     }
 }
@@ -321,7 +320,7 @@ impl <'a> Gfx<'a> {
         self.status_line.text.tick();
     }
 
-    pub fn composite(&mut self, ppu_screen: &mut [uint8_t; SCREEN_SIZE]) {
+    pub fn composite(&mut self, ppu_screen: &mut [u8; SCREEN_SIZE]) {
         self.status_line.render(ppu_screen);
         self.blit(&*ppu_screen);
         drop(self.renderer.clear());
@@ -334,7 +333,7 @@ impl <'a> Gfx<'a> {
         self.renderer.present();
     }
 
-    fn blit(&mut self, ppu_screen: &[uint8_t; SCREEN_SIZE]) {
+    fn blit(&mut self, ppu_screen: &[u8; SCREEN_SIZE]) {
         self.texture.update(None, ppu_screen, SCREEN_WIDTH * 3).unwrap()
     }
 }

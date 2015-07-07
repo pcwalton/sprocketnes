@@ -7,7 +7,6 @@
 // TODO: This module is very unsafe. Adding a reader-writer audio lock to SDL would help make it
 // safe.
 
-use libc::uint8_t;
 use sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired, AudioDeviceLockGuard};
 use std::cmp;
 use std::mem;
@@ -29,7 +28,7 @@ pub static mut g_mutex: StaticMutex = MUTEX_INIT;
 pub static mut g_condvar: StaticCondvar = CONDVAR_INIT;
 
 pub struct OutputBuffer {
-    pub samples: [uint8_t; SAMPLE_COUNT],
+    pub samples: [u8; SAMPLE_COUNT],
     pub play_offset: usize,
 }
 

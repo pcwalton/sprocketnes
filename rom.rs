@@ -10,12 +10,10 @@ use std::fs::File;
 use std::path::Path;
 use std::vec::Vec;
 
-use libc::uint8_t;
-
 pub struct Rom {
     pub header: INesHeader,
-    pub prg: Vec<uint8_t>,         // PRG-ROM
-    pub chr: Vec<uint8_t>,         // CHR-ROM
+    pub prg: Vec<u8>,         // PRG-ROM
+    pub chr: Vec<u8>,         // CHR-ROM
 }
 
 impl Rom {
@@ -41,9 +39,9 @@ impl Rom {
         };
 
         assert!(header.magic == [
-            'N' as uint8_t,
-            'E' as uint8_t,
-            'S' as uint8_t,
+            'N' as u8,
+            'E' as u8,
+            'S' as u8,
             0x1a,
         ]);
 
@@ -65,22 +63,22 @@ impl Rom {
 }
 
 pub struct INesHeader {
-    pub magic: [uint8_t; 4],   // 'N' 'E' 'S' '\x1a'
-    pub prg_rom_size: uint8_t,   // number of 16K units of PRG-ROM
-    pub chr_rom_size: uint8_t,   // number of 8K units of CHR-ROM
-    pub flags_6: uint8_t,
-    pub flags_7: uint8_t,
-    pub prg_ram_size: uint8_t,   // number of 8K units of PRG-RAM
-    pub flags_9: uint8_t,
-    pub flags_10: uint8_t,
-    pub zero: [uint8_t; 5],    // always zero
+    pub magic: [u8; 4],   // 'N' 'E' 'S' '\x1a'
+    pub prg_rom_size: u8,   // number of 16K units of PRG-ROM
+    pub chr_rom_size: u8,   // number of 8K units of CHR-ROM
+    pub flags_6: u8,
+    pub flags_7: u8,
+    pub prg_ram_size: u8,   // number of 8K units of PRG-RAM
+    pub flags_9: u8,
+    pub flags_10: u8,
+    pub zero: [u8; 5],    // always zero
 }
 
 impl INesHeader {
-    pub fn mapper(&self) -> uint8_t {
+    pub fn mapper(&self) -> u8 {
         (self.flags_7 & 0xf0) | (self.flags_6 >> 4)
     }
-    pub fn ines_mapper(&self) -> uint8_t {
+    pub fn ines_mapper(&self) -> u8 {
         self.flags_6 >> 4
     }
     pub fn trainer(&self) -> bool {

@@ -6,7 +6,6 @@
 
 use mem::Mem;
 
-use libc::{uint8_t, uint16_t};
 use sdl2::Sdl;
 use sdl2::event::Event;
 use sdl2::event::Event::*;
@@ -18,21 +17,21 @@ use std::ops::Deref;
 // The "strobe state": the order in which the NES reads the buttons.
 //
 
-const STROBE_STATE_A: uint8_t        = 0;
-const STROBE_STATE_B: uint8_t        = 1;
-const STROBE_STATE_SELECT: uint8_t   = 2;
-const STROBE_STATE_START: uint8_t    = 3;
-const STROBE_STATE_UP: uint8_t       = 4;
-const STROBE_STATE_DOWN: uint8_t     = 5;
-const STROBE_STATE_LEFT: uint8_t     = 6;
-const STROBE_STATE_RIGHT: uint8_t    = 7;
+const STROBE_STATE_A: u8        = 0;
+const STROBE_STATE_B: u8        = 1;
+const STROBE_STATE_SELECT: u8   = 2;
+const STROBE_STATE_START: u8    = 3;
+const STROBE_STATE_UP: u8       = 4;
+const STROBE_STATE_DOWN: u8     = 5;
+const STROBE_STATE_LEFT: u8     = 6;
+const STROBE_STATE_RIGHT: u8    = 7;
 
-struct StrobeState{ val: uint8_t }
+struct StrobeState{ val: u8 }
 
 impl Deref for StrobeState {
-    type Target = uint8_t;
+    type Target = u8;
 
-    fn deref(&self) -> &uint8_t {
+    fn deref(&self) -> &u8 {
         &self.val
     }
 }
@@ -144,9 +143,9 @@ impl Input {
 }
 
 impl Mem for Input {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t {
+    fn loadb(&mut self, addr: u16) -> u8 {
         if addr == 0x4016 {
-            let result = self.gamepad_0.strobe_state.get(&self.gamepad_0) as uint8_t;
+            let result = self.gamepad_0.strobe_state.get(&self.gamepad_0) as u8;
             self.gamepad_0.strobe_state.next();
             result
         } else {
@@ -154,7 +153,7 @@ impl Mem for Input {
         }
     }
 
-    fn storeb(&mut self, addr: uint16_t, _: uint8_t) {
+    fn storeb(&mut self, addr: u16, _: u8) {
         if addr == 0x4016 {
             // FIXME: This is not really accurate; you're supposed to not reset until you see
             // 1 strobed than 0. But I doubt this will break anything.

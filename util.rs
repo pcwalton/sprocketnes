@@ -4,9 +4,7 @@
 // Author: Patrick Walton
 //
 
-#![allow(improper_ctypes)]
-
-use libc::{c_int, c_void, time_t, uint8_t, uint16_t, uint32_t, uint64_t};
+use libc::{c_int, c_void, time_t};
 use std::fs::File;
 use std::io::{self, Read, Write, Result};
 use std::ptr::null;
@@ -34,7 +32,7 @@ pub trait Save {
     fn load(&mut self, fd: &mut File);
 }
 
-impl Save for uint8_t {
+impl Save for u8 {
     fn save(&mut self, fd: &mut File) {
         fd.write_all(&[*self]).unwrap();
     }
@@ -45,22 +43,22 @@ impl Save for uint8_t {
     }
 }
 
-impl Save for uint16_t {
+impl Save for u16 {
     fn save(&mut self, fd: &mut File) {
-        fd.write(&[*self as uint8_t, (*self >> 8) as uint8_t]).unwrap();
+        fd.write(&[*self as u8, (*self >> 8) as u8]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
         let mut buf = [ 0, 0 ];
         read_to_buf(&mut buf, fd).unwrap();
-        *self = (buf[0] as uint16_t) | ((buf[1] as uint16_t) << 8);
+        *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
     }
 }
 
-impl Save for uint64_t {
+impl Save for u64 {
     fn save(&mut self, fd: &mut File) {
         let mut buf = [0; 8];
         for i in 0..8 {
-            buf[i] = ((*self) >> (i * 8)) as uint8_t;
+            buf[i] = ((*self) >> (i * 8)) as u8;
         }
         fd.write_all(&buf).unwrap();
     }
@@ -69,12 +67,12 @@ impl Save for uint64_t {
         read_to_buf(&mut buf, fd).unwrap();
         *self = 0;
         for i in 0..8 {
-            *self = *self | (buf[i] as uint64_t) << (i * 8);
+            *self = *self | (buf[i] as u64) << (i * 8);
         }
     }
 }
 
-impl<'a> Save for &'a mut [uint8_t] {
+impl<'a> Save for &'a mut [u8] {
     fn save(&mut self, fd: &mut File) {
         fd.write(*self).unwrap();
     }
@@ -88,7 +86,7 @@ impl Save for bool {
         fd.write(&[ if *self { 0 } else { 1 } ]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        let mut val: [uint8_t; 1] = [ 0 ];
+        let mut val: [u8; 1] = [ 0 ];
         read_to_buf(&mut val, fd).unwrap();
         *self = val[0] != 0
     }
@@ -112,11 +110,11 @@ macro_rules! save_enum(
     ($name:ident { $val_0:ident, $val_1:ident }) => (
         impl Save for $name {
             fn save(&mut self, fd: &mut File) {
-                let mut val: uint8_t = match *self { $name::$val_0 => 0, $name::$val_1 => 1 };
+                let mut val: u8 = match *self { $name::$val_0 => 0, $name::$val_1 => 1 };
                 val.save(fd)
             }
             fn load(&mut self, fd: &mut File) {
-                let mut val: uint8_t = 0;
+                let mut val: u8 = 0;
                 val.load(fd);
                 *self = if val == 0 { $name::$val_0 } else { $name::$val_1 };
             }
@@ -130,10 +128,10 @@ macro_rules! save_enum(
 
 #[derive(Copy, Clone)]
 pub struct Xorshift {
-    pub x: uint32_t,
-    pub y: uint32_t,
-    pub z: uint32_t,
-    pub w: uint32_t,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+    pub w: u32,
 }
 
 impl Xorshift {
@@ -141,7 +139,7 @@ impl Xorshift {
         Xorshift { x: 123456789, y: 362436069, z: 521288629, w: 88675123 }
     }
 
-    pub fn next(&mut self) -> uint32_t {
+    pub fn next(&mut self) -> u32 {
         let t = self.x ^ (self.x << 11);
         self.x = self.y; self.y = self.z; self.z = self.w;
         self.w = self.w ^ (self.w >> 19) ^ (t ^ (t >> 8));
@@ -176,19 +174,20 @@ pub fn debug_print(_: &str) {}
 //
 
 #[allow(non_camel_case_types)]
+#[repr(C)]
 struct timeval {
     tv_sec: time_t,
-    tv_usec: uint32_t,
+    tv_usec: u32,
 }
 
 extern {
     fn gettimeofday(tp: *mut timeval, tzp: *const c_void) -> c_int;
 }
 
-pub fn current_time_millis() -> uint64_t {
+pub fn current_time_millis() -> u64 {
     unsafe {
         let mut tv = timeval { tv_sec: 0, tv_usec: 0 };
         gettimeofday(&mut tv, null());
-        (tv.tv_sec as uint64_t) * 1000 + (tv.tv_usec as uint64_t) / 1000
+        (tv.tv_sec as u64) * 1000 + (tv.tv_usec as u64) / 1000
     }
 }

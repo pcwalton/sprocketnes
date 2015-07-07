@@ -7,7 +7,6 @@
 use mem::{Mem, MemUtil};
 use util::Save;
 
-use libc::{int8_t, int32_t, uint8_t, uint16_t, uint32_t, uint64_t};
 use std::fs::File;
 use std::ops::Deref;
 
@@ -18,23 +17,23 @@ use disasm::Disassembler;
 // Constants
 //
 
-static CARRY_FLAG:    uint8_t = 1 << 0;
-static ZERO_FLAG:     uint8_t = 1 << 1;
-static IRQ_FLAG:      uint8_t = 1 << 2;
-static DECIMAL_FLAG:  uint8_t = 1 << 3;
-static BREAK_FLAG:    uint8_t = 1 << 4;
-static OVERFLOW_FLAG: uint8_t = 1 << 6;
-static NEGATIVE_FLAG: uint8_t = 1 << 7;
+static CARRY_FLAG:    u8 = 1 << 0;
+static ZERO_FLAG:     u8 = 1 << 1;
+static IRQ_FLAG:      u8 = 1 << 2;
+static DECIMAL_FLAG:  u8 = 1 << 3;
+static BREAK_FLAG:    u8 = 1 << 4;
+static OVERFLOW_FLAG: u8 = 1 << 6;
+static NEGATIVE_FLAG: u8 = 1 << 7;
 
-static NMI_VECTOR:   uint16_t = 0xfffa;
-static RESET_VECTOR: uint16_t = 0xfffc;
-static BRK_VECTOR:   uint16_t = 0xfffe;
+static NMI_VECTOR:   u16 = 0xfffa;
+static RESET_VECTOR: u16 = 0xfffc;
+static BRK_VECTOR:   u16 = 0xfffe;
 
 /// The number of cycles that each machine operation takes. Indexed by opcode number.
 ///
 /// FIXME: This is copied from FCEU.
 
-static CYCLE_TABLE: [uint8_t; 256] = [
+static CYCLE_TABLE: [u8; 256] = [
     /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
     /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
     /*0x20*/ 6,6,2,8,3,3,5,5,4,2,2,2,4,4,6,6,
@@ -58,12 +57,12 @@ static CYCLE_TABLE: [uint8_t; 256] = [
 //
 
 struct Regs {
-    a: uint8_t,
-    x: uint8_t,
-    y: uint8_t,
-    s: uint8_t,
-    flags: uint8_t,
-    pc: uint16_t
+    a: u8,
+    x: u8,
+    y: u8,
+    s: u8,
+    flags: u8,
+    pc: u16
 }
 
 save_struct!(Regs { a, x, y, s, flags, pc });
@@ -77,38 +76,38 @@ impl Regs {
 //
 
 trait AddressingMode<M> {
-    fn load(&self, cpu: &mut Cpu<M>) -> uint8_t;
-    fn store(&self, cpu: &mut Cpu<M>, val: uint8_t);
+    fn load(&self, cpu: &mut Cpu<M>) -> u8;
+    fn store(&self, cpu: &mut Cpu<M>, val: u8);
 }
 
 struct AccumulatorAddressingMode;
 impl<M> AddressingMode<M> for AccumulatorAddressingMode where M: Mem {
-    fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.regs.a }
-    fn store(&self, cpu: &mut Cpu<M>, val: uint8_t) { cpu.regs.a = val }
+    fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.regs.a }
+    fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.regs.a = val }
 }
 
 struct ImmediateAddressingMode;
 impl<M> AddressingMode<M> for ImmediateAddressingMode where M: Mem {
-    fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.loadb_bump_pc() }
-    fn store(&self, _: &mut Cpu<M>, _: uint8_t) {
+    fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb_bump_pc() }
+    fn store(&self, _: &mut Cpu<M>, _: u8) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
         panic!("can't store to immediate")
     }
 }
 
-struct MemoryAddressingMode{val: uint16_t}
+struct MemoryAddressingMode{val: u16}
 
 impl Deref for MemoryAddressingMode {
-    type Target = uint16_t;
+    type Target = u16;
 
-    fn deref(&self) -> &uint16_t {
+    fn deref(&self) -> &u16 {
         &self.val
     }
 }
 
 impl<M> AddressingMode<M> for MemoryAddressingMode where M: Mem {
-    fn load(&self, cpu: &mut Cpu<M>) -> uint8_t { cpu.loadb(**self) }
-    fn store(&self, cpu: &mut Cpu<M>, val: uint8_t) { cpu.storeb(**self, val) }
+    fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
+    fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
 }
 
 //
@@ -325,7 +324,7 @@ macro_rules! decode_op {
 // Main CPU implementation
 //
 
-pub type Cycles = uint64_t;
+pub type Cycles = u64;
 
 /// The main CPU structure definition.
 pub struct Cpu<M> {
@@ -336,8 +335,8 @@ pub struct Cpu<M> {
 
 // The CPU implements Mem so that it can handle writes to the DMA register.
 impl<M> Mem for Cpu<M> where M: Mem {
-    fn loadb(&mut self, addr: uint16_t) -> uint8_t { self.mem.loadb(addr) }
-    fn storeb(&mut self, addr: uint16_t, val: uint8_t) {
+    fn loadb(&mut self, addr: u16) -> u8 { self.mem.loadb(addr) }
+    fn storeb(&mut self, addr: u16, val: u8) {
         // Handle OAM_DMA.
         if addr == 0x4014 {
             self.dma(val)
@@ -385,11 +384,11 @@ impl<M> Cpu<M> where M: Mem {
     fn trace(&mut self) {}
 
     // Performs DMA to the OAMDATA ($2004) register.
-    fn dma(&mut self, hi_addr: uint8_t) {
+    fn dma(&mut self, hi_addr: u8) {
         let start = (hi_addr as u16) << 8;
 
         for addr in start..start + 256 {
-            let val = self.loadb(addr as uint16_t);
+            let val = self.loadb(addr);
             self.storeb(0x2004, val);
 
             // FIXME: The last address sometimes takes 1 cycle, sometimes 2 -- NESdev isn't very
@@ -400,7 +399,7 @@ impl<M> Cpu<M> where M: Mem {
 
     // Memory access helpers
     /// Loads the byte at the program counter and increments the program counter.
-    fn loadb_bump_pc(&mut self) -> uint8_t {
+    fn loadb_bump_pc(&mut self) -> u8 {
         let pc = self.regs.pc;
         let val = self.loadb(pc);
         self.regs.pc += 1;
@@ -408,7 +407,7 @@ impl<M> Cpu<M> where M: Mem {
     }
     /// Loads two bytes (little-endian) at the program counter and bumps the program counter over
     /// them.
-    fn loadw_bump_pc(&mut self) -> uint16_t {
+    fn loadw_bump_pc(&mut self) -> u16 {
         let pc = self.regs.pc;
         let val = self.loadw(pc);
         self.regs.pc += 2;
@@ -416,46 +415,46 @@ impl<M> Cpu<M> where M: Mem {
     }
 
     // Stack helpers
-    fn pushb(&mut self, val: uint8_t) {
+    fn pushb(&mut self, val: u8) {
         let s = self.regs.s;
-        self.storeb(0x100 + s as uint16_t, val);
+        self.storeb(0x100 + s as u16, val);
         self.regs.s -= 1;
     }
-    fn pushw(&mut self, val: uint16_t) {
+    fn pushw(&mut self, val: u16) {
         // FIXME: Is this correct? FCEU has two self.storeb()s here. Might have different
         // semantics...
         let s = self.regs.s;
-        self.storew(0x100 + (s - 1) as uint16_t, val);
+        self.storew(0x100 + (s - 1) as u16, val);
         self.regs.s -= 2;
     }
-    fn popb(&mut self) -> uint8_t {
+    fn popb(&mut self) -> u8 {
         let s = self.regs.s;
-        let val = self.loadb(0x100 + s as uint16_t + 1);
+        let val = self.loadb(0x100 + s as u16 + 1);
         self.regs.s += 1;
         val
     }
-    fn popw(&mut self) -> uint16_t {
+    fn popw(&mut self) -> u16 {
         // FIXME: See comment in pushw().
         let s = self.regs.s;
-        let val = self.loadw(0x100 + s as uint16_t + 1);
+        let val = self.loadw(0x100 + s as u16 + 1);
         self.regs.s += 2;
         val
     }
 
     // Flag helpers
-    fn get_flag(&self, flag: uint8_t) -> bool { (self.regs.flags & flag) != 0 }
-    fn set_flag(&mut self, flag: uint8_t, on: bool) {
+    fn get_flag(&self, flag: u8) -> bool { (self.regs.flags & flag) != 0 }
+    fn set_flag(&mut self, flag: u8, on: bool) {
         if on {
             self.regs.flags |= flag;
         } else {
             self.regs.flags &= !flag;
         }
     }
-    fn set_flags(&mut self, val: uint8_t) {
+    fn set_flags(&mut self, val: u8) {
         // Flags get munged in a strange way relating to the unused bit 5 on the NES.
         self.regs.flags = (val | 0x30) - 0x10;
     }
-    fn set_zn(&mut self, val: uint8_t) -> uint8_t {
+    fn set_zn(&mut self, val: u8) -> u8 {
         self.set_flag(ZERO_FLAG, val == 0);
         self.set_flag(NEGATIVE_FLAG, (val & 0x80) != 0);
         val
@@ -465,22 +464,22 @@ impl<M> Cpu<M> where M: Mem {
     fn immediate(&mut self) -> ImmediateAddressingMode { ImmediateAddressingMode }
     fn accumulator(&mut self) -> AccumulatorAddressingMode { AccumulatorAddressingMode }
     fn zero_page(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode{val: self.loadb_bump_pc() as uint16_t}
+        MemoryAddressingMode{val: self.loadb_bump_pc() as u16}
     }
     fn zero_page_x(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.x) as uint16_t}
+        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.x) as u16}
     }
     fn zero_page_y(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.y) as uint16_t}
+        MemoryAddressingMode{val: (self.loadb_bump_pc() + self.regs.y) as u16}
     }
     fn absolute(&mut self) -> MemoryAddressingMode {
         MemoryAddressingMode{val: self.loadw_bump_pc()}
     }
     fn absolute_x(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.x as uint16_t}
+        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.x as u16}
     }
     fn absolute_y(&mut self) -> MemoryAddressingMode {
-        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.y as uint16_t}
+        MemoryAddressingMode{val: self.loadw_bump_pc() + self.regs.y as u16}
     }
     fn indexed_indirect_x(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
@@ -491,7 +490,7 @@ impl<M> Cpu<M> where M: Mem {
     fn indirect_indexed_y(&mut self) -> MemoryAddressingMode {
         let val = self.loadb_bump_pc();
         let y = self.regs.y;
-        let addr = self.loadw_zp(val) + y as uint16_t;
+        let addr = self.loadw_zp(val) + y as u16;
         MemoryAddressingMode{val: addr}
     }
 
@@ -531,14 +530,14 @@ impl<M> Cpu<M> where M: Mem {
     #[inline(always)]
     fn adc<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
-        let mut result = self.regs.a as uint32_t + val as uint32_t;
+        let mut result = self.regs.a as u32 + val as u32;
         if self.get_flag(CARRY_FLAG) {
             result += 1;
         }
 
         self.set_flag(CARRY_FLAG, (result & 0x100) != 0);
 
-        let result = result as uint8_t;
+        let result = result as u8;
         let a = self.regs.a;
         self.set_flag(OVERFLOW_FLAG, (a ^ val) & 0x80 == 0 && (a ^ result) & 0x80 == 0x80);
         self.regs.a = self.set_zn(result);
@@ -547,25 +546,25 @@ impl<M> Cpu<M> where M: Mem {
     fn sbc<AM:AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
         let a = self.regs.a;
-        let mut result = a as uint32_t - val as uint32_t;
+        let mut result = a as u32 - val as u32;
         if !self.get_flag(CARRY_FLAG) {
             result -= 1;
         }
 
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
 
-        let result = result as uint8_t;
+        let result = result as u8;
         let a = self.regs.a;
         self.set_flag(OVERFLOW_FLAG, (a ^ result) & 0x80 != 0 && (a ^ val) & 0x80 == 0x80);
         self.regs.a = self.set_zn(result);
     }
 
     // Comparisons
-    fn cmp_base<AM:AddressingMode<M>>(&mut self, x: uint8_t, am: AM) {
+    fn cmp_base<AM:AddressingMode<M>>(&mut self, x: u8, am: AM) {
         let y = am.load(self);
-        let result = x as uint32_t - y as uint32_t;
+        let result = x as u32 - y as u32;
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
-        let _ = self.set_zn(result as uint8_t);
+        let _ = self.set_zn(result as u8);
     }
     fn cmp<AM:AddressingMode<M>>(&mut self, am: AM) {
         let a = self.regs.a;
@@ -610,7 +609,7 @@ impl<M> Cpu<M> where M: Mem {
             result |= 1;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        let val = self.set_zn(result as uint8_t);
+        let val = self.set_zn(result as u8);
         am.store(self, val)
     }
     fn shr_base<AM:AddressingMode<M>>(&mut self, msb: bool, am: AM) {
@@ -621,7 +620,7 @@ impl<M> Cpu<M> where M: Mem {
             result |= 0x80;
         }
         self.set_flag(CARRY_FLAG, new_carry);
-        let val = self.set_zn(result as uint8_t);
+        let val = self.set_zn(result as u8);
         am.store(self, val)
     }
     fn rol<AM:AddressingMode<M>>(&mut self, am: AM) {
@@ -697,9 +696,9 @@ impl<M> Cpu<M> where M: Mem {
 
     // Branches
     fn bra_base(&mut self, cond: bool) {
-        let disp = self.loadb_bump_pc() as int8_t;
+        let disp = self.loadb_bump_pc() as i8;
         if cond {
-            self.regs.pc = (self.regs.pc as int32_t + disp as int32_t) as uint16_t;
+            self.regs.pc = (self.regs.pc as i32 + disp as i32) as u16;
         }
     }
     fn bpl(&mut self) {

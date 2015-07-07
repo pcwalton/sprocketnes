@@ -6,10 +6,9 @@
 
 use mem::Mem;
 
-use libc::{uint8_t, uint16_t};
 
 pub struct Disassembler<'a,M:'a> {
-    pub pc: uint16_t,
+    pub pc: u16,
     pub mem: &'a mut M
 }
 
@@ -18,14 +17,14 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
     // Loads and byte-to-string conversion
     //
 
-    fn loadb_bump_pc(&mut self) -> uint8_t {
+    fn loadb_bump_pc(&mut self) -> u8 {
         let val = (&mut *self.mem).loadb(self.pc);
         self.pc += 1;
         val
     }
-    fn loadw_bump_pc(&mut self) -> uint16_t {
-        let bottom = self.loadb_bump_pc() as uint16_t;
-        let top = (self.loadb_bump_pc() as uint16_t) << 8;
+    fn loadw_bump_pc(&mut self) -> u16 {
+        let bottom = self.loadb_bump_pc() as u16;
+        let top = (self.loadb_bump_pc() as u16) << 8;
         bottom | top
     }
 
@@ -175,4 +174,3 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
         decode_op!(op, self)
     }
 }
-

@@ -17,7 +17,6 @@ use rom::Rom;
 use util::Save;
 use util;
 
-use libc::uint64_t;
 use std::cell::RefCell;
 use std::env;
 use std::fs::File;
@@ -25,7 +24,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 #[cfg(debug)]
-fn record_fps(last_time: &mut uint64_t, frames: &mut uint) {
+fn record_fps(last_time: &mut u64, frames: &mut uint) {
     let now = util::current_time_millis();
     if now >= *last_time + 1000 {
         println!("{} FPS", *frames);
@@ -37,7 +36,7 @@ fn record_fps(last_time: &mut uint64_t, frames: &mut uint) {
 }
 
 #[cfg(not(debug))]
-fn record_fps(_: &mut uint64_t, _: &mut usize) {}
+fn record_fps(_: &mut u64, _: &mut usize) {}
 
 //
 // Argument parsing
