@@ -7,9 +7,6 @@ has many shortcomings and is not intended to be a production-quality emulator.
 `sprocketnes` is also designed to be a relatively clean example codebase,
 showing off various Rust idioms.
 
-The Rust garbage collector is not used in this project, and unsafe code is
-kept to a minimum.
-
 The NES was chosen for this project because:
 
 * It's familiar to most hackers.
@@ -43,11 +40,9 @@ Other keys:
 
 * Quit: Escape
 
-If you want to build `sprocketnes`, you will first need `rust-sdl2`, available
-at https://github.com/AngryLawyer/rust-sdl2. You will also need the Speex codec
-library installed; on the Mac you can install it with `brew install speex`.
-Finally, you will also need the Rust master branch; no Rust release can build
-`sprocketnes`.
+If you want to build `sprocketnes`, you will first need the Speex codec library
+installed; on the Mac you can install it with `brew install speex`.
+You will also need a Rust nightly, since we're using some unstable features.
 
 To build (add `--release` if you actually want playable speed):
 
@@ -57,4 +52,3 @@ There are numerous demos and games available for free for use with this
 emulator at http://nesdev.com/.
 
 Enjoy!
-
