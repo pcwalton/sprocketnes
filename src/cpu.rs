@@ -2,7 +2,7 @@
 // Author: Patrick Walton
 //
 
-use mem::{Mem, MemUtil};
+use mem::Mem;
 use util::Save;
 
 use std::fs::File;
