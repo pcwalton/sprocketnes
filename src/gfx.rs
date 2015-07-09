@@ -3,13 +3,16 @@
 //
 
 use sdl2::pixels::PixelFormatEnum::BGR24;
-use sdl2::rect::Rect;
 use sdl2::render::{Renderer, Texture, TextureAccess};
 use sdl2::{InitBuilder, Sdl};
 
 
+/// Emulated screen width in pixels
 const SCREEN_WIDTH: usize = 256;
+/// Emulated screen height in pixels
 const SCREEN_HEIGHT: usize = 240;
+/// Screen texture size in bytes
+const SCREEN_SIZE: usize = SCREEN_WIDTH * SCREEN_HEIGHT * 3;
 
 const FONT_HEIGHT: usize = 10;
 const FONT_GLYPH_COUNT: usize = 95;
@@ -19,9 +22,6 @@ const STATUS_LINE_PADDING: usize = 6;
 const STATUS_LINE_X: usize = STATUS_LINE_PADDING;
 const STATUS_LINE_Y: usize = SCREEN_HEIGHT - STATUS_LINE_PADDING - FONT_HEIGHT;
 const STATUS_LINE_PAUSE_DURATION: usize = 120;                   // in 1/60 of a second
-
-#[allow(dead_code)]
-const SCREEN_SIZE: usize = 184320;
 
 //
 // PT Ronda Seven
@@ -285,10 +285,6 @@ pub struct Gfx<'a> {
     pub status_line: StatusLine,
 }
 
-//
-// Main graphics routine
-//
-
 impl<'a> Gfx<'a> {
     pub fn new(scale: Scale) -> (Gfx<'a>, Sdl) {
         // FIXME: Handle SDL better
@@ -318,19 +314,16 @@ impl<'a> Gfx<'a> {
         self.status_line.text.tick();
     }
 
+    /// Copies the overlay onto the given screen and displays it to the SDL window.
     pub fn composite(&mut self, ppu_screen: &mut [u8; SCREEN_SIZE]) {
         self.status_line.render(ppu_screen);
-        self.blit(&*ppu_screen);
-        drop(self.renderer.clear());
-        drop(self.renderer.copy(&*self.texture, None, Rect::new(
-            0,
-            0,
-            (SCREEN_WIDTH * self.scale.factor()) as u32,
-            (SCREEN_HEIGHT * self.scale.factor()) as u32
-        ).unwrap()));
+        self.blit(ppu_screen);
+        self.renderer.clear();
+        self.renderer.copy(&self.texture, None, None);
         self.renderer.present();
     }
 
+    /// Updates the window texture with new screen data.
     fn blit(&mut self, ppu_screen: &[u8; SCREEN_SIZE]) {
         self.texture.update(None, ppu_screen, SCREEN_WIDTH * 3).unwrap()
     }
