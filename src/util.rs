@@ -2,10 +2,8 @@
 // Author: Patrick Walton
 //
 
-use libc::{c_int, c_void, time_t};
 use std::fs::File;
 use std::io::{self, Read, Write, Result};
-use std::ptr::null;
 
 /// Reads until the buffer is filled or the reader signals EOF
 pub fn read_to_buf(mut buf: &mut [u8], rd: &mut Read) -> io::Result<()> {
@@ -150,30 +148,5 @@ impl Xorshift {
         self.x = self.y; self.y = self.z; self.z = self.w;
         self.w = self.w ^ (self.w >> 19) ^ (t ^ (t >> 8));
         self.w
-    }
-}
-
-//
-// Bindings for `gettimeofday(2)`
-//
-
-// TODO use the `time` crate
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-struct timeval {
-    tv_sec: time_t,
-    tv_usec: u32,
-}
-
-extern {
-    fn gettimeofday(tp: *mut timeval, tzp: *const c_void) -> c_int;
-}
-
-pub fn current_time_millis() -> u64 {
-    unsafe {
-        let mut tv = timeval { tv_sec: 0, tv_usec: 0 };
-        gettimeofday(&mut tv, null());
-        (tv.tv_sec as u64) * 1000 + (tv.tv_usec as u64) / 1000
     }
 }

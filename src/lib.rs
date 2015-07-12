@@ -2,10 +2,11 @@
 // Author: Patrick Walton
 //
 
-#![feature(libc, static_mutex, static_condvar)]
+#![feature(static_mutex, static_condvar)]
 
 extern crate libc;
 extern crate sdl2;
+extern crate time;
 
 // NB: This must be first to pick up the macro definitions. What a botch.
 #[macro_use]
@@ -41,20 +42,18 @@ use std::fs::File;
 use std::path::Path;
 use std::rc::Rc;
 
-#[cfg(debug)]
-fn record_fps(last_time: &mut u64, frames: &mut uint) {
-    let now = util::current_time_millis();
-    if now >= *last_time + 1000 {
-        println!("{} FPS", *frames);
-        *frames = 0;
-        *last_time = now;
-    } else {
-        *frames += 1;
+fn record_fps(last_time: &mut f64, frames: &mut usize) {
+    if cfg!(debug) {
+        let now = time::precise_time_s();
+        if now >= *last_time + 1f64 {
+            println!("{} FPS", *frames);
+            *frames = 0;
+            *last_time = now;
+        } else {
+            *frames += 1;
+        }
     }
 }
-
-#[cfg(not(debug))]
-fn record_fps(_: &mut u64, _: &mut usize) {}
 
 /// Starts the emulator main loop with a ROM and window scaling. Returns when the user presses ESC.
 pub fn start_emulator(rom: Rom, scale: Scale) {
@@ -75,7 +74,7 @@ pub fn start_emulator(rom: Rom, scale: Scale) {
     // TODO: Add a flag to not reset for nestest.log
     cpu.reset();
 
-    let mut last_time = util::current_time_millis();
+    let mut last_time = time::precise_time_s();
     let mut frames = 0;
 
     loop {
