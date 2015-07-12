@@ -1,27 +1,22 @@
 //
-// sprocketnes/ppu.rs
-//
 // Author: Patrick Walton
 //
 
 use mapper::{Mapper, MapperResult};
 use mem::Mem;
-use util::{Save, debug_assert};
+use util::Save;
 
 use std::cell::RefCell;
 use std::fs::File;
 use std::rc::Rc;
 use std::ops::{Deref, DerefMut};
 
-//
-// Constants
-//
 
-pub static SCREEN_WIDTH: usize = 256;
-pub static SCREEN_HEIGHT: usize = 240;
-pub static CYCLES_PER_SCANLINE: u64 = 114;   // 29781 cycles per frame, 261 scanlines
-pub static VBLANK_SCANLINE: usize = 241;
-pub static LAST_SCANLINE: usize = 261;
+pub const SCREEN_WIDTH: usize = 256;
+pub const SCREEN_HEIGHT: usize = 240;
+pub const CYCLES_PER_SCANLINE: u64 = 114;   // 29781 cycles per frame / 261 scanlines
+pub const VBLANK_SCANLINE: usize = 241;
+pub const LAST_SCANLINE: usize = 261;
 
 static PALETTE: [u8; 192] = [
     124,124,124,    0,0,252,        0,0,188,        68,40,188,
@@ -376,7 +371,7 @@ pub struct Ppu {
 impl Mem for Ppu {
     // Performs a load of the PPU register at the given CPU address.
     fn loadb(&mut self, addr: u16) -> u8 {
-        debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
+        debug_assert!(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
         match addr & 7 {
             0 => *self.regs.ctrl,
             1 => *self.regs.mask,
@@ -392,7 +387,7 @@ impl Mem for Ppu {
 
     // Performs a store to the PPU register at the given CPU address.
     fn storeb(&mut self, addr: u16, val: u8) {
-        debug_assert(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
+        debug_assert!(addr >= 0x2000 && addr < 0x4000, "invalid PPU register");
         match addr & 7 {
             0 => self.update_ppuctrl(val),
             1 => self.regs.mask = PpuMask{val: val},
@@ -722,8 +717,8 @@ impl Ppu {
                             let mut y = self.scanline as u8 - sprite.y;
                             if sprite.flip_vertical() { y = 7 - y; }
 
-                            debug_assert(x < 8, "sprite X miscalculation");
-                            debug_assert(y < 8, "sprite Y miscalculation");
+                            debug_assert!(x < 8, "sprite X miscalculation");
+                            debug_assert!(y < 8, "sprite Y miscalculation");
 
                             pattern_color = self.get_pattern_pixel(PatternPixelKind::Sprite, tile, x, y);
                         }
@@ -850,7 +845,7 @@ impl Ppu {
 
             self.cy += CYCLES_PER_SCANLINE;
 
-            debug_assert(self.cy % CYCLES_PER_SCANLINE == 0, "at even scanline cycle");
+            debug_assert!(self.cy % CYCLES_PER_SCANLINE == 0, "at even scanline cycle");
         }
 
         return result;

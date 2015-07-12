@@ -1,6 +1,4 @@
 //
-// sprocketnes/mem.rs
-//
 // Author: Patrick Walton
 //
 

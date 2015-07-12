@@ -1,11 +1,11 @@
-//
-// sprocketnes/mapper.rs
+//! Defines the `Mapper` trait and mapper implementations that are used to translate CPU addresses
+//! to addresses on the cartridge memory.
+
 //
 // Author: Patrick Walton
 //
 
 use rom::Rom;
-use util;
 
 use std::ops::Deref;
 
@@ -72,14 +72,6 @@ impl Mapper for Nrom {
 #[derive(Copy, Clone)]
 struct SxCtrl{ val: u8 }
 
-impl Deref for SxCtrl {
-    type Target = u8;
-
-    fn deref(&self) -> &u8 {
-        &self.val
-    }
-}
-
 pub enum Mirroring {
     OneScreenLower,
     OneScreenUpper,
@@ -88,14 +80,17 @@ pub enum Mirroring {
 }
 
 enum SxPrgBankMode {
-    Switch32K,      // Switch 32K at $8000, ignore low bit
-    FixFirstBank,   // Fix first bank at $8000, switch 16K bank at $C000
-    FixLastBank,    // Fix last bank at $C000, switch 16K bank at $8000
+    /// Switch 32K at $8000, ignore low bit
+    Switch32K,
+    /// Fix first bank at $8000, switch 16K bank at $C000
+    FixFirstBank,
+    /// Fix last bank at $C000, switch 16K bank at $8000
+    FixLastBank,
 }
 
 impl SxCtrl {
     fn prg_rom_mode(self) -> SxPrgBankMode {
-        match (*self >> 2) & 3 {
+        match (self.val >> 2) & 3 {
             0 | 1 => SxPrgBankMode::Switch32K,
             2 => SxPrgBankMode::FixFirstBank,
             3 => SxPrgBankMode::FixLastBank,
@@ -106,20 +101,24 @@ impl SxCtrl {
 
 #[derive(Copy, Clone)]
 struct SxRegs {
-    ctrl: SxCtrl,   // $8000-$9FFF
-    chr_bank_0: u8, // $A000-$BFFF
-    chr_bank_1: u8, // $C000-$DFFF
-    prg_bank: u8,   // $E000-$FFFF
+    /// $8000-$9FFF
+    ctrl: SxCtrl,
+    /// $A000-$BFFF
+    chr_bank_0: u8,
+    /// $C000-$DFFF
+    chr_bank_1: u8,
+    /// $E000-$FFFF
+    prg_bank: u8,
 }
 
 pub struct SxRom {
     rom: Box<Rom>,
     regs: SxRegs,
-    // The internal accumulator.
+    /// The internal accumulator.
     accum: u8,
-    // The write count. At the 5th write, we update the register.
+    /// The write count. At the 5th write, we update the register.
     write_count: u8,
-    //prg_ram: Box<[u8, ..8192]>,
+    //prg_ram: Box<[u8; 8192]>,
     chr_ram: Box<[u8; 8192]>,
 }
 
@@ -173,7 +172,7 @@ impl Mapper for SxRom {
         if (val & 0x80) != 0 {
             self.write_count = 0;
             self.accum = 0;
-            self.regs.ctrl = SxCtrl{val: *self.regs.ctrl | (3 << 2)};
+            self.regs.ctrl = SxCtrl{val: self.regs.ctrl.val | (3 << 2)};
             return;
         }
 
@@ -200,10 +199,17 @@ impl Mapper for SxRom {
     }
 
     // FIXME: Apparently this mapper can have CHR-ROM as well. Handle this case.
-    fn chr_loadb(&mut self, addr: u16) -> u8     { self.chr_ram[addr as usize]       }
-    fn chr_storeb(&mut self, addr: u16, val: u8) { self.chr_ram[addr as usize] = val }
+    fn chr_loadb(&mut self, addr: u16) -> u8 {
+        self.chr_ram[addr as usize]
+    }
 
-    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
+    fn chr_storeb(&mut self, addr: u16, val: u8) {
+        self.chr_ram[addr as usize] = val
+    }
+
+    fn next_scanline(&mut self) -> MapperResult {
+        MapperResult::Continue
+    }
 }
 
 //
@@ -229,15 +235,21 @@ enum TxPrgBankMode {
 }
 
 impl TxBankSelect {
-    fn bank_update_select(self) -> u8 { *self & 0x7 }
-    fn prg_bank_mode(self) -> TxPrgBankMode {
-        if (*self & 0x40) == 0 {
+    fn bank_update_select(&self) -> u8 {
+        self.val & 0x7
+    }
+
+    fn prg_bank_mode(&self) -> TxPrgBankMode {
+        if (self.val & 0x40) == 0 {
             TxPrgBankMode::Swappable8000
         } else {
             TxPrgBankMode::SwappableC000
         }
     }
-    fn chr_a12_inversion(self) -> bool { (*self & 0x80) != 0 }
+
+    fn chr_a12_inversion(self) -> bool {
+        (self.val & 0x80) != 0
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -276,7 +288,9 @@ impl TxRom {
         }
     }
 
-    fn prg_bank_count(&self) -> u8 { self.rom.header.prg_rom_size * 2 }
+    fn prg_bank_count(&self) -> u8 {
+        self.rom.header.prg_rom_size * 2
+    }
 }
 
 impl Mapper for TxRom {
@@ -374,7 +388,7 @@ impl Mapper for TxRom {
                 self.scanline_counter = self.irq_reload;
 
                 if self.irq_enabled {
-                    util::debug_print("*** Generated IRQ! ***");
+                    //debug!("*** Generated IRQ! ***");
                     return MapperResult::Irq;
                 }
             }

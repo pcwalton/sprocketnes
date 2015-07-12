@@ -1,6 +1,4 @@
 //
-// sprocketnes/input.rs
-//
 // Author: Patrick Walton
 //
 

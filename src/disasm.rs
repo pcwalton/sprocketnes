@@ -1,6 +1,4 @@
 //
-// sprocketnes/disasm.rs
-//
 // Author: Patrick Walton
 //
 

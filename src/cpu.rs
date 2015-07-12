@@ -1,6 +1,4 @@
 //
-// sprocketnes/cpu.rs
-//
 // Author: Patrick Walton
 //
 
@@ -13,26 +11,21 @@ use std::ops::Deref;
 #[cfg(cpuspew)]
 use disasm::Disassembler;
 
-//
-// Constants
-//
+const CARRY_FLAG:    u8 = 1 << 0;
+const ZERO_FLAG:     u8 = 1 << 1;
+const IRQ_FLAG:      u8 = 1 << 2;
+const DECIMAL_FLAG:  u8 = 1 << 3;
+const BREAK_FLAG:    u8 = 1 << 4;
+const OVERFLOW_FLAG: u8 = 1 << 6;
+const NEGATIVE_FLAG: u8 = 1 << 7;
 
-static CARRY_FLAG:    u8 = 1 << 0;
-static ZERO_FLAG:     u8 = 1 << 1;
-static IRQ_FLAG:      u8 = 1 << 2;
-static DECIMAL_FLAG:  u8 = 1 << 3;
-static BREAK_FLAG:    u8 = 1 << 4;
-static OVERFLOW_FLAG: u8 = 1 << 6;
-static NEGATIVE_FLAG: u8 = 1 << 7;
-
-static NMI_VECTOR:   u16 = 0xfffa;
-static RESET_VECTOR: u16 = 0xfffc;
-static BRK_VECTOR:   u16 = 0xfffe;
+const NMI_VECTOR:   u16 = 0xfffa;
+const RESET_VECTOR: u16 = 0xfffc;
+const BRK_VECTOR:   u16 = 0xfffe;
 
 /// The number of cycles that each machine operation takes. Indexed by opcode number.
 ///
 /// FIXME: This is copied from FCEU.
-
 static CYCLE_TABLE: [u8; 256] = [
     /*0x00*/ 7,6,2,8,3,3,5,5,3,2,2,2,4,4,6,6,
     /*0x10*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
@@ -52,10 +45,7 @@ static CYCLE_TABLE: [u8; 256] = [
     /*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
 ];
 
-//
-// Registers
-//
-
+/// CPU Registers
 struct Regs {
     a: u8,
     x: u8,
@@ -68,26 +58,35 @@ struct Regs {
 save_struct!(Regs { a, x, y, s, flags, pc });
 
 impl Regs {
-    fn new() -> Regs { Regs { a: 0, x: 0, y: 0, s: 0xfd, flags: 0x24, pc: 0xc000 } }
+    fn new() -> Regs {
+        Regs {
+            a: 0,
+            x: 0,
+            y: 0,
+            s: 0xfd,
+            flags: 0x24,
+            pc: 0xc000
+        }
+    }
 }
 
 //
 // Addressing modes
 //
 
-trait AddressingMode<M> {
+trait AddressingMode<M: Mem> {
     fn load(&self, cpu: &mut Cpu<M>) -> u8;
     fn store(&self, cpu: &mut Cpu<M>, val: u8);
 }
 
 struct AccumulatorAddressingMode;
-impl<M> AddressingMode<M> for AccumulatorAddressingMode where M: Mem {
+impl <M: Mem> AddressingMode<M> for AccumulatorAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.regs.a }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.regs.a = val }
 }
 
 struct ImmediateAddressingMode;
-impl<M> AddressingMode<M> for ImmediateAddressingMode where M: Mem {
+impl <M: Mem> AddressingMode<M> for ImmediateAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb_bump_pc() }
     fn store(&self, _: &mut Cpu<M>, _: u8) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
@@ -105,17 +104,14 @@ impl Deref for MemoryAddressingMode {
     }
 }
 
-impl<M> AddressingMode<M> for MemoryAddressingMode where M: Mem {
+impl <M: Mem> AddressingMode<M> for MemoryAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
 }
 
-//
-// Opcode decoding
-//
-// This is implemented as a macro so that both the disassembler and the emulator can use it.
-//
-
+/// Opcode decoding
+///
+/// This is implemented as a macro so that both the disassembler and the emulator can use it.
 macro_rules! decode_op {
     ($op:expr, $this:ident) => {
         // We try to keep this in the same order as the implementations above.
@@ -327,15 +323,18 @@ macro_rules! decode_op {
 pub type Cycles = u64;
 
 /// The main CPU structure definition.
-pub struct Cpu<M> {
+pub struct Cpu<M: Mem> {
     pub cy: Cycles,
     regs: Regs,
     pub mem: M,
 }
 
-// The CPU implements Mem so that it can handle writes to the DMA register.
-impl<M> Mem for Cpu<M> where M: Mem {
-    fn loadb(&mut self, addr: u16) -> u8 { self.mem.loadb(addr) }
+/// The CPU implements Mem so that it can handle writes to the DMA register.
+impl <M: Mem> Mem for Cpu<M> {
+    fn loadb(&mut self, addr: u16) -> u8 {
+        self.mem.loadb(addr)
+    }
+
     fn storeb(&mut self, addr: u16, val: u8) {
         // Handle OAM_DMA.
         if addr == 0x4014 {
@@ -346,13 +345,13 @@ impl<M> Mem for Cpu<M> where M: Mem {
     }
 }
 
-// Save state logic.
-impl<M> Save for Cpu<M> where M: Mem + Save {
+impl <M: Mem + Save> Save for Cpu<M> {
     fn save(&mut self, fd: &mut File) {
         self.cy.save(fd);
         self.regs.save(fd);
         self.mem.save(fd);
     }
+
     fn load(&mut self, fd: &mut File) {
         self.cy.load(fd);
         self.regs.load(fd);
@@ -360,7 +359,7 @@ impl<M> Save for Cpu<M> where M: Mem + Save {
     }
 }
 
-impl<M> Cpu<M> where M: Mem {
+impl <M: Mem> Cpu<M> {
     // Debugging
     #[cfg(cpuspew)]
     fn trace(&mut self) {
@@ -800,7 +799,9 @@ impl<M> Cpu<M> where M: Mem {
     }
 
     /// External interfaces
-    pub fn reset(&mut self) { self.regs.pc = self.loadw(RESET_VECTOR); }
+    pub fn reset(&mut self) {
+        self.regs.pc = self.loadw(RESET_VECTOR);
+    }
 
     pub fn nmi(&mut self) {
         let (pc, flags) = (self.regs.pc, self.regs.flags);
@@ -820,6 +821,11 @@ impl<M> Cpu<M> where M: Mem {
         self.regs.pc = self.loadw(BRK_VECTOR);
     }
 
-    /// The constructor.
-    pub fn new(mem: M) -> Cpu<M> { Cpu { cy: 0, regs: Regs::new(), mem: mem } }
+    pub fn new(mem: M) -> Cpu<M> {
+        Cpu {
+            cy: 0,
+            regs: Regs::new(),
+            mem: mem,
+        }
+    }
 }

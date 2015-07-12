@@ -1,5 +1,5 @@
-//
-// sprocketnes/speex.rs
+//! A wrapper for the resampling module in Speex.
+
 //
 // Author: Patrick Walton
 //
@@ -10,7 +10,7 @@ use std::ptr::null;
 
 type SpeexResamplerState = c_void;
 
-#[link_args="-lspeexdsp"]
+#[link(name = "speexdsp")]
 extern {
     fn speex_resampler_init(nb_channels: uint32_t,
                             in_rate: uint32_t,
@@ -37,7 +37,7 @@ impl Resampler {
     /// The resampling quality can be an integer in range `0..10` (inclusive), where 10 is the
     /// highest quality.
     pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
-               -> Result<Resampler,c_int> {
+               -> Result<Resampler, c_int> {
         unsafe {
             let mut err = 0;
             let speex_resampler = speex_resampler_init(channels,
@@ -55,8 +55,10 @@ impl Resampler {
         }
     }
 
-    pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8])
-                   -> (u32, u32) {
+    /// Resamples `input` on channel `channel_index` and writes the result to `out`.
+    ///
+    /// Returns a tuple of the number of input samples processed and output samples written.
+    pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
             assert!(input.len() <= 0xffffffff);
             assert!(out.len() / 2 <= 0xffffffff);

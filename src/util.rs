@@ -1,6 +1,4 @@
 //
-// sprocketnes/util.rs
-//
 // Author: Patrick Walton
 //
 
@@ -26,6 +24,8 @@ pub fn read_to_buf<R: Read>(mut buf: &mut [u8], rd: &mut R) -> io::Result<()> {
 // TODO: Use the standard library's ToBytes and add a FromBytes -- or don't; this is such a small
 // amount of code it barely seems worth it.
 //
+
+// TODO: use `serde` (if it's ready) or `rustc-serialize` and `bincode`
 
 pub trait Save {
     fn save(&mut self, fd: &mut File);
@@ -126,6 +126,8 @@ macro_rules! save_enum(
 // Random number generation
 //
 
+// TODO use the `rand` crate
+
 #[derive(Copy, Clone)]
 pub struct Xorshift {
     pub x: u32,
@@ -148,30 +150,10 @@ impl Xorshift {
 }
 
 //
-// Simple assertions
-//
-
-#[cfg(debug)]
-pub fn debug_assert(cond: bool, msg: &str) {
-    if !cond {
-        println!("{}", msg);
-    }
-}
-
-#[cfg(not(debug))]
-pub fn debug_assert(_: bool, _: &str) {}
-
-#[cfg(debug)]
-pub fn debug_print(msg: &str) {
-    println!("{}", msg);
-}
-
-#[cfg(not(debug))]
-pub fn debug_print(_: &str) {}
-
-//
 // Bindings for `gettimeofday(2)`
 //
+
+// TODO use the `time` crate
 
 #[allow(non_camel_case_types)]
 #[repr(C)]

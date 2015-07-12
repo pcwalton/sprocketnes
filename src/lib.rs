@@ -1,24 +1,42 @@
 //
-// sprocketnes/main.rs
-//
 // Author: Patrick Walton
 //
 
+#![feature(libc, static_mutex, static_condvar)]
+
+extern crate libc;
+extern crate sdl2;
+
+// NB: This must be first to pick up the macro definitions. What a botch.
+#[macro_use]
+pub mod util;
+
+pub mod apu;
+pub mod audio;
+#[macro_use]
+pub mod cpu;
+pub mod disasm;
+pub mod gfx;
+pub mod input;
+pub mod mapper;
+pub mod mem;
+pub mod ppu;
+pub mod rom;
+
+// C library support
+pub mod speex;
+
 use apu::Apu;
-use audio;
 use cpu::Cpu;
 use gfx::{Gfx, Scale};
 use input::{Input, InputResult};
 use mapper::Mapper;
-use mapper;
 use mem::MemMap;
 use ppu::{Oam, Ppu, Vram};
 use rom::Rom;
 use util::Save;
-use util;
 
 use std::cell::RefCell;
-use std::env;
 use std::fs::File;
 use std::path::Path;
 use std::rc::Rc;
@@ -38,62 +56,12 @@ fn record_fps(last_time: &mut u64, frames: &mut uint) {
 #[cfg(not(debug))]
 fn record_fps(_: &mut u64, _: &mut usize) {}
 
-//
-// Argument parsing
-//
+/// Starts the emulator main loop with a ROM and window scaling. Returns when the user presses ESC.
+pub fn start_emulator(rom: Rom, scale: Scale) {
+    let rom = Box::new(rom);
+    println!("Loaded ROM: {}", rom.header);
 
-struct Options {
-    rom_path: String,
-    scale: Scale,
-}
-
-fn usage() {
-    println!("usage: sprocketnes [options] <path-to-rom>");
-    println!("options:");
-    println!("    -1 scale by 1x (default)");
-    println!("    -2 scale by 2x");
-    println!("    -3 scale by 3x");
-}
-
-fn parse_args() -> Option<Options> {
-    let mut options = Options {
-        rom_path: String::new(),
-        scale: Scale::Scale1x,
-    };
-
-    for arg in env::args().skip(1) {
-        match &*arg {
-            "-1" => { options.scale = Scale::Scale1x; },
-            "-2" => { options.scale = Scale::Scale2x; },
-            "-3" => { options.scale = Scale::Scale3x; },
-            _ if arg.starts_with('-') => { usage(); return None; },
-            _ => { options.rom_path = arg; },
-        }
-    }
-
-    if options.rom_path.len() == 0 {
-        usage();
-        return None;
-    }
-
-    Some(options)
-}
-
-//
-// Entry point and main loop
-//
-
-pub fn start() {
-    let options = match parse_args() {
-        Some(options) => options,
-        None => return,
-    };
-
-    let rom_path = &options.rom_path;
-    let rom = Box::new(Rom::from_path(&Path::new(rom_path)));
-    println!("Loaded ROM:\n{}", rom.header.to_str());
-
-    let (mut gfx, sdl) = Gfx::new(options.scale);
+    let (mut gfx, sdl) = Gfx::new(scale);
     let audio_buffer = audio::open();
 
     let mapper: Box<Mapper+Send> = mapper::create_mapper(rom);

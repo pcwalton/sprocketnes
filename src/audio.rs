@@ -1,5 +1,5 @@
-//
-// sprocketnes/audio.rs
+/// SDL audio interface. Used by the APU to actually play audio.
+
 //
 // Author: Patrick Walton
 //
@@ -58,10 +58,8 @@ impl AudioCallback for NesAudioCallback {
     }
 }
 
-//
-// Audio initialization
-//
-
+/// Audio initialization. If successful, returns a pointer to an allocated `OutputBuffer` that can
+/// be filled with raw audio data.
 pub fn open() -> Option<*mut OutputBuffer> {
     let output_buffer = Box::new(OutputBuffer {
         samples: [ 0; SAMPLE_COUNT ],
@@ -81,8 +79,6 @@ pub fn open() -> Option<*mut OutputBuffer> {
         channels: Some(1),
         samples: Some(4410),
     };
-    //format: AudioFormat::S16LSB,
-    //callback: Some(NesAudioCallback),
 
     unsafe {
         match AudioDevice::open_playback(None, spec, |_| NesAudioCallback) {

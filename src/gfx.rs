@@ -1,6 +1,4 @@
 //
-// sprocketnes/gfx.rs
-//
 // Author: Patrick Walton
 //
 
