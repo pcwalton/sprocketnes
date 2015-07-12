@@ -42,7 +42,6 @@ Other keys:
 
 If you want to build `sprocketnes`, you will first need the Speex codec library
 installed; on the Mac you can install it with `brew install speex`.
-You will also need a Rust nightly, since we're using some unstable features.
 
 To build (add `--release` if you actually want playable speed):
 

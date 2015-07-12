@@ -11,3 +11,4 @@ name = "nes"
 sdl2 = { git = "https://github.com/AngryLawyer/rust-sdl2.git" }
 time = "*"
 libc = "*"
+lazy_static = "*"

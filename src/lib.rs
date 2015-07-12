@@ -2,8 +2,8 @@
 // Author: Patrick Walton
 //
 
-#![feature(static_mutex, static_condvar)]
-
+#[macro_use]
+extern crate lazy_static;
 extern crate libc;
 extern crate sdl2;
 extern crate time;

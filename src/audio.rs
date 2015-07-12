@@ -11,7 +11,7 @@ use sdl2::audio::{AudioDevice, AudioCallback, AudioSpecDesired, AudioDeviceLockG
 use std::cmp;
 use std::mem;
 use std::slice::from_raw_parts_mut;
-use std::sync::{StaticMutex, StaticCondvar, MUTEX_INIT, CONDVAR_INIT};
+use std::sync::{Mutex, Condvar};
 
 //
 // The audio callback
@@ -23,9 +23,10 @@ static mut g_audio_device: Option<*mut AudioDevice<NesAudioCallback>> = None;
 
 static mut g_output_buffer: Option<*mut OutputBuffer> = None;
 
-pub static mut g_mutex: StaticMutex = MUTEX_INIT;
-
-pub static mut g_condvar: StaticCondvar = CONDVAR_INIT;
+lazy_static! {
+    pub static ref AUDIO_MUTEX: Mutex<()> = Mutex::new(());
+    pub static ref AUDIO_CONDVAR: Condvar = Condvar::new();
+}
 
 pub struct OutputBuffer {
     pub samples: [u8; SAMPLE_COUNT],
@@ -51,9 +52,9 @@ impl AudioCallback for NesAudioCallback {
                 samples[i] = output_buffer.samples[i + play_offset];
             }
 
-            let _ = g_mutex.lock();
+            let _ = AUDIO_MUTEX.lock();
             output_buffer.play_offset = cmp::min(play_offset + samples.len(), output_buffer_len);
-            g_condvar.notify_one();
+            AUDIO_CONDVAR.notify_one();
         }
     }
 }

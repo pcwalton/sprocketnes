@@ -735,8 +735,8 @@ impl Apu {
         // Wait for the audio callback to catch up if necessary.
         loop {
             unsafe {
-                let lock = audio::g_mutex.lock().unwrap();
-                let _lock = audio::g_condvar.wait(lock).unwrap();
+                let lock = audio::AUDIO_MUTEX.lock().unwrap();
+                let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
                 if (*output_buffer).play_offset == (*output_buffer).samples.len() {
                     break
                 }
