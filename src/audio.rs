@@ -1,4 +1,4 @@
-/// SDL audio interface. Used by the APU to actually play audio.
+//! SDL audio interface. Used by the APU to actually play audio.
 
 //
 // Author: Patrick Walton

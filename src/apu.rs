@@ -68,7 +68,7 @@ impl ApuLength {
 
     // Channels that support the APU Length follow the same register protocol, *except* that the
     // disable bit may be different.
-    fn storeb<DB:DisableBit>(&mut self, addr: u16, val: u8, db: DB) {
+    fn storeb<DB: DisableBit>(&mut self, addr: u16, val: u8, db: DB) {
         match addr & 0x3 {
             0 => self.disable = ((val >> db.bit_number() as usize) & 1) != 0,
             1 | 2 => {}

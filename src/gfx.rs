@@ -289,7 +289,7 @@ pub struct Gfx<'a> {
 // Main graphics routine
 //
 
-impl <'a> Gfx<'a> {
+impl<'a> Gfx<'a> {
     pub fn new(scale: Scale) -> (Gfx<'a>, Sdl) {
         // FIXME: Handle SDL better
 

@@ -5,12 +5,12 @@
 use mem::Mem;
 
 
-pub struct Disassembler<'a,M:'a> {
+pub struct Disassembler<'a, M: Mem + 'a> {
     pub pc: u16,
     pub mem: &'a mut M
 }
 
-impl<'a,M> Disassembler<'a,M> where M: Mem {
+impl<'a, M: Mem> Disassembler<'a, M> {
     //
     // Loads and byte-to-string conversion
     //
@@ -27,10 +27,10 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
     }
 
     fn disb_bump_pc(&mut self) -> String {
-        (format!("${:02X}", self.loadb_bump_pc() as usize)).to_string()
+        format!("${:02X}", self.loadb_bump_pc() as usize)
     }
     fn disw_bump_pc(&mut self) -> String {
-        (format!("${:04X}", self.loadw_bump_pc() as usize)).to_string()
+        format!("${:04X}", self.loadw_bump_pc() as usize)
     }
 
     //

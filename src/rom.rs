@@ -1,4 +1,4 @@
-//! Contains ROM loading code (we use the iNES format).
+//! Contains iNES ROM loading code.
 
 //
 // Author: Patrick Walton
@@ -6,10 +6,23 @@
 
 use util;
 
-use std::fs::File;
+use std::io::{self, Read};
 use std::fmt;
-use std::path::Path;
 use std::vec::Vec;
+
+#[derive(Debug)]
+pub enum RomLoadError {
+    /// IO error while reading the ROM image
+    IoError(io::Error),
+    /// The ROM image has an invalid format
+    FormatError,
+}
+
+impl From<io::Error> for RomLoadError {
+    fn from(err: io::Error) -> Self {
+        RomLoadError::IoError(err)
+    }
+}
 
 /// A ROM image
 pub struct Rom {
@@ -21,48 +34,42 @@ pub struct Rom {
 }
 
 impl Rom {
-    fn from_file(file: &mut File) -> Rom {
-        let mut buffer = [ 0; 16 ];
-        util::read_to_buf(&mut buffer, file).unwrap();
+    pub fn load(r: &mut Read) -> Result<Rom, RomLoadError> {
+        let mut header = [ 0u8; 16 ];
+        try!(util::read_to_buf(&mut header, r));
 
         let header = INesHeader {
             magic: [
-                buffer[0],
-                buffer[1],
-                buffer[2],
-                buffer[3],
+                header[0],
+                header[1],
+                header[2],
+                header[3],
             ],
-            prg_rom_size: buffer[4],
-            chr_rom_size: buffer[5],
-            flags_6: buffer[6],
-            flags_7: buffer[7],
-            prg_ram_size: buffer[8],
-            flags_9: buffer[9],
-            flags_10: buffer[10],
-            zero: [ 0; 5 ]
+            prg_rom_size: header[4],
+            chr_rom_size: header[5],
+            flags_6: header[6],
+            flags_7: header[7],
+            prg_ram_size: header[8],
+            flags_9: header[9],
+            flags_10: header[10],
+            zero: [ 0; 5 ],
         };
 
-        assert!(header.magic == [
-            'N' as u8,
-            'E' as u8,
-            'S' as u8,
-            0x1a,
-        ]);
+        if header.magic != *b"NES\x1a" { return Err(RomLoadError::FormatError); }
 
-        let mut prg_rom = vec![ 0u8; header.prg_rom_size as usize * 16384 ];
-        util::read_to_buf(&mut prg_rom, file).unwrap();
-        let mut chr_rom = vec![ 0u8; header.chr_rom_size as usize * 8192 ];
-        util::read_to_buf(&mut chr_rom, file).unwrap();
+        let prg_bytes = header.prg_rom_size as usize * 16384;
+        let mut prg_rom = vec![ 0u8; prg_bytes ];
+        try!(util::read_to_buf(&mut prg_rom, r));
 
-        Rom {
+        let chr_bytes = header.chr_rom_size as usize * 8192;
+        let mut chr_rom = vec![ 0u8; chr_bytes ];
+        try!(util::read_to_buf(&mut chr_rom, r));
+
+        Ok(Rom {
             header: header,
             prg: prg_rom,
             chr: chr_rom,
-        }
-    }
-
-    pub fn from_path(path: &Path) -> Rom {
-        Rom::from_file(&mut File::open(path).unwrap())
+        })
     }
 }
 
@@ -120,10 +127,10 @@ impl INesHeader {
 impl fmt::Display for INesHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "PRG-ROM: {} KB, CHR-ROM: {} KB, Mapper: {} ({}), Trainer: {}",
-            self.prg_rom_size as u16 * 16,
-            self.chr_rom_size as u16 * 8,
-            self.mapper() as isize,
-            self.ines_mapper() as isize,
+            self.prg_rom_size as u32 * 16,
+            self.chr_rom_size as u32 * 8,
+            self.mapper(),
+            self.ines_mapper(),
             self.trainer(),
         )
     }

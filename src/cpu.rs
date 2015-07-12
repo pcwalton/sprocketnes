@@ -80,13 +80,13 @@ trait AddressingMode<M: Mem> {
 }
 
 struct AccumulatorAddressingMode;
-impl <M: Mem> AddressingMode<M> for AccumulatorAddressingMode {
+impl<M: Mem> AddressingMode<M> for AccumulatorAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.regs.a }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.regs.a = val }
 }
 
 struct ImmediateAddressingMode;
-impl <M: Mem> AddressingMode<M> for ImmediateAddressingMode {
+impl<M: Mem> AddressingMode<M> for ImmediateAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb_bump_pc() }
     fn store(&self, _: &mut Cpu<M>, _: u8) {
         // Not particularly type-safe, but probably not worth using trait inheritance for this.
@@ -104,7 +104,7 @@ impl Deref for MemoryAddressingMode {
     }
 }
 
-impl <M: Mem> AddressingMode<M> for MemoryAddressingMode {
+impl<M: Mem> AddressingMode<M> for MemoryAddressingMode {
     fn load(&self, cpu: &mut Cpu<M>) -> u8 { cpu.loadb(**self) }
     fn store(&self, cpu: &mut Cpu<M>, val: u8) { cpu.storeb(**self, val) }
 }
@@ -330,7 +330,7 @@ pub struct Cpu<M: Mem> {
 }
 
 /// The CPU implements Mem so that it can handle writes to the DMA register.
-impl <M: Mem> Mem for Cpu<M> {
+impl<M: Mem> Mem for Cpu<M> {
     fn loadb(&mut self, addr: u16) -> u8 {
         self.mem.loadb(addr)
     }
@@ -345,7 +345,7 @@ impl <M: Mem> Mem for Cpu<M> {
     }
 }
 
-impl <M: Mem + Save> Save for Cpu<M> {
+impl<M: Mem + Save> Save for Cpu<M> {
     fn save(&mut self, fd: &mut File) {
         self.cy.save(fd);
         self.regs.save(fd);
@@ -359,7 +359,7 @@ impl <M: Mem + Save> Save for Cpu<M> {
     }
 }
 
-impl <M: Mem> Cpu<M> {
+impl<M: Mem> Cpu<M> {
     // Debugging
     #[cfg(cpuspew)]
     fn trace(&mut self) {

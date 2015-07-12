@@ -9,10 +9,7 @@ use nes::gfx::Scale;
 
 use std::env;
 use std::path::Path;
-
-//
-// Argument parsing
-//
+use std::fs::File;
 
 struct Options {
     rom_path: String,
@@ -58,7 +55,7 @@ fn main() {
     };
 
     let rom_path = &options.rom_path;
-    let rom = Rom::from_path(&Path::new(rom_path));
+    let rom = Rom::load(&mut File::open(&Path::new(rom_path)).unwrap()).unwrap();
 
     nes::start_emulator(rom, options.scale);
 }
