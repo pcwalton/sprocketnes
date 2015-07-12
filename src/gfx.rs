@@ -300,7 +300,7 @@ impl<'a> Gfx<'a> {
                                             (SCREEN_HEIGHT as usize * scale.factor()) as u32);
         let window = window_builder.position_centered().build().unwrap();
 
-        let renderer = window.renderer().accelerated().build().unwrap();
+        let renderer = window.renderer().accelerated().present_vsync().build().unwrap();
         let texture = renderer.create_texture(BGR24,
                                               TextureAccess::Streaming,
                                               (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32))
