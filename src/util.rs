@@ -128,7 +128,7 @@ macro_rules! save_enum(
 // Random number generation
 //
 
-// TODO use the `rand` crate
+// TODO remove this and emulate the APU's noise generator properly
 
 #[derive(Copy, Clone)]
 pub struct Xorshift {
