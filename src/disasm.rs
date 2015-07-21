@@ -1,39 +1,36 @@
 //
-// sprocketnes/disasm.rs
-//
 // Author: Patrick Walton
 //
 
 use mem::Mem;
 
-use libc::{uint8_t, uint16_t};
 
-pub struct Disassembler<'a,M:'a> {
-    pub pc: uint16_t,
+pub struct Disassembler<'a, M: Mem + 'a> {
+    pub pc: u16,
     pub mem: &'a mut M
 }
 
-impl<'a,M> Disassembler<'a,M> where M: Mem {
+impl<'a, M: Mem> Disassembler<'a, M> {
     //
     // Loads and byte-to-string conversion
     //
 
-    fn loadb_bump_pc(&mut self) -> uint8_t {
+    fn loadb_bump_pc(&mut self) -> u8 {
         let val = (&mut *self.mem).loadb(self.pc);
         self.pc += 1;
         val
     }
-    fn loadw_bump_pc(&mut self) -> uint16_t {
-        let bottom = self.loadb_bump_pc() as uint16_t;
-        let top = (self.loadb_bump_pc() as uint16_t) << 8;
+    fn loadw_bump_pc(&mut self) -> u16 {
+        let bottom = self.loadb_bump_pc() as u16;
+        let top = (self.loadb_bump_pc() as u16) << 8;
         bottom | top
     }
 
     fn disb_bump_pc(&mut self) -> String {
-        (format!("${:02X}", self.loadb_bump_pc() as uint)).to_string()
+        format!("${:02X}", self.loadb_bump_pc() as usize)
     }
     fn disw_bump_pc(&mut self) -> String {
-        (format!("${:04X}", self.loadw_bump_pc() as uint)).to_string()
+        format!("${:04X}", self.loadw_bump_pc() as usize)
     }
 
     //
@@ -175,4 +172,3 @@ impl<'a,M> Disassembler<'a,M> where M: Mem {
         decode_op!(op, self)
     }
 }
-

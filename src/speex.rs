@@ -1,16 +1,16 @@
-//
-// sprocketnes/speex.rs
+//! A wrapper for the resampling module in Speex.
+
 //
 // Author: Patrick Walton
 //
 
-use libc::{c_int, c_void, int16_t, uint8_t, uint32_t};
+use libc::{c_int, c_void, uint32_t, int16_t};
 use std::mem::transmute;
 use std::ptr::null;
 
 type SpeexResamplerState = c_void;
 
-#[link_args="-lspeexdsp"]
+#[link(name = "speexdsp")]
 extern {
     fn speex_resampler_init(nb_channels: uint32_t,
                             in_rate: uint32_t,
@@ -33,8 +33,11 @@ pub struct Resampler {
 }
 
 impl Resampler {
-    pub fn new(channels: uint32_t, in_rate: uint32_t, out_rate: uint32_t, quality: c_int)
-               -> Result<Resampler,c_int> {
+    /// Creates a new resampler that will resample the input stream from `in_rate` to `out_rate`.
+    /// The resampling quality can be an integer in range `0..10` (inclusive), where 10 is the
+    /// highest quality.
+    pub fn new(channels: u32, in_rate: u32, out_rate: u32, quality: c_int)
+               -> Result<Resampler, c_int> {
         unsafe {
             let mut err = 0;
             let speex_resampler = speex_resampler_init(channels,
@@ -52,12 +55,14 @@ impl Resampler {
         }
     }
 
-    pub fn process(&self, channel_index: uint32_t, input: &[int16_t], out: &mut [uint8_t])
-                   -> (uint32_t, uint32_t) {
+    /// Resamples `input` on channel `channel_index` and writes the result to `out`.
+    ///
+    /// Returns a tuple of the number of input samples processed and output samples written.
+    pub fn process(&self, channel_index: u32, input: &[i16], out: &mut [u8]) -> (u32, u32) {
         unsafe {
             assert!(input.len() <= 0xffffffff);
             assert!(out.len() / 2 <= 0xffffffff);
-            let (in_len, out_len) = (input.len() as uint32_t, out.len() as uint32_t / 2);
+            let (in_len, out_len) = (input.len() as u32, out.len() as u32 / 2);
             let mut in_len = in_len;
             let mut out_len = out_len;
             let err = speex_resampler_process_int(self.speex_resampler,
@@ -79,4 +84,3 @@ impl Drop for Resampler {
         }
     }
 }
-
