@@ -345,7 +345,7 @@ impl SpriteStruct {
 
     // Quick test to see whether the given point is in the bounding box of this sprite.
     fn in_bounding_box(&self, ppu: &Ppu, x: u8, y: u8) -> bool {
-        x >= self.x && x < self.x + 8 && self.on_scanline(ppu, y)
+        x >= self.x && (x as u16) < self.x as u16 + 8 && self.on_scanline(ppu, y)
     }
 }
 
@@ -530,7 +530,7 @@ impl Ppu {
 
     fn write_oamdata(&mut self, val: u8) {
         self.oam.storeb(self.regs.oam_addr as u16, val);
-        self.regs.oam_addr += 1;
+        self.regs.oam_addr = (self.regs.oam_addr as u16 + 1) as u8;
     }
 
     fn update_ppuaddr(&mut self, val: u8) {
