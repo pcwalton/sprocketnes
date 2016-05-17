@@ -557,7 +557,7 @@ impl Apu {
                     if pulse.sweep.enabled() {
                         let delta = pulse.timer.value >> pulse.sweep.shift_count() as usize;
                         if !pulse.sweep.negate() {
-                            pulse.timer.value += delta;
+                            pulse.timer.value = (pulse.timer.value as u32 + delta as u32) as u16;
                         } else {
                             pulse.timer.value -= delta;
                         }
