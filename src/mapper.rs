@@ -31,6 +31,7 @@ pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper+Send> {
             }) as Box<Mapper+Send>
         },
         1 => Box::new(SxRom::new(rom)) as Box<Mapper+Send>,
+        2 => Box::new(UxRom::new(rom)) as Box<Mapper+Send>,
         4 => Box::new(TxRom::new(rom)) as Box<Mapper+Send>,
         _ => panic!("unsupported mapper")
     }
@@ -157,7 +158,7 @@ impl Mapper for SxRom {
             let bank = match self.regs.ctrl.prg_rom_mode() {
                 SxPrgBankMode::Switch32K => (self.regs.prg_bank & 0xfe) | 1,
                 SxPrgBankMode::FixFirstBank => self.regs.prg_bank,
-                SxPrgBankMode::FixLastBank => (*self.rom).header.prg_rom_size - 1,
+                SxPrgBankMode::FixLastBank => self.rom.header.prg_rom_size - 1,
             };
             self.rom.prg[(bank as usize * 16384) | ((addr & 0x3fff) as usize)]
         }
@@ -205,6 +206,69 @@ impl Mapper for SxRom {
 
     fn chr_storeb(&mut self, addr: u16, val: u8) {
         self.chr_ram[addr as usize] = val
+    }
+
+    fn next_scanline(&mut self) -> MapperResult {
+        MapperResult::Continue
+    }
+}
+
+//
+// Mapper 2 (UxROM)
+//
+// See http://wiki.nesdev.com/w/index.php/UxROM
+//
+
+struct UxRom {
+    rom: Box<Rom>,
+    /// PRG ROM bank mapped to $8000-$BFFF
+    bank: u8,
+
+    chr_ram: Box<[u8; 8192]>,
+}
+
+impl UxRom {
+    fn new(rom: Box<Rom>) -> UxRom {
+        UxRom {
+            rom: rom,
+            bank: 0,
+            chr_ram: Box::new([0u8; 8192]),
+        }
+    }
+}
+
+impl Mapper for UxRom {
+    fn prg_loadb(&mut self, addr: u16) -> u8 {
+        if addr < 0x8000 {
+            0
+        } else {
+            let bank = if addr < 0xC000 {
+                // switchable 16K PRG ROM bank
+                self.bank
+            } else {
+                // fixed to last PRG ROM bank
+                self.rom.header.prg_rom_size - 1
+            };
+
+            self.rom.prg[(bank as usize * 16384) | ((addr & 0x3fff) as usize)]
+        }
+    }
+
+    fn prg_storeb(&mut self, addr: u16, val: u8) {
+        if addr < 0x8000 {
+            return;
+        }
+
+        // $8000-$FFFF bank select
+        self.bank = val;
+    }
+
+    fn chr_loadb(&mut self, addr: u16) -> u8 {
+        self.chr_ram[addr as usize]
+    }
+
+    fn chr_storeb(&mut self, addr: u16, val: u8) {
+        self.chr_ram[addr as usize] = val;
     }
 
     fn next_scanline(&mut self) -> MapperResult {
