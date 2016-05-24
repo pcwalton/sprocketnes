@@ -289,7 +289,7 @@ impl<'a> Gfx<'a> {
     pub fn new(scale: Scale) -> (Gfx<'a>, Sdl) {
         // FIXME: Handle SDL better
 
-        let sdl = InitBuilder::new().video().audio().timer().events().unwrap();
+        let sdl = InitBuilder::new().video().audio().timer().events().game_controller().unwrap();
 
         let mut window_builder = sdl.window("sprocketnes",
                                             (SCREEN_WIDTH as usize * scale.factor()) as u32,

@@ -5,8 +5,9 @@
 use mem::Mem;
 
 use sdl2::Sdl;
+use sdl2::controller::{Button, GameController};
+use sdl2::joystick::num_joysticks;
 use sdl2::event::Event;
-use sdl2::event::Event::*;
 use sdl2::keyboard::Keycode;
 
 use std::ops::Deref;
@@ -78,6 +79,8 @@ pub struct GamePadState {
 
 pub struct Input {
     pub gamepad_0: GamePadState,
+    // XXX The sdl2 wrapper is quite unsafe: Swapping `controllers` with `sdl` crashes on drop.
+    _controllers: Vec<GameController>,
     sdl: Sdl,   // FIXME: Use a `&'a mut EventPump` instead
 }
 
@@ -104,10 +107,21 @@ impl Input {
                 strobe_state: StrobeState{val: STROBE_STATE_A}
             },
             sdl: sdl,
+            _controllers: (0..num_joysticks().unwrap())
+                .filter_map(|i| match GameController::open(i) {
+                    Ok(c) => {
+                        println!("opened controller {}: {}", i, c.name());
+                        Some(c)
+                    }
+                    Err(e) => {
+                        println!("couldn't open controller {}: {}", i, e);
+                        None
+                    }
+                }).collect(),
         }
     }
 
-    fn handle_gamepad_event(&mut self, key: Keycode, down: bool) {
+    fn handle_keyboard_event(&mut self, key: Keycode, down: bool) {
         match key {
             Keycode::Left   => self.gamepad_0.left   = down,
             Keycode::Down   => self.gamepad_0.down   = down,
@@ -121,6 +135,21 @@ impl Input {
         }
     }
 
+    fn handle_controller_event(&mut self, button: Button, down: bool) {
+        match button {
+            Button::A             => self.gamepad_0.a      = down,
+            // X is mapped to B because it's in a better position on many controllers
+            Button::B | Button::X => self.gamepad_0.b      = down,
+            Button::Back          => self.gamepad_0.select = down,
+            Button::Start         => self.gamepad_0.start  = down,
+            Button::DPadLeft      => self.gamepad_0.left   = down,
+            Button::DPadDown      => self.gamepad_0.down   = down,
+            Button::DPadUp        => self.gamepad_0.up     = down,
+            Button::DPadRight     => self.gamepad_0.right  = down,
+            _                     => {}
+        }
+    }
+
     pub fn check_input(&mut self) -> InputResult {
         while let Some(ev) = self.sdl.event_pump().poll_event() {
             match ev {
@@ -128,9 +157,17 @@ impl Input {
                 Event::KeyDown { keycode: Some(Keycode::S), .. } => return InputResult::SaveState,
                 Event::KeyDown { keycode: Some(Keycode::L), .. } => return InputResult::LoadState,
                 Event::KeyDown { keycode: Some(key), .. } => {
-                    self.handle_gamepad_event(key, true)
+                    self.handle_keyboard_event(key, true)
                 }
-                Event::KeyUp { keycode: Some(key), .. } => self.handle_gamepad_event(key, false),
+                Event::KeyUp { keycode: Some(key), .. } => {
+                    self.handle_keyboard_event(key, false)
+                },
+                Event::ControllerButtonDown { button, .. } => {
+                    self.handle_controller_event(button, true)
+                },
+                Event::ControllerButtonUp { button, .. } => {
+                    self.handle_controller_event(button, false)
+                },
                 Event::Quit { .. } => return InputResult::Quit,
                 _ => {}
             }
