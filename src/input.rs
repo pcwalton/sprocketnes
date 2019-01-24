@@ -5,7 +5,6 @@
 use mem::Mem;
 
 use sdl2::event::Event;
-use sdl2::event::Event::*;
 use sdl2::keyboard::Keycode;
 use sdl2::Sdl;
 
@@ -130,7 +129,7 @@ impl Input {
     }
 
     pub fn check_input(&mut self) -> InputResult {
-        while let Some(ev) = self.sdl.event_pump().poll_event() {
+        while let Some(ev) = self.sdl.event_pump().unwrap().poll_event() {
             match ev {
                 Event::KeyDown {
                     keycode: Some(Keycode::Escape),

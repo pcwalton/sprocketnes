@@ -2,9 +2,8 @@
 // Author: Patrick Walton
 //
 
-use sdl2::pixels::PixelFormatEnum::BGR24;
-use sdl2::render::{Renderer, Texture, TextureAccess};
-use sdl2::{InitBuilder, Sdl};
+use sdl2::render::{Canvas, Texture, TextureAccess};
+use sdl2::Sdl;
 
 /// Emulated screen width in pixels
 const SCREEN_WIDTH: usize = 256;
@@ -289,6 +288,10 @@ enum StatusLineAnimation {
 }
 
 use self::StatusLineAnimation::*;
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::render::TextureCreator;
+use sdl2::video::Window;
+use sdl2::video::WindowContext;
 
 struct StatusLineText {
     string: String,
@@ -376,20 +379,22 @@ impl Scale {
     }
 }
 
-pub struct Gfx<'a> {
-    pub renderer: Box<Renderer<'a>>,
-    pub texture: Box<Texture>,
+pub struct Gfx {
+    pub renderer: Box<Canvas<Window>>,
+    pub texture: Texture<'static>,
     pub scale: Scale,
     pub status_line: StatusLine,
+    _texture_creator: TextureCreator<WindowContext>,
 }
 
-impl<'a> Gfx<'a> {
-    pub fn new(scale: Scale) -> (Gfx<'a>, Sdl) {
+impl Gfx {
+    pub fn new(scale: Scale) -> (Gfx, Sdl) {
         // FIXME: Handle SDL better
 
-        let sdl = InitBuilder::new().video().audio().timer().events().unwrap();
+        let sdl = sdl2::init().unwrap();
+        let video_subsystem = sdl.video().unwrap();
 
-        let mut window_builder = sdl.window(
+        let mut window_builder = video_subsystem.window(
             "sprocketnes",
             (SCREEN_WIDTH as usize * scale.factor()) as u32,
             (SCREEN_HEIGHT as usize * scale.factor()) as u32,
@@ -397,25 +402,29 @@ impl<'a> Gfx<'a> {
         let window = window_builder.position_centered().build().unwrap();
 
         let renderer = window
-            .renderer()
+            .into_canvas()
             .accelerated()
             .present_vsync()
             .build()
             .unwrap();
-        let texture = renderer
+        let texture_creator = renderer.texture_creator();
+        let texture_creator_pointer = &texture_creator as *const TextureCreator<WindowContext>;
+        let texture = unsafe { &*texture_creator_pointer }
             .create_texture(
-                BGR24,
+                PixelFormatEnum::BGR24,
                 TextureAccess::Streaming,
-                (SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32),
+                SCREEN_WIDTH as u32,
+                SCREEN_HEIGHT as u32,
             )
             .unwrap();
 
         (
             Gfx {
                 renderer: Box::new(renderer),
-                texture: Box::new(texture),
-                scale: scale,
+                texture,
+                scale,
                 status_line: StatusLine::new(),
+                _texture_creator: texture_creator,
             },
             sdl,
         )
@@ -430,7 +439,7 @@ impl<'a> Gfx<'a> {
         self.status_line.render(ppu_screen);
         self.blit(ppu_screen);
         self.renderer.clear();
-        self.renderer.copy(&self.texture, None, None);
+        let _ = self.renderer.copy(&self.texture, None, None);
         self.renderer.present();
     }
 
