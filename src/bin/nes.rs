@@ -4,12 +4,12 @@
 
 extern crate nes;
 
-use nes::rom::Rom;
 use nes::gfx::Scale;
+use nes::rom::Rom;
 
 use std::env;
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 
 struct Options {
     rom_path: String,
@@ -32,11 +32,22 @@ fn parse_args() -> Option<Options> {
 
     for arg in env::args().skip(1) {
         match &*arg {
-            "-1" => { options.scale = Scale::Scale1x; },
-            "-2" => { options.scale = Scale::Scale2x; },
-            "-3" => { options.scale = Scale::Scale3x; },
-            _ if arg.starts_with('-') => { usage(); return None; },
-            _ => { options.rom_path = arg; },
+            "-1" => {
+                options.scale = Scale::Scale1x;
+            }
+            "-2" => {
+                options.scale = Scale::Scale2x;
+            }
+            "-3" => {
+                options.scale = Scale::Scale3x;
+            }
+            _ if arg.starts_with('-') => {
+                usage();
+                return None;
+            }
+            _ => {
+                options.rom_path = arg;
+            }
         }
     }
 

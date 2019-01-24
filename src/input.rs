@@ -4,10 +4,10 @@
 
 use mem::Mem;
 
-use sdl2::Sdl;
 use sdl2::event::Event;
 use sdl2::event::Event::*;
 use sdl2::keyboard::Keycode;
+use sdl2::Sdl;
 
 use std::ops::Deref;
 
@@ -15,16 +15,18 @@ use std::ops::Deref;
 // The "strobe state": the order in which the NES reads the buttons.
 //
 
-const STROBE_STATE_A: u8        = 0;
-const STROBE_STATE_B: u8        = 1;
-const STROBE_STATE_SELECT: u8   = 2;
-const STROBE_STATE_START: u8    = 3;
-const STROBE_STATE_UP: u8       = 4;
-const STROBE_STATE_DOWN: u8     = 5;
-const STROBE_STATE_LEFT: u8     = 6;
-const STROBE_STATE_RIGHT: u8    = 7;
+const STROBE_STATE_A: u8 = 0;
+const STROBE_STATE_B: u8 = 1;
+const STROBE_STATE_SELECT: u8 = 2;
+const STROBE_STATE_START: u8 = 3;
+const STROBE_STATE_UP: u8 = 4;
+const STROBE_STATE_DOWN: u8 = 5;
+const STROBE_STATE_LEFT: u8 = 6;
+const STROBE_STATE_RIGHT: u8 = 7;
 
-struct StrobeState{ val: u8 }
+struct StrobeState {
+    val: u8,
+}
 
 impl Deref for StrobeState {
     type Target = u8;
@@ -38,24 +40,28 @@ impl StrobeState {
     // Given a GamePadState structure, returns the state of the given button.
     fn get(&self, state: &GamePadState) -> bool {
         match **self {
-            STROBE_STATE_A      => state.a,
-            STROBE_STATE_B      => state.b,
+            STROBE_STATE_A => state.a,
+            STROBE_STATE_B => state.b,
             STROBE_STATE_SELECT => state.select,
-            STROBE_STATE_START  => state.start,
-            STROBE_STATE_UP     => state.up,
-            STROBE_STATE_DOWN   => state.down,
-            STROBE_STATE_LEFT   => state.left,
-            STROBE_STATE_RIGHT  => state.right,
-            _                   => panic!("shouldn't happen")
+            STROBE_STATE_START => state.start,
+            STROBE_STATE_UP => state.up,
+            STROBE_STATE_DOWN => state.down,
+            STROBE_STATE_LEFT => state.left,
+            STROBE_STATE_RIGHT => state.right,
+            _ => panic!("shouldn't happen"),
         }
     }
 
     fn next(&mut self) {
-        *self = StrobeState{val: (**self + 1) & 7};
+        *self = StrobeState {
+            val: (**self + 1) & 7,
+        };
     }
 
     fn reset(&mut self) {
-        *self = StrobeState{val: STROBE_STATE_A};
+        *self = StrobeState {
+            val: STROBE_STATE_A,
+        };
     }
 }
 
@@ -78,14 +84,14 @@ pub struct GamePadState {
 
 pub struct Input {
     pub gamepad_0: GamePadState,
-    sdl: Sdl,   // FIXME: Use a `&'a mut EventPump` instead
+    sdl: Sdl, // FIXME: Use a `&'a mut EventPump` instead
 }
 
 pub enum InputResult {
-    Continue,   // Keep playing.
-    Quit,       // Quit the emulator.
-    SaveState,  // Save a state.
-    LoadState,  // Load a state.
+    Continue,  // Keep playing.
+    Quit,      // Quit the emulator.
+    SaveState, // Save a state.
+    LoadState, // Load a state.
 }
 
 impl Input {
@@ -101,7 +107,9 @@ impl Input {
                 select: false,
                 start: false,
 
-                strobe_state: StrobeState{val: STROBE_STATE_A}
+                strobe_state: StrobeState {
+                    val: STROBE_STATE_A,
+                },
             },
             sdl: sdl,
         }
@@ -109,28 +117,39 @@ impl Input {
 
     fn handle_gamepad_event(&mut self, key: Keycode, down: bool) {
         match key {
-            Keycode::Left   => self.gamepad_0.left   = down,
-            Keycode::Down   => self.gamepad_0.down   = down,
-            Keycode::Up     => self.gamepad_0.up     = down,
-            Keycode::Right  => self.gamepad_0.right  = down,
-            Keycode::Z      => self.gamepad_0.a      = down,
-            Keycode::X      => self.gamepad_0.b      = down,
+            Keycode::Left => self.gamepad_0.left = down,
+            Keycode::Down => self.gamepad_0.down = down,
+            Keycode::Up => self.gamepad_0.up = down,
+            Keycode::Right => self.gamepad_0.right = down,
+            Keycode::Z => self.gamepad_0.a = down,
+            Keycode::X => self.gamepad_0.b = down,
             Keycode::RShift => self.gamepad_0.select = down,
-            Keycode::Return => self.gamepad_0.start  = down,
-            _               => {}
+            Keycode::Return => self.gamepad_0.start = down,
+            _ => {}
         }
     }
 
     pub fn check_input(&mut self) -> InputResult {
         while let Some(ev) = self.sdl.event_pump().poll_event() {
             match ev {
-                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return InputResult::Quit,
-                Event::KeyDown { keycode: Some(Keycode::S), .. } => return InputResult::SaveState,
-                Event::KeyDown { keycode: Some(Keycode::L), .. } => return InputResult::LoadState,
-                Event::KeyDown { keycode: Some(key), .. } => {
-                    self.handle_gamepad_event(key, true)
-                }
-                Event::KeyUp { keycode: Some(key), .. } => self.handle_gamepad_event(key, false),
+                Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => return InputResult::Quit,
+                Event::KeyDown {
+                    keycode: Some(Keycode::S),
+                    ..
+                } => return InputResult::SaveState,
+                Event::KeyDown {
+                    keycode: Some(Keycode::L),
+                    ..
+                } => return InputResult::LoadState,
+                Event::KeyDown {
+                    keycode: Some(key), ..
+                } => self.handle_gamepad_event(key, true),
+                Event::KeyUp {
+                    keycode: Some(key), ..
+                } => self.handle_gamepad_event(key, false),
                 Event::Quit { .. } => return InputResult::Quit,
                 _ => {}
             }
