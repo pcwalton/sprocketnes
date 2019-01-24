@@ -10,6 +10,7 @@ use std::ops::Deref;
 
 #[cfg(cpuspew)]
 use disasm::Disassembler;
+use std::num::Wrapping;
 
 const CARRY_FLAG: u8 = 1 << 0;
 const ZERO_FLAG: u8 = 1 << 1;
@@ -925,9 +926,9 @@ impl<M: Mem> Cpu<M> {
     fn sbc<AM: AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
         let a = self.regs.a;
-        let mut result = a as u32 - val as u32;
+        let mut result = (Wrapping(a as u32) - Wrapping(val as u32)).0;
         if !self.get_flag(CARRY_FLAG) {
-            result -= 1;
+            result = (Wrapping(result) - Wrapping(1)).0;
         }
 
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
@@ -944,7 +945,7 @@ impl<M: Mem> Cpu<M> {
     // Comparisons
     fn cmp_base<AM: AddressingMode<M>>(&mut self, x: u8, am: AM) {
         let y = am.load(self);
-        let result = x as u32 - y as u32;
+        let result = (Wrapping(x as u32) - Wrapping(y as u32)).0;
         self.set_flag(CARRY_FLAG, (result & 0x100) == 0);
         let _ = self.set_zn(result as u8);
     }
@@ -1023,29 +1024,29 @@ impl<M: Mem> Cpu<M> {
     // Increments and decrements
     fn inc<AM: AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
-        let val = self.set_zn(val + 1);
+        let val = self.set_zn((Wrapping(val) + Wrapping(1)).0);
         am.store(self, val)
     }
     fn dec<AM: AddressingMode<M>>(&mut self, am: AM) {
         let val = am.load(self);
-        let val = self.set_zn(val - 1);
+        let val = self.set_zn((Wrapping(val) - Wrapping(1)).0);
         am.store(self, val)
     }
     fn inx(&mut self) {
         let x = self.regs.x;
-        self.regs.x = self.set_zn(x + 1)
+        self.regs.x = self.set_zn((Wrapping(x) + Wrapping(1)).0)
     }
     fn dex(&mut self) {
         let x = self.regs.x;
-        self.regs.x = self.set_zn(x - 1)
+        self.regs.x = self.set_zn((Wrapping(x) - Wrapping(1)).0)
     }
     fn iny(&mut self) {
         let y = self.regs.y;
-        self.regs.y = self.set_zn(y + 1)
+        self.regs.y = self.set_zn((Wrapping(y) + Wrapping(1)).0)
     }
     fn dey(&mut self) {
         let y = self.regs.y;
-        self.regs.y = self.set_zn(y - 1)
+        self.regs.y = self.set_zn((Wrapping(y) - Wrapping(1)).0)
     }
 
     // Register moves

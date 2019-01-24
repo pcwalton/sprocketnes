@@ -426,7 +426,7 @@ impl SpriteStruct {
 
     // Quick test to see whether the given point is in the bounding box of this sprite.
     fn in_bounding_box(&self, ppu: &Ppu, x: u8, y: u8) -> bool {
-        x >= self.x && x < self.x + 8 && self.on_scanline(ppu, y)
+        x >= self.x && x < (Wrapping(self.x) + Wrapping(8)).0 && self.on_scanline(ppu, y)
     }
 }
 
@@ -519,6 +519,7 @@ enum SpritePriority {
 }
 
 use self::SpritePriority::*;
+use std::num::Wrapping;
 
 impl Save for Ppu {
     fn save(&mut self, fd: &mut File) {
@@ -618,7 +619,7 @@ impl Ppu {
 
     fn write_oamdata(&mut self, val: u8) {
         self.oam.storeb(self.regs.oam_addr as u16, val);
-        self.regs.oam_addr += 1;
+        self.regs.oam_addr = (Wrapping(self.regs.oam_addr) + Wrapping(1)).0;
     }
 
     fn update_ppuaddr(&mut self, val: u8) {
