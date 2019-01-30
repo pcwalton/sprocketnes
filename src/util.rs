@@ -3,16 +3,19 @@
 //
 
 use std::fs::File;
-use std::io::{self, Read, Write, Result};
+use std::io::{self, Read, Write};
 
 /// Reads until the buffer is filled or the reader signals EOF
-pub fn read_to_buf(mut buf: &mut [u8], rd: &mut Read) -> io::Result<()> {
+pub fn read_to_buf(buf: &mut [u8], rd: &mut Read) -> io::Result<()> {
     let mut total = 0;
     while total < buf.len() {
         let count = try!(rd.read(&mut buf[total..]));
         if count == 0 {
             // Buffer not yet filled, but EOF reached
-            return Err(io::Error::new(io::ErrorKind::Other, "eof reached prematurely"))
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "eof reached prematurely",
+            ));
         }
         total += count;
     }
@@ -39,7 +42,7 @@ impl Save for u8 {
         fd.write_all(&[*self]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        let mut buf = [ 0 ];
+        let mut buf = [0];
         read_to_buf(&mut buf, fd).unwrap();
         *self = buf[0];
     }
@@ -50,7 +53,7 @@ impl Save for u16 {
         fd.write(&[*self as u8, (*self >> 8) as u8]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        let mut buf = [ 0, 0 ];
+        let mut buf = [0, 0];
         read_to_buf(&mut buf, fd).unwrap();
         *self = (buf[0] as u16) | ((buf[1] as u16) << 8);
     }
@@ -85,10 +88,10 @@ impl<'a> Save for &'a mut [u8] {
 
 impl Save for bool {
     fn save(&mut self, fd: &mut File) {
-        fd.write(&[ if *self { 0 } else { 1 } ]).unwrap();
+        fd.write(&[if *self { 0 } else { 1 }]).unwrap();
     }
     fn load(&mut self, fd: &mut File) {
-        let mut val: [u8; 1] = [ 0 ];
+        let mut val: [u8; 1] = [0];
         read_to_buf(&mut val, fd).unwrap();
         *self = val[0] != 0
     }
@@ -140,12 +143,19 @@ pub struct Xorshift {
 
 impl Xorshift {
     pub fn new() -> Xorshift {
-        Xorshift { x: 123456789, y: 362436069, z: 521288629, w: 88675123 }
+        Xorshift {
+            x: 123456789,
+            y: 362436069,
+            z: 521288629,
+            w: 88675123,
+        }
     }
 
     pub fn next(&mut self) -> u32 {
         let t = self.x ^ (self.x << 11);
-        self.x = self.y; self.y = self.z; self.z = self.w;
+        self.x = self.y;
+        self.y = self.z;
+        self.z = self.w;
         self.w = self.w ^ (self.w >> 19) ^ (t ^ (t >> 8));
         self.w
     }

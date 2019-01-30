@@ -15,26 +15,26 @@ use std::ops::{Deref, DerefMut};
 const CYCLES_PER_EVEN_TICK: u64 = 7438;
 const CYCLES_PER_ODD_TICK: u64 = 7439;
 
-const NES_SAMPLE_RATE: u32 = 1789920;   // Actual is 1789800, but this is divisible by 240.
+const NES_SAMPLE_RATE: u32 = 1789920; // Actual is 1789800, but this is divisible by 240.
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
 const TICK_FREQUENCY: u32 = 240;
 const NES_SAMPLES_PER_TICK: u32 = NES_SAMPLE_RATE / TICK_FREQUENCY;
 
-const PULSE_WAVEFORMS: [u8; 4] = [ 0b01000000, 0b01100000, 0b01111000, 0b10011111 ];
+const PULSE_WAVEFORMS: [u8; 4] = [0b01000000, 0b01100000, 0b01111000, 0b10011111];
 
 const LENGTH_COUNTERS: [u8; 32] = [
-    10, 254, 20,  2, 40,  4, 80,  6, 160,  8, 60, 10, 14, 12, 26, 14,
-    12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
+    10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
+    192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
 const TRIANGLE_WAVEFORM: [u8; 32] = [
-    15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0,
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    13, 14, 15,
 ];
 
 // TODO: PAL
 const NOISE_PERIODS: [u16; 16] = [
-    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 ];
 
 //
@@ -42,11 +42,21 @@ const NOISE_PERIODS: [u16; 16] = [
 //
 
 // There are two modes in which the disable bit can be set: bit 5 (pulses) or bit 7 (triangle).
-trait DisableBit { fn bit_number(self) -> u8; }
+trait DisableBit {
+    fn bit_number(self) -> u8;
+}
 struct DisableBit5;
-impl DisableBit for DisableBit5 { fn bit_number(self) -> u8 { 5 } }
+impl DisableBit for DisableBit5 {
+    fn bit_number(self) -> u8 {
+        5
+    }
+}
 struct DisableBit7;
-impl DisableBit for DisableBit7 { fn bit_number(self) -> u8 { 7 } }
+impl DisableBit for DisableBit7 {
+    fn bit_number(self) -> u8 {
+        7
+    }
+}
 
 #[derive(Copy, Clone)]
 struct ApuLength {
@@ -55,7 +65,11 @@ struct ApuLength {
     remaining: u8,
 }
 
-save_struct!(ApuLength { disable, id, remaining });
+save_struct!(ApuLength {
+    disable,
+    id,
+    remaining
+});
 
 impl ApuLength {
     fn new() -> ApuLength {
@@ -98,7 +112,13 @@ struct ApuEnvelope {
     length: ApuLength,
 }
 
-save_struct!(ApuEnvelope { enabled, volume, period, counter, length });
+save_struct!(ApuEnvelope {
+    enabled,
+    volume,
+    period,
+    counter,
+    length
+});
 
 impl ApuEnvelope {
     fn new() -> ApuEnvelope {
@@ -169,7 +189,10 @@ struct ApuTimer {
     wavelen_count: u64,
 }
 
-save_struct!(ApuTimer { value, wavelen_count });
+save_struct!(ApuTimer {
+    value,
+    wavelen_count
+});
 
 impl ApuTimer {
     fn new() -> ApuTimer {
@@ -189,8 +212,12 @@ impl ApuTimer {
         }
     }
 
-    fn audible(&self) -> bool { self.value > 0 }
-    fn wavelen(&self) -> u64 { (self.value as u64 + 1) * 2 }
+    fn audible(&self) -> bool {
+        self.value > 0
+    }
+    fn wavelen(&self) -> u64 {
+        (self.value as u64 + 1) * 2
+    }
 }
 
 /// APUPULSE: [0x4000, 0x4008)
@@ -217,7 +244,14 @@ impl ApuPulse {
     }
 }
 
-save_struct!(ApuPulse { envelope, sweep, timer, duty, sweep_cycle, waveform_index });
+save_struct!(ApuPulse {
+    envelope,
+    sweep,
+    timer,
+    duty,
+    sweep_cycle,
+    waveform_index
+});
 
 /// APU pulse sweep
 #[derive(Copy, Clone)]
@@ -266,7 +300,11 @@ struct ApuTriangle {
     waveform_index: u8,
 }
 
-save_struct!(ApuTriangle { timer, length, linear_counter });
+save_struct!(ApuTriangle {
+    timer,
+    length,
+    linear_counter
+});
 
 impl ApuTriangle {
     fn new() -> ApuTriangle {
@@ -318,10 +356,14 @@ struct ApuNoise {
     /// The number of ticks since the last timer.
     timer_count: u16,
     /// The xorshift RNG.
-    rng: Xorshift,      // FIXME: This is inaccurate.
+    rng: Xorshift, // FIXME: This is inaccurate.
 }
 
-save_struct!(ApuNoise { envelope, timer, timer_count });
+save_struct!(ApuNoise {
+    envelope,
+    timer,
+    timer_count
+});
 
 impl ApuNoise {
     fn new() -> ApuNoise {
@@ -421,15 +463,15 @@ impl Mem for Apu {
     fn loadb(&mut self, addr: u16) -> u8 {
         match addr {
             0x4015 => *self.regs.status,
-            _ => 0
+            _ => 0,
         }
     }
     fn storeb(&mut self, addr: u16, val: u8) {
         match addr {
-            0x4000 ... 0x4003 => self.update_pulse(addr, val, 0),
-            0x4004 ... 0x4007 => self.update_pulse(addr, val, 1),
-            0x4008 ... 0x400b => self.regs.triangle.storeb(addr, val),
-            0x400c ... 0x400f => self.update_noise(addr, val),
+            0x4000...0x4003 => self.update_pulse(addr, val, 0),
+            0x4004...0x4007 => self.update_pulse(addr, val, 1),
+            0x4008...0x400b => self.regs.triangle.storeb(addr, val),
+            0x400c...0x400f => self.update_noise(addr, val),
             0x4015 => self.update_status(val),
             _ => {} // TODO
         }
@@ -440,7 +482,7 @@ impl Apu {
     pub fn new(output_buffer: Option<*mut OutputBuffer>) -> Apu {
         Apu {
             regs: Regs {
-                pulses: [ ApuPulse::new(), ApuPulse::new() ],
+                pulses: [ApuPulse::new(), ApuPulse::new()],
                 triangle: ApuTriangle::new(),
                 noise: ApuNoise::new(),
                 status: ApuStatus(0),
@@ -448,19 +490,19 @@ impl Apu {
 
             sample_buffers: Box::new([
                 SampleBuffer {
-                    samples: [ 0; SAMPLE_COUNT ]
+                    samples: [0; SAMPLE_COUNT],
                 },
                 SampleBuffer {
-                    samples: [ 0; SAMPLE_COUNT ]
+                    samples: [0; SAMPLE_COUNT],
                 },
                 SampleBuffer {
-                    samples: [ 0; SAMPLE_COUNT ]
+                    samples: [0; SAMPLE_COUNT],
                 },
                 SampleBuffer {
-                    samples: [ 0; SAMPLE_COUNT ]
+                    samples: [0; SAMPLE_COUNT],
                 },
                 SampleBuffer {
-                    samples: [ 0; SAMPLE_COUNT ]
+                    samples: [0; SAMPLE_COUNT],
                 },
             ]),
 
@@ -492,8 +534,8 @@ impl Apu {
     // FIXME: Refactor into a method on ApuPulse itself.
     fn update_pulse(&mut self, addr: u16, val: u8, pulse_number: usize) {
         let pulse = &mut self.regs.pulses[pulse_number];
-        pulse.envelope.storeb(addr, val);   // Write to the envelope.
-        pulse.timer.storeb(addr, val);      // Write to the timer.
+        pulse.envelope.storeb(addr, val); // Write to the envelope.
+        pulse.timer.storeb(addr, val); // Write to the timer.
         match addr & 0x3 {
             0 => pulse.duty = val >> 6,
             1 => {
@@ -592,8 +634,11 @@ impl Apu {
     // Channel playback
     //
 
-    fn get_or_zero_sample_buffer(buffer: &mut [i16], offset: usize, audible: bool)
-                                 -> Option<&mut [i16]> {
+    fn get_or_zero_sample_buffer(
+        buffer: &mut [i16],
+        offset: usize,
+        audible: bool,
+    ) -> Option<&mut [i16]> {
         let buffer = &mut buffer[offset..offset + NES_SAMPLES_PER_TICK as usize];
         if audible {
             return Some(buffer);
@@ -608,9 +653,11 @@ impl Apu {
     fn play_pulse(&mut self, pulse_number: usize, channel: usize) {
         let pulse = &mut self.regs.pulses[pulse_number];
         let audible = pulse.envelope.audible() && pulse.timer.audible();
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
-                                                        self.sample_buffer_offset,
-                                                        audible);
+        let buffer_opt = Apu::get_or_zero_sample_buffer(
+            &mut self.sample_buffers[channel].samples,
+            self.sample_buffer_offset,
+            audible,
+        );
         match buffer_opt {
             None => {}
             Some(buffer) => {
@@ -644,9 +691,11 @@ impl Apu {
 
     fn play_triangle(&mut self, channel: usize) {
         let triangle = &mut self.regs.triangle;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
-                                                        self.sample_buffer_offset,
-                                                        triangle.audible());
+        let buffer_opt = Apu::get_or_zero_sample_buffer(
+            &mut self.sample_buffers[channel].samples,
+            self.sample_buffer_offset,
+            triangle.audible(),
+        );
         match buffer_opt {
             None => {}
             Some(buffer) => {
@@ -673,9 +722,11 @@ impl Apu {
 
     fn play_noise(&mut self, channel: usize) {
         let noise = &mut self.regs.noise;
-        let buffer_opt = Apu::get_or_zero_sample_buffer(&mut self.sample_buffers[channel].samples,
-                                                        self.sample_buffer_offset,
-                                                        noise.envelope.audible());
+        let buffer_opt = Apu::get_or_zero_sample_buffer(
+            &mut self.sample_buffers[channel].samples,
+            self.sample_buffer_offset,
+            noise.envelope.audible(),
+        );
         match buffer_opt {
             None => {}
             Some(buffer) => {
@@ -738,16 +789,18 @@ impl Apu {
                 let lock = audio::AUDIO_MUTEX.lock().unwrap();
                 let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
                 if (*output_buffer).play_offset == (*output_buffer).samples.len() {
-                    break
+                    break;
                 }
             }
         }
         let _lock = audio::lock();
         unsafe {
             // Resample and output the audio.
-            let _ = self.resampler.process(0,
-                                           &mut self.sample_buffers[0].samples,
-                                           &mut (*output_buffer).samples);
+            let _ = self.resampler.process(
+                0,
+                &mut self.sample_buffers[0].samples,
+                &mut (*output_buffer).samples,
+            );
             (*output_buffer).play_offset = 0;
         }
     }

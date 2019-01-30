@@ -6,8 +6,8 @@
 
 use util;
 
-use std::io::{self, Read};
 use std::fmt;
+use std::io::{self, Read};
 use std::vec::Vec;
 
 #[derive(Debug)]
@@ -35,16 +35,11 @@ pub struct Rom {
 
 impl Rom {
     pub fn load(r: &mut Read) -> Result<Rom, RomLoadError> {
-        let mut header = [ 0u8; 16 ];
+        let mut header = [0u8; 16];
         try!(util::read_to_buf(&mut header, r));
 
         let header = INesHeader {
-            magic: [
-                header[0],
-                header[1],
-                header[2],
-                header[3],
-            ],
+            magic: [header[0], header[1], header[2], header[3]],
             prg_rom_size: header[4],
             chr_rom_size: header[5],
             flags_6: header[6],
@@ -52,17 +47,19 @@ impl Rom {
             prg_ram_size: header[8],
             flags_9: header[9],
             flags_10: header[10],
-            zero: [ 0; 5 ],
+            zero: [0; 5],
         };
 
-        if header.magic != *b"NES\x1a" { return Err(RomLoadError::FormatError); }
+        if header.magic != *b"NES\x1a" {
+            return Err(RomLoadError::FormatError);
+        }
 
         let prg_bytes = header.prg_rom_size as usize * 16384;
-        let mut prg_rom = vec![ 0u8; prg_bytes ];
+        let mut prg_rom = vec![0u8; prg_bytes];
         try!(util::read_to_buf(&mut prg_rom, r));
 
         let chr_bytes = header.chr_rom_size as usize * 8192;
-        let mut chr_rom = vec![ 0u8; chr_bytes ];
+        let mut chr_rom = vec![0u8; chr_bytes];
         try!(util::read_to_buf(&mut chr_rom, r));
 
         Ok(Rom {
@@ -126,7 +123,9 @@ impl INesHeader {
 
 impl fmt::Display for INesHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "PRG-ROM: {} KB, CHR-ROM: {} KB, Mapper: {} ({}), Trainer: {}",
+        write!(
+            f,
+            "PRG-ROM: {} KB, CHR-ROM: {} KB, Mapper: {} ({}), Trainer: {}",
             self.prg_rom_size as u32 * 16,
             self.chr_rom_size as u32 * 8,
             self.mapper(),

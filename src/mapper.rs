@@ -23,16 +23,12 @@ pub trait Mapper {
     fn next_scanline(&mut self) -> MapperResult;
 }
 
-pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper+Send> {
+pub fn create_mapper(rom: Box<Rom>) -> Box<Mapper + Send> {
     match rom.header.ines_mapper() {
-        0 => {
-            Box::new(Nrom {
-                rom: rom,
-            }) as Box<Mapper+Send>
-        },
-        1 => Box::new(SxRom::new(rom)) as Box<Mapper+Send>,
-        4 => Box::new(TxRom::new(rom)) as Box<Mapper+Send>,
-        _ => panic!("unsupported mapper")
+        0 => Box::new(Nrom { rom: rom }) as Box<Mapper + Send>,
+        1 => Box::new(SxRom::new(rom)) as Box<Mapper + Send>,
+        4 => Box::new(TxRom::new(rom)) as Box<Mapper + Send>,
+        _ => panic!("unsupported mapper"),
     }
 }
 
@@ -57,10 +53,14 @@ impl Mapper for Nrom {
             self.rom.prg[addr as usize & 0x3fff]
         }
     }
-    fn prg_storeb(&mut self, _: u16, _: u8) {}  // Can't store to PRG-ROM.
-    fn chr_loadb(&mut self, addr: u16) -> u8 { self.rom.chr[addr as usize] }
-    fn chr_storeb(&mut self, _: u16, _: u8) {}  // Can't store to CHR-ROM.
-    fn next_scanline(&mut self) -> MapperResult { MapperResult::Continue }
+    fn prg_storeb(&mut self, _: u16, _: u8) {} // Can't store to PRG-ROM.
+    fn chr_loadb(&mut self, addr: u16) -> u8 {
+        self.rom.chr[addr as usize]
+    }
+    fn chr_storeb(&mut self, _: u16, _: u8) {} // Can't store to CHR-ROM.
+    fn next_scanline(&mut self) -> MapperResult {
+        MapperResult::Continue
+    }
 }
 
 //
@@ -70,7 +70,9 @@ impl Mapper for Nrom {
 //
 
 #[derive(Copy, Clone)]
-struct SxCtrl{ val: u8 }
+struct SxCtrl {
+    val: u8,
+}
 
 pub enum Mirroring {
     OneScreenLower,
@@ -94,7 +96,7 @@ impl SxCtrl {
             0 | 1 => SxPrgBankMode::Switch32K,
             2 => SxPrgBankMode::FixFirstBank,
             3 => SxPrgBankMode::FixLastBank,
-            _ => panic!("can't happen")
+            _ => panic!("can't happen"),
         }
     }
 }
@@ -127,9 +129,7 @@ impl SxRom {
         SxRom {
             rom: rom,
             regs: SxRegs {
-                ctrl: SxCtrl {
-                    val: 3 << 2,
-                },
+                ctrl: SxCtrl { val: 3 << 2 },
                 chr_bank_0: 0,
                 chr_bank_1: 0,
                 prg_bank: 0,
@@ -137,7 +137,7 @@ impl SxRom {
             accum: 0,
             write_count: 0,
             //prg_ram: box() ([ 0, ..8192 ]),
-            chr_ram: Box::new([ 0; 8192 ]),
+            chr_ram: Box::new([0; 8192]),
         }
     }
 }
@@ -172,7 +172,9 @@ impl Mapper for SxRom {
         if (val & 0x80) != 0 {
             self.write_count = 0;
             self.accum = 0;
-            self.regs.ctrl = SxCtrl{val: self.regs.ctrl.val | (3 << 2)};
+            self.regs.ctrl = SxCtrl {
+                val: self.regs.ctrl.val | (3 << 2),
+            };
             return;
         }
 
@@ -185,7 +187,7 @@ impl Mapper for SxRom {
 
             // Write to the right internal register.
             if addr <= 0x9fff {
-                self.regs.ctrl = SxCtrl{val: self.accum};
+                self.regs.ctrl = SxCtrl { val: self.accum };
             } else if addr <= 0xbfff {
                 self.regs.chr_bank_0 = self.accum;
             } else if addr <= 0xdfff {
@@ -219,7 +221,9 @@ impl Mapper for SxRom {
 //
 
 #[derive(Copy, Clone)]
-struct TxBankSelect{ val: u8 }
+struct TxBankSelect {
+    val: u8,
+}
 
 impl Deref for TxBankSelect {
     type Target = u8;
@@ -254,7 +258,7 @@ impl TxBankSelect {
 
 #[derive(Copy, Clone)]
 struct TxRegs {
-    bank_select: TxBankSelect,  // Bank select (0x8000-0x9ffe even)
+    bank_select: TxBankSelect, // Bank select (0x8000-0x9ffe even)
 }
 
 struct TxRom {
@@ -262,12 +266,12 @@ struct TxRom {
     regs: TxRegs,
     prg_ram: Box<[u8; 8192]>,
 
-    chr_banks_2k: [u8; 2],    // 2KB CHR-ROM banks
-    chr_banks_1k: [u8; 4],    // 1KB CHR-ROM banks
-    prg_banks:    [u8; 2],    // 8KB PRG-ROM banks
+    chr_banks_2k: [u8; 2], // 2KB CHR-ROM banks
+    chr_banks_1k: [u8; 4], // 1KB CHR-ROM banks
+    prg_banks: [u8; 2],    // 8KB PRG-ROM banks
 
     scanline_counter: u8,
-    irq_reload: u8,             // Copied into the scanline counter when it hits zero.
+    irq_reload: u8, // Copied into the scanline counter when it hits zero.
     irq_enabled: bool,
 }
 
@@ -275,12 +279,14 @@ impl TxRom {
     fn new(rom: Box<Rom>) -> TxRom {
         TxRom {
             rom: rom,
-            regs: TxRegs { bank_select: TxBankSelect{val: 0} },
-            prg_ram: Box::new([ 0; 8192 ]),
+            regs: TxRegs {
+                bank_select: TxBankSelect { val: 0 },
+            },
+            prg_ram: Box::new([0; 8192]),
 
-            chr_banks_2k: [ 0, 0 ],
-            chr_banks_1k: [ 0, 0, 0, 0 ],
-            prg_banks: [ 0, 0 ],
+            chr_banks_2k: [0, 0],
+            chr_banks_1k: [0, 0, 0, 0],
+            prg_banks: [0, 0],
 
             scanline_counter: 0,
             irq_reload: 0,
@@ -333,15 +339,15 @@ impl Mapper for TxRom {
         } else if addr < 0xa000 {
             if (addr & 1) == 0 {
                 // Bank select.
-                self.regs.bank_select = TxBankSelect{val: val};
+                self.regs.bank_select = TxBankSelect { val: val };
             } else {
                 // Bank data.
                 let bank_update_select = self.regs.bank_select.bank_update_select() as usize;
                 match bank_update_select {
-                    0 ... 1 => self.chr_banks_2k[bank_update_select] = val,
-                    2 ... 5 => self.chr_banks_1k[bank_update_select - 2] = val,
-                    6 ... 7 => self.prg_banks[bank_update_select - 6] = val,
-                    _ => panic!()
+                    0...1 => self.chr_banks_2k[bank_update_select] = val,
+                    2...5 => self.chr_banks_1k[bank_update_select - 2] = val,
+                    6...7 => self.prg_banks[bank_update_select - 6] = val,
+                    _ => panic!(),
                 }
             }
         } else if addr < 0xc000 {
@@ -362,12 +368,12 @@ impl Mapper for TxRom {
 
     fn chr_loadb(&mut self, addr: u16) -> u8 {
         let (bank, two_kb) = match (addr, self.regs.bank_select.chr_a12_inversion()) {
-            (0x0000 ... 0x07ff, false) | (0x1000 ... 0x17ff, true) => (self.chr_banks_2k[0], true),
-            (0x0800 ... 0x0fff, false) | (0x1800 ... 0x1fff, true) => (self.chr_banks_2k[1], true),
-            (0x1000 ... 0x13ff, false) | (0x0000 ... 0x03ff, true) => (self.chr_banks_1k[0], false),
-            (0x1400 ... 0x17ff, false) | (0x0400 ... 0x07ff, true) => (self.chr_banks_1k[1], false),
-            (0x1800 ... 0x1bff, false) | (0x0800 ... 0x0bff, true) => (self.chr_banks_1k[2], false),
-            (0x1c00 ... 0x1fff, false) | (0x0c00 ... 0x0fff, true) => (self.chr_banks_1k[3], false),
+            (0x0000...0x07ff, false) | (0x1000...0x17ff, true) => (self.chr_banks_2k[0], true),
+            (0x0800...0x0fff, false) | (0x1800...0x1fff, true) => (self.chr_banks_2k[1], true),
+            (0x1000...0x13ff, false) | (0x0000...0x03ff, true) => (self.chr_banks_1k[0], false),
+            (0x1400...0x17ff, false) | (0x0400...0x07ff, true) => (self.chr_banks_1k[1], false),
+            (0x1800...0x1bff, false) | (0x0800...0x0bff, true) => (self.chr_banks_1k[2], false),
+            (0x1c00...0x1fff, false) | (0x0c00...0x0fff, true) => (self.chr_banks_1k[3], false),
             _ => return 0,
         };
         if two_kb {
