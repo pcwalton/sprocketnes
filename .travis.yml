@@ -1,0 +1,18 @@
+language: rust
+rust:
+    - nightly
+    - beta
+    - stable
+matrix:
+    allow_failures:
+        - rust: nightly
+before_install:
+    - sudo apt-get install -y libspeexdsp-dev
+    - sudo apt-get install -y libsdl2-2.0
+    - sudo apt-get install -y libsdl2-dev
+    - rustup component add rustfmt
+script:
+    - cargo fmt --all -- --check
+    - RUST_BACKTRACE=1 CARGO_INCREMENTAL=0 cargo test --all
+    - RUST_BACKTRACE=1 CARGO_INCREMENTAL=0 cargo test --tests --all
+    - RUST_BACKTRACE=1 CARGO_INCREMENTAL=0 cargo test --examples --all
