@@ -41,7 +41,7 @@ Other keys:
 * Quit: Escape
 
 If you want to build `sprocketnes`, you will first need the Speex codec library
-installed; on the Mac you can install it with `brew install speex`.
+installed; on the Mac you can install it with `brew install speex`. If you are on Ubuntu you can install the required libraries with `sudo apt-get install libsdl2-dev libspeexdsp-dev`.
 
 To build (add `--release` if you actually want playable speed):
 
