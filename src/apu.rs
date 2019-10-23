@@ -4,11 +4,12 @@
 // Author: Patrick Walton
 //
 
-use audio::{self, OutputBuffer};
+use audio::{self, NesAudioCallback};
 use mem::Mem;
 use speex::Resampler;
 use util::{Save, Xorshift};
 
+use sdl2::audio::AudioDevice;
 use std::fs::File;
 use std::ops::{Deref, DerefMut};
 
@@ -450,7 +451,7 @@ pub struct Apu {
 
     sample_buffers: Box<[SampleBuffer; 5]>,
     sample_buffer_offset: usize,
-    output_buffer: Option<*mut OutputBuffer>,
+    audio_device: Option<AudioDevice<NesAudioCallback>>,
     resampler: Resampler,
 
     pub cy: u64,
@@ -479,7 +480,7 @@ impl Mem for Apu {
 }
 
 impl Apu {
-    pub fn new(output_buffer: Option<*mut OutputBuffer>) -> Apu {
+    pub fn new(audio_device: Option<AudioDevice<NesAudioCallback>>) -> Apu {
         Apu {
             regs: Regs {
                 pulses: [ApuPulse::new(), ApuPulse::new()],
@@ -507,7 +508,7 @@ impl Apu {
             ]),
 
             sample_buffer_offset: 0,
-            output_buffer: output_buffer,
+            audio_device: audio_device,
             resampler: Resampler::new(1, NES_SAMPLE_RATE, OUTPUT_SAMPLE_RATE, 0).unwrap(),
 
             cy: 0,
@@ -778,30 +779,27 @@ impl Apu {
             self.sample_buffers[0].samples[i] = val as i16;
         }
 
-        if self.output_buffer.is_none() {
+        if self.audio_device.is_none() {
             return;
         }
-        let output_buffer = self.output_buffer.unwrap();
+        let audio_device = self.audio_device.as_mut().unwrap();
 
         // Wait for the audio callback to catch up if necessary.
         loop {
-            unsafe {
-                let lock = audio::AUDIO_MUTEX.lock().unwrap();
-                let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
-                if (*output_buffer).play_offset == (*output_buffer).samples.len() {
-                    break;
-                }
+            let lock = audio::AUDIO_MUTEX.lock().unwrap();
+            let _lock = audio::AUDIO_CONDVAR.wait(lock).unwrap();
+            let audio_lock = audio_device.lock();
+            if audio_lock.play_offset == audio_lock.samples.len() {
+                break;
             }
         }
-        let _lock = audio::lock();
-        unsafe {
-            // Resample and output the audio.
-            let _ = self.resampler.process(
-                0,
-                &mut self.sample_buffers[0].samples,
-                &mut (*output_buffer).samples,
-            );
-            (*output_buffer).play_offset = 0;
-        }
+        let mut audio_lock = audio_device.lock();
+        // Resample and output the audio.
+        let _ = self.resampler.process(
+            0,
+            &mut self.sample_buffers[0].samples,
+            &mut audio_lock.samples,
+        );
+        audio_lock.play_offset = 0;
     }
 }
