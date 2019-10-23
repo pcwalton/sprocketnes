@@ -40,8 +40,8 @@ Other keys:
 
 * Quit: Escape
 
-If you want to build `sprocketnes`, you will first need the Speex codec library
-installed; on the Mac you can install it with `brew install speex`.
+If you want to build `sprocketnes`, you will first need the Speex resampler library
+installed; on the Mac you can install it with `brew install speexdsp`.
 
 To build (add `--release` if you actually want playable speed):
 
